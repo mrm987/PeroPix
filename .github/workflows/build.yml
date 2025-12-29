@@ -1,9 +1,9 @@
 name: Build and Release
 
 on:
-  push:
-    tags:
-      - 'v*'  # v1.0.0 같은 태그 푸시 시 실행
+  release:
+    types: [created]
+  workflow_dispatch:
 
 jobs:
   build-windows:
@@ -32,32 +32,21 @@ jobs:
       - name: Package Release
         shell: pwsh
         run: |
-          # 배포 폴더 생성
           New-Item -ItemType Directory -Force -Path dist
-          
-          # Tauri exe 복사
-          Copy-Item "src-tauri/target/release/PeroLab.exe" -Destination "dist/"
-          
-          # Python 파일들 복사
+          Copy-Item "src-tauri/target/release/PeroPix.exe" -Destination "dist/"
           Copy-Item "backend.py" -Destination "dist/"
           Copy-Item "index.html" -Destination "dist/"
           Copy-Item -Recurse "prompts" -Destination "dist/"
-          
-          # 빈 폴더 생성
           New-Item -ItemType Directory -Force -Path "dist/models/checkpoints"
           New-Item -ItemType Directory -Force -Path "dist/models/loras"
           New-Item -ItemType Directory -Force -Path "dist/models/upscale_models"
           New-Item -ItemType Directory -Force -Path "dist/outputs"
-          
-          # README 복사
           Copy-Item "README.md" -Destination "dist/" -ErrorAction SilentlyContinue
-          
-          # zip 압축
-          Compress-Archive -Path "dist/*" -DestinationPath "PeroLab-Windows.zip"
+          Compress-Archive -Path "dist/*" -DestinationPath "PeroPix-Windows.zip"
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v1
         with:
-          files: PeroLab-Windows.zip
+          files: PeroPix-Windows.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

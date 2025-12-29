@@ -29,19 +29,61 @@ jobs:
           cd src-tauri
           cargo tauri build
       
+      - name: Setup Python Environment for NAI
+        shell: pwsh
+        run: |
+          # Python standalone 다운로드
+          $pythonUrl = "https://github.com/indygreg/python-build-standalone/releases/download/20241016/cpython-3.11.10+20241016-x86_64-pc-windows-msvc-install_only_stripped.tar.gz"
+          Invoke-WebRequest -Uri $pythonUrl -OutFile python.tar.gz
+          
+          # 압축 해제
+          New-Item -ItemType Directory -Force -Path python_env
+          tar -xzf python.tar.gz -C python_env
+          
+          # uv 다운로드
+          $uvUrl = "https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip"
+          Invoke-WebRequest -Uri $uvUrl -OutFile uv.zip
+          Expand-Archive -Path uv.zip -DestinationPath uv_temp
+          Copy-Item "uv_temp/uv.exe" -Destination "python_env/uv.exe"
+          
+          # NAI용 기본 패키지 설치
+          $pythonExe = "python_env/python/python.exe"
+          $uvExe = "python_env/uv.exe"
+          
+          & $uvExe pip install --python $pythonExe fastapi uvicorn[standard] sse-starlette httpx aiofiles pillow numpy
+          
+          # 정리
+          Remove-Item python.tar.gz
+          Remove-Item uv.zip
+          Remove-Item -Recurse uv_temp
+
       - name: Package Release
         shell: pwsh
         run: |
+          # 배포 폴더 생성
           New-Item -ItemType Directory -Force -Path dist
+          
+          # Tauri exe 복사
           Copy-Item "src-tauri/target/release/PeroPix.exe" -Destination "dist/"
+          
+          # Python 파일들 복사
           Copy-Item "backend.py" -Destination "dist/"
           Copy-Item "index.html" -Destination "dist/"
           Copy-Item -Recurse "prompts" -Destination "dist/"
+          
+          # Python 환경 복사
+          Copy-Item -Recurse "python_env" -Destination "dist/"
+          
+          # 빈 폴더 생성
           New-Item -ItemType Directory -Force -Path "dist/models/checkpoints"
           New-Item -ItemType Directory -Force -Path "dist/models/loras"
           New-Item -ItemType Directory -Force -Path "dist/models/upscale_models"
           New-Item -ItemType Directory -Force -Path "dist/outputs"
+          
+          # README 복사
           Copy-Item "README.md" -Destination "dist/" -ErrorAction SilentlyContinue
+          
+          # zip 압축
           Compress-Archive -Path "dist/*" -DestinationPath "PeroPix-Windows.zip"
 
       - name: Upload Release Asset

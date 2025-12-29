@@ -1,7 +1,7 @@
 [package]
-name = "perolab"
+name = "peropix"
 version = "1.0.0"
-description = "PeroLab - NAI + Local Image Generator"
+description = "PeroPix - NAI + Local Image Generator"
 authors = [""]
 edition = "2021"
 

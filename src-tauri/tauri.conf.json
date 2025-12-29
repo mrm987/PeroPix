@@ -7,7 +7,7 @@
     "distDir": "../"
   },
   "package": {
-    "productName": "PeroLab",
+    "productName": "PeroPix",
     "version": "1.0.0"
   },
   "tauri": {
@@ -51,8 +51,8 @@
         "icons/icon.icns",
         "icons/icon.ico"
       ],
-      "identifier": "com.perolab.app",
-      "longDescription": "PeroLab - NAI + Local Diffusers Image Generator",
+      "identifier": "com.peropix.app",
+      "longDescription": "PeroPix - NAI + Local Diffusers Image Generator",
       "macOS": {
         "entitlements": null,
         "exceptionDomain": "",
@@ -79,7 +79,7 @@
         "fullscreen": false,
         "height": 900,
         "resizable": true,
-        "title": "PeroLab",
+        "title": "PeroPix",
         "width": 1400,
         "minWidth": 1000,
         "minHeight": 700,

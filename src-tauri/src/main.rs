@@ -80,5 +80,5 @@ fn main() {
             }
         })
         .run(tauri::generate_context!())
-        .expect("error while running PeroLab");
+        .expect("error while running PeroPix");
 }

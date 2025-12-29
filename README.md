@@ -1,4 +1,4 @@
-# PeroLab
+# PeroPix
 
 NAI API + Local Diffusers 이미지 생성기 (Tauri 앱)
 

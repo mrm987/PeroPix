@@ -37,6 +37,12 @@ jobs:
         if: steps.cache-tauri.outputs.cache-hit != 'true'
         run: cargo install tauri-cli --version "^1"
 
+      - name: Prepare Web Assets
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path web
+          Copy-Item "index.html" -Destination "web/"
+
       - name: Build Tauri App
         run: |
           cd src-tauri

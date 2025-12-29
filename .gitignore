@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.env
+.venv
+venv/
+ENV/
+
+# 런타임 생성 파일
+python_env/
+config.json
+outputs/
+*.log
+
+# 모델 파일 (용량 큼)
+models/checkpoints/*.safetensors
+models/checkpoints/*.ckpt
+models/loras/*.safetensors
+models/upscale_models/*.pth
+models/upscale_models/*.safetensors
+
+# Rust/Tauri
+src-tauri/target/
+src-tauri/Cargo.lock
+
+# Node
+node_modules/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build outputs
+dist/
+*.msi
+*.exe
+*.dmg
+*.AppImage

@@ -535,9 +535,49 @@ NAI_SCHEDULER_MAP = {
     "beta": "karras",  # fallback
 }
 
+# Vibe 캐시 디렉토리
+VIBE_CACHE_DIR = APP_DIR / "vibe_cache"
+VIBE_CACHE_DIR.mkdir(exist_ok=True)
+
+
+def get_vibe_cache_key(image_base64: str, model: str, info_extracted: float) -> str:
+    """이미지 + 모델 + info_extracted로 캐시 키 생성"""
+    import hashlib
+    # 이미지의 해시값 생성 (base64 전체를 해싱)
+    image_hash = hashlib.sha256(image_base64.encode()).hexdigest()[:16]
+    # info_extracted는 소수점 2자리까지만 (0.70 -> "070")
+    info_str = f"{int(info_extracted * 100):03d}"
+    # 모델명 간소화
+    model_short = model.replace("nai-diffusion-", "").replace("-", "")
+    return f"{image_hash}_{model_short}_{info_str}"
+
+
+def get_cached_vibe(cache_key: str) -> Optional[str]:
+    """캐시된 vibe 데이터 반환"""
+    cache_file = VIBE_CACHE_DIR / f"{cache_key}.vibe"
+    if cache_file.exists():
+        return cache_file.read_text(encoding='utf-8')
+    return None
+
+
+def save_vibe_cache(cache_key: str, encoded_vibe: str):
+    """vibe 데이터를 캐시에 저장"""
+    cache_file = VIBE_CACHE_DIR / f"{cache_key}.vibe"
+    cache_file.write_text(encoded_vibe, encoding='utf-8')
+
+
 async def encode_vibe_v4(image_base64: str, model: str, info_extracted: float, token: str) -> str:
-    """V4+ 모델용 vibe 사전 인코딩 - /ai/encode-vibe 엔드포인트 사용"""
+    """V4+ 모델용 vibe 사전 인코딩 - /ai/encode-vibe 엔드포인트 사용 (캐시 지원)"""
     import httpx
+
+    # 캐시 확인
+    cache_key = get_vibe_cache_key(image_base64, model, info_extracted)
+    cached = get_cached_vibe(cache_key)
+    if cached:
+        print(f"[NAI] Vibe cache hit: {cache_key}")
+        return cached
+
+    print(f"[NAI] Vibe cache miss, encoding...")
 
     headers = {
         "Authorization": f"Bearer {token}",
@@ -569,6 +609,11 @@ async def encode_vibe_v4(image_base64: str, model: str, info_extracted: float, t
         # 응답은 바이너리 vibe 데이터 - base64로 인코딩
         encoded_vibe = base64.b64encode(response.content).decode('utf-8')
         print(f"[NAI] Vibe encoded successfully, length: {len(encoded_vibe)}")
+
+        # 캐시에 저장
+        save_vibe_cache(cache_key, encoded_vibe)
+        print(f"[NAI] Vibe cached: {cache_key}")
+
         return encoded_vibe
 
 

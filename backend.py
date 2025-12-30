@@ -187,12 +187,12 @@ def resize_image_base64(base64_image: str, max_size: int = 1024) -> str:
     return base64.b64encode(buffer.getvalue()).decode('utf-8')
 
 def resize_image_to_size_base64(base64_image: str, target_width: int, target_height: int) -> str:
-    """base64 이미지를 지정된 크기로 리사이즈 (Vibe Transfer용) - JPEG 압축"""
+    """base64 이미지를 지정된 크기로 리사이즈 (Vibe Transfer용) - PNG 포맷"""
     from PIL import Image as PILImage
-    
+
     image_data = base64.b64decode(base64_image)
     pil_img = PILImage.open(io.BytesIO(image_data))
-    
+
     # RGB로 변환
     if pil_img.mode == 'RGBA':
         background = PILImage.new('RGB', pil_img.size, (255, 255, 255))
@@ -200,13 +200,13 @@ def resize_image_to_size_base64(base64_image: str, target_width: int, target_hei
         pil_img = background
     elif pil_img.mode != 'RGB':
         pil_img = pil_img.convert('RGB')
-    
+
     # 지정된 크기로 리사이즈
     pil_resized = pil_img.resize((target_width, target_height), PILImage.LANCZOS)
-    
-    # JPEG로 압축 (품질 95)
+
+    # PNG로 저장 (bedovyy 방식)
     buffer = io.BytesIO()
-    pil_resized.save(buffer, format='JPEG', quality=95)
+    pil_resized.save(buffer, format='PNG')
     return base64.b64encode(buffer.getvalue()).decode('utf-8')
 class ModelCache:
     def __init__(self):
@@ -586,15 +586,16 @@ async def call_nai_api(req: GenerateRequest):
         params["deliberate_euler_ancestral_bug"] = False
         params["prefer_brownian"] = True
 
-    # Vibe Transfer 이미지 처리 (원본 그대로 - NAI 웹 방식)
-    # 주의: bedovyy 노드는 리사이즈하지만, NAI 웹은 원본 그대로 전송
+    # Vibe Transfer 이미지 처리 (bedovyy 방식 - 출력 크기로 리사이즈)
     if req.vibe_transfer:
         vibe_images = []
         for i, v in enumerate(req.vibe_transfer):
             try:
                 orig_size = get_image_size_from_base64(v["image"])
-                print(f"[NAI] Vibe {i+1}: {orig_size[0]}x{orig_size[1]}, base64 len: {len(v['image'])}")
-                vibe_images.append(v["image"])  # 리사이즈 없이 원본 사용
+                # 출력 크기로 리사이즈 (bedovyy ComfyUI 방식)
+                resized_image = resize_image_to_size_base64(v["image"], req.width, req.height)
+                print(f"[NAI] Vibe {i+1}: {orig_size[0]}x{orig_size[1]} -> {req.width}x{req.height}")
+                vibe_images.append(resized_image)
             except Exception as e:
                 print(f"[NAI] Vibe {i+1} error: {e}")
                 vibe_images.append(v["image"])

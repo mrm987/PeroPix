@@ -604,8 +604,8 @@ async def call_nai_api(req: GenerateRequest):
         params["deliberate_euler_ancestral_bug"] = False
         params["prefer_brownian"] = True
 
-    # Vibe Transfer 이미지 처리 (PNG로 재인코딩하여 전송)
-    # bedovyy/ComfyUI_NAIDGenerator 방식 - PNG 포맷 보장
+    # Vibe Transfer 이미지 처리 (출력 크기로 리사이즈 후 PNG로 전송)
+    # bedovyy/ComfyUI_NAIDGenerator 방식 - 출력 크기로 리사이즈
     # 파라미터는 vibe가 있을 때만 추가 (빈 배열 전송 방지)
     if req.vibe_transfer and len(req.vibe_transfer) > 0:
         vibe_images = []
@@ -614,10 +614,10 @@ async def call_nai_api(req: GenerateRequest):
         for i, v in enumerate(req.vibe_transfer):
             try:
                 orig_size = get_image_size_from_base64(v["image"])
-                # PNG로 재인코딩 (RGB 변환 포함)
-                png_image = ensure_png_base64(v["image"])
-                print(f"[NAI] Vibe {i+1}: {orig_size[0]}x{orig_size[1]}, re-encoded to PNG, base64 len: {len(png_image)}")
-                vibe_images.append(png_image)
+                # 출력 크기로 리사이즈 + PNG 변환 (bedovyy 방식)
+                resized_image = resize_image_to_size_base64(v["image"], req.width, req.height)
+                print(f"[NAI] Vibe {i+1}: {orig_size[0]}x{orig_size[1]} -> {req.width}x{req.height}, base64 len: {len(resized_image)}")
+                vibe_images.append(resized_image)
                 info_extracted_list.append(v.get("info_extracted", 1.0))
                 strength_list.append(v.get("strength", 0.6))
             except Exception as e:

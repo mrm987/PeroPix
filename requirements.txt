@@ -7,6 +7,9 @@ httpx>=0.25.0
 Pillow>=10.0.0
 numpy>=1.24.0
 
+# Desktop app
+pywebview>=5.0.0
+
 # Local generation (optional - only needed for Local mode)
 torch>=2.0.0
 diffusers>=0.25.0

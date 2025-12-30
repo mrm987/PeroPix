@@ -903,7 +903,6 @@ class GenerationQueue:
         job_id = str(uuid.uuid4())[:8]
         job = {"id": job_id, "request": request}
         self.queue.append(job)
-        print(f"[Queue] Job added: {job_id}, queue size: {len(self.queue)}")
         return job_id
     
     def get_next_job(self):
@@ -936,12 +935,10 @@ class GenerationQueue:
     
     async def broadcast(self, data):
         """모든 클라이언트에 메시지 전송"""
-        print(f"[Broadcast] Sending to {len(self.clients)} clients: {data.get('type', 'unknown')}")
         for client in self.clients[:]:
             try:
                 await client.put(data)
-            except Exception as e:
-                print(f"[Broadcast] Client error: {e}")
+            except:
                 self.clients.remove(client)
 
 gen_queue = GenerationQueue()
@@ -949,10 +946,8 @@ gen_queue = GenerationQueue()
 
 async def process_queue():
     """큐 처리 루프"""
-    print("[Queue] Queue processor started")
     while True:
         if not gen_queue.is_processing and gen_queue.queue:
-            print(f"[Queue] Found job in queue, processing... (queue size: {len(gen_queue.queue)})")
             job = gen_queue.get_next_job()
             if job:
                 gen_queue.is_processing = True
@@ -963,15 +958,12 @@ async def process_queue():
                 try:
                     await process_job(job)
                 except Exception as e:
-                    print(f"[Queue] Error processing job: {e}")
-                    import traceback
-                    traceback.print_exc()
+                    print(f"[Error] Job failed: {e}")
 
                 gen_queue.is_processing = False
                 gen_queue.current_job = None
                 gen_queue.current_job_id = None
                 gen_queue.cancel_current = False
-                print(f"[Queue] Job completed")
 
         await asyncio.sleep(0.1)
 

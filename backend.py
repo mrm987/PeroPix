@@ -208,6 +208,27 @@ def resize_image_to_size_base64(base64_image: str, target_width: int, target_hei
     buffer = io.BytesIO()
     pil_resized.save(buffer, format='PNG')
     return base64.b64encode(buffer.getvalue()).decode('utf-8')
+
+def ensure_png_base64(base64_image: str) -> str:
+    """base64 이미지를 PNG 포맷으로 재인코딩 (리사이즈 없음)"""
+    from PIL import Image as PILImage
+
+    image_data = base64.b64decode(base64_image)
+    pil_img = PILImage.open(io.BytesIO(image_data))
+
+    # RGB로 변환 (NAI API 호환성)
+    if pil_img.mode == 'RGBA':
+        background = PILImage.new('RGB', pil_img.size, (255, 255, 255))
+        background.paste(pil_img, mask=pil_img.split()[3])
+        pil_img = background
+    elif pil_img.mode != 'RGB':
+        pil_img = pil_img.convert('RGB')
+
+    # PNG로 저장
+    buffer = io.BytesIO()
+    pil_img.save(buffer, format='PNG')
+    return base64.b64encode(buffer.getvalue()).decode('utf-8')
+
 class ModelCache:
     def __init__(self):
         self.pipe = None
@@ -586,16 +607,17 @@ async def call_nai_api(req: GenerateRequest):
         params["deliberate_euler_ancestral_bug"] = False
         params["prefer_brownian"] = True
 
-    # Vibe Transfer 이미지 처리 (bedovyy 방식 - 출력 크기로 리사이즈)
+    # Vibe Transfer 이미지 처리 (PNG로 재인코딩하여 전송)
+    # bedovyy/ComfyUI_NAIDGenerator 방식 - PNG 포맷 보장
     if req.vibe_transfer:
         vibe_images = []
         for i, v in enumerate(req.vibe_transfer):
             try:
                 orig_size = get_image_size_from_base64(v["image"])
-                # 출력 크기로 리사이즈 (bedovyy ComfyUI 방식)
-                resized_image = resize_image_to_size_base64(v["image"], req.width, req.height)
-                print(f"[NAI] Vibe {i+1}: {orig_size[0]}x{orig_size[1]} -> {req.width}x{req.height}")
-                vibe_images.append(resized_image)
+                # PNG로 재인코딩 (RGB 변환 포함)
+                png_image = ensure_png_base64(v["image"])
+                print(f"[NAI] Vibe {i+1}: {orig_size[0]}x{orig_size[1]}, re-encoded to PNG, base64 len: {len(png_image)}")
+                vibe_images.append(png_image)
             except Exception as e:
                 print(f"[NAI] Vibe {i+1} error: {e}")
                 vibe_images.append(v["image"])
@@ -677,9 +699,12 @@ async def call_nai_api(req: GenerateRequest):
         )
         
         if response.status_code != 200:
+            error_text = response.text[:500] if len(response.text) > 500 else response.text
+            print(f"[NAI] Error {response.status_code}: {error_text}")
+            print(f"[NAI] Headers: {dict(response.headers)}")
             raise HTTPException(
                 status_code=response.status_code,
-                detail=f"NAI API error: {response.text}"
+                detail=f"NAI API error: {error_text}"
             )
         
         import zipfile

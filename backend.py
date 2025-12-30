@@ -936,10 +936,12 @@ class GenerationQueue:
     
     async def broadcast(self, data):
         """모든 클라이언트에 메시지 전송"""
+        print(f"[Broadcast] Sending to {len(self.clients)} clients: {data.get('type', 'unknown')}")
         for client in self.clients[:]:
             try:
                 await client.put(data)
-            except:
+            except Exception as e:
+                print(f"[Broadcast] Client error: {e}")
                 self.clients.remove(client)
 
 gen_queue = GenerationQueue()

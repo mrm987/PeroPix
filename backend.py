@@ -394,7 +394,7 @@ upscale_cache = UpscaleModelCache()
 # ============================================================
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel
 
 class GenerateRequest(BaseModel):
@@ -1121,6 +1121,15 @@ def image_to_base64(img) -> str:
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/")
+async def serve_index():
+    """Serve index.html"""
+    index_path = APP_DIR / "index.html"
+    if index_path.exists():
+        return FileResponse(index_path, media_type="text/html")
+    return {"error": "index.html not found"}
 
 
 @app.get("/api/config")

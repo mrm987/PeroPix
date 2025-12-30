@@ -45,3 +45,6 @@ dist/
 *.exe
 *.dmg
 *.AppImage
+
+# Web assets (copied from root)
+web/

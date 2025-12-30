@@ -37,7 +37,11 @@ jobs:
         if: steps.cache-tauri.outputs.cache-hit != 'true'
         run: cargo install tauri-cli --version "^1"
 
-      # index.html이 루트에 있으므로 별도 준비 불필요
+      - name: Prepare Web Assets
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path web
+          Copy-Item "index.html" -Destination "web/"
 
       - name: Build Tauri App
         run: |

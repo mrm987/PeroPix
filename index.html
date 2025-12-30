@@ -1862,8 +1862,8 @@
                         </div>
                     </div>
                     <div class="prefix-input-wrapper">
-                        <span class="prefix-label">Prefix:</span>
-                        <input type="text" id="savePrefix" value="Name_" placeholder="Name_" class="prefix-input">
+                        <span class="prefix-label">📁 Folder:</span>
+                        <input type="text" id="outputFolder" value="" placeholder="(outputs에 저장)" class="prefix-input">
                     </div>
                     <button type="button" class="header-btn" id="syncScrollBtn" title="Sync scroll across all slots">
                         <span>🔗</span>
@@ -2377,7 +2377,7 @@
                 }
                 
                 // Prefix 적용
-                document.getElementById('savePrefix').value = data.prefix || 'Name_';
+                document.getElementById('outputFolder').value = data.folder || '';
                 
                 currentPreset = { filename, name: data.name };
                 presetNameSpan.textContent = data.name;
@@ -2395,13 +2395,13 @@
             if (!name) return;
             
             const slots = getSlotList().map(s => ({ name: s.name, content: s.content }));
-            const prefix = document.getElementById('savePrefix').value || 'Name_';
-            
+            const folder = document.getElementById('outputFolder').value || '';
+
             try {
                 const res = await fetch(`${API_BASE}/api/presets`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, slots, prefix })
+                    body: JSON.stringify({ name, slots, folder })
                 });
                 const data = await res.json();
                 
@@ -2423,13 +2423,13 @@
             }
             
             const slots = getSlotList().map(s => ({ name: s.name, content: s.content }));
-            const prefix = document.getElementById('savePrefix').value || 'Name_';
-            
+            const folder = document.getElementById('outputFolder').value || '';
+
             try {
                 await fetch(`${API_BASE}/api/presets/${currentPreset.filename}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: currentPreset.name, slots, prefix })
+                    body: JSON.stringify({ name: currentPreset.name, slots, folder })
                 });
                 
                 showToast(`Saved: ${currentPreset.name}`, 'success');
@@ -3147,7 +3147,7 @@
                 random_seed_per_image: document.getElementById('randomSeed').checked,
                 sampler: document.getElementById('sampler').value,
                 scheduler: document.getElementById('scheduler').value,
-                save_prefix: document.getElementById('savePrefix').value || 'Name_',
+                output_folder: document.getElementById('outputFolder').value || '',
             };
             
             if (currentProvider === 'nai') {
@@ -4011,7 +4011,7 @@
                 upscaleDenoise: document.getElementById('upscaleDenoise').value,
                 
                 // Output
-                savePrefix: document.getElementById('savePrefix').value,
+                outputFolder: document.getElementById('outputFolder').value,
                 repeatCount: document.getElementById('repeatCount').value,
                 
                 // Slots
@@ -4118,7 +4118,7 @@
                 }
                 
                 // Output
-                if (settings.savePrefix) document.getElementById('savePrefix').value = settings.savePrefix;
+                if (settings.outputFolder !== undefined) document.getElementById('outputFolder').value = settings.outputFolder;
                 if (settings.repeatCount) document.getElementById('repeatCount').value = settings.repeatCount;
                 
                 // Slots - 기존 슬롯 제거 후 복원
@@ -4153,7 +4153,7 @@
                 'sampler', 'scheduler', 'seed', 'randomSeed', 'naiModel', 'smea',
                 'ucPreset', 'qualityTags', 'localModel', 'enableUpscale', 'upscaleModel',
                 'downscaleRatio', 'sizeAlignment', 'upscaleSteps', 'upscaleCfg',
-                'upscaleDenoise', 'savePrefix', 'repeatCount', 'sizePreset'
+                'upscaleDenoise', 'outputFolder', 'repeatCount', 'sizePreset'
             ];
             
             inputs.forEach(id => {

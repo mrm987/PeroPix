@@ -32,13 +32,16 @@ CONFIG_FILE = APP_DIR / "config.json"
 PYTHON_ENV_DIR = APP_DIR / "python_env"  # 로컬 생성용 Python 환경
 
 # 카테고리별 이미지 순번 - 매번 실제 폴더 스캔
-def get_next_image_number(category: str) -> int:
+def get_next_image_number(category: str, save_dir: Path = None) -> int:
     """해당 카테고리의 다음 순번 반환 - 실제 폴더에서 스캔"""
+    if save_dir is None:
+        save_dir = OUTPUT_DIR
+
     max_num = 0
     pattern = re.compile(rf'^{re.escape(category)}_(\d{{7}})\.png$')
-    
-    if OUTPUT_DIR.exists():
-        for f in OUTPUT_DIR.iterdir():
+
+    if save_dir.exists():
+        for f in save_dir.iterdir():
             try:
                 if f.suffix == '.png':
                     match = pattern.match(f.name)
@@ -48,7 +51,7 @@ def get_next_image_number(category: str) -> int:
                             max_num = num
             except Exception:
                 pass
-    
+
     return max_num + 1
 
 # 디렉토리 생성
@@ -344,7 +347,7 @@ class MultiGenerateRequest(BaseModel):
     quality_tags: bool = True
     model: str = ""
     loras: List[dict] = []
-    save_prefix: str = "Name_"
+    output_folder: str = ""  # 비어있으면 outputs에 직접 저장, 있으면 outputs/폴더명에 저장
     
     # Upscale (Local only)
     enable_upscale: bool = False
@@ -877,17 +880,23 @@ async def process_job(job):
                 file_tag = "".join(c for c in tag if c.isalnum() or c in "_-")[:20]
             
             image_idx += 1
-            
-            # 카테고리 결정 및 해당 카테고리의 순번 획득
-            # 슬롯 인덱스를 파일명에 사용 (prefix 입력 그대로 적용)
-            if file_tag:
-                category = f"{req.save_prefix}{slot_index+1:03d}_{file_tag}"
+
+            # 저장 경로 결정
+            if req.output_folder:
+                save_dir = OUTPUT_DIR / req.output_folder
+                save_dir.mkdir(parents=True, exist_ok=True)
             else:
-                category = f"{req.save_prefix}{slot_index+1:03d}"
-            
-            file_num = get_next_image_number(category)
+                save_dir = OUTPUT_DIR
+
+            # 카테고리 결정 (슬롯 인덱스 + 파일 태그)
+            if file_tag:
+                category = f"{slot_index+1:03d}_{file_tag}"
+            else:
+                category = f"{slot_index+1:03d}"
+
+            file_num = get_next_image_number(category, save_dir)
             filename = f"{category}_{file_num:07d}.png"
-            image.save(OUTPUT_DIR / filename)
+            image.save(save_dir / filename)
             
             await gen_queue.broadcast({
                 "type": "image",

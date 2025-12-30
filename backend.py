@@ -535,10 +535,47 @@ NAI_SCHEDULER_MAP = {
     "beta": "karras",  # fallback
 }
 
+async def encode_vibe_v4(image_base64: str, model: str, info_extracted: float, token: str) -> str:
+    """V4+ 모델용 vibe 사전 인코딩 - /ai/encode-vibe 엔드포인트 사용"""
+    import httpx
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+
+    payload = {
+        "image": image_base64,
+        "model": model,
+        "parameters": {
+            "information_extracted": info_extracted
+        }
+    }
+
+    async with httpx.AsyncClient(timeout=120) as client:
+        response = await client.post(
+            "https://image.novelai.net/ai/encode-vibe",
+            headers=headers,
+            json=payload
+        )
+
+        if response.status_code != 200:
+            print(f"[NAI] encode-vibe error {response.status_code}: {response.text[:200]}")
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"Vibe encoding failed: {response.text}"
+            )
+
+        # 응답은 바이너리 vibe 데이터 - base64로 인코딩
+        encoded_vibe = base64.b64encode(response.content).decode('utf-8')
+        print(f"[NAI] Vibe encoded successfully, length: {len(encoded_vibe)}")
+        return encoded_vibe
+
+
 async def call_nai_api(req: GenerateRequest):
     lazy_imports()
     import httpx
-    
+
     token = CONFIG.get("nai_token", "")
     if not token:
         raise HTTPException(status_code=500, detail="NAI token not set. Go to Settings.")
@@ -604,27 +641,42 @@ async def call_nai_api(req: GenerateRequest):
         params["deliberate_euler_ancestral_bug"] = False
         params["prefer_brownian"] = True
 
-    # Vibe Transfer 이미지 처리 (출력 크기로 리사이즈 후 PNG로 전송)
-    # bedovyy/ComfyUI_NAIDGenerator 방식 - 출력 크기로 리사이즈
+    # Vibe Transfer - V4+ 모델은 /ai/encode-vibe로 사전 인코딩 필요
     # 파라미터는 vibe가 있을 때만 추가 (빈 배열 전송 방지)
     if req.vibe_transfer and len(req.vibe_transfer) > 0:
         vibe_images = []
         info_extracted_list = []
         strength_list = []
+
+        # V4+ 모델인지 확인
+        is_v4_plus = "diffusion-4" in req.nai_model
+
         for i, v in enumerate(req.vibe_transfer):
             try:
-                orig_size = get_image_size_from_base64(v["image"])
-                # 출력 크기로 리사이즈 + PNG 변환 (bedovyy 방식)
-                resized_image = resize_image_to_size_base64(v["image"], req.width, req.height)
-                print(f"[NAI] Vibe {i+1}: {orig_size[0]}x{orig_size[1]} -> {req.width}x{req.height}, base64 len: {len(resized_image)}")
-                vibe_images.append(resized_image)
-                info_extracted_list.append(v.get("info_extracted", 1.0))
-                strength_list.append(v.get("strength", 0.6))
+                info_extracted = v.get("info_extracted", 1.0)
+                strength = v.get("strength", 0.6)
+
+                if is_v4_plus:
+                    # V4+ 모델: encode-vibe 엔드포인트로 사전 인코딩
+                    orig_size = get_image_size_from_base64(v["image"])
+                    png_image = ensure_png_base64(v["image"])
+                    print(f"[NAI] Vibe {i+1}: {orig_size[0]}x{orig_size[1]}, encoding for V4+...")
+
+                    encoded_vibe = await encode_vibe_v4(png_image, req.nai_model, info_extracted, token)
+                    vibe_images.append(encoded_vibe)
+                    print(f"[NAI] Vibe {i+1}: encoded successfully")
+                else:
+                    # V3 모델: 원본 이미지 그대로 전송
+                    png_image = ensure_png_base64(v["image"])
+                    vibe_images.append(png_image)
+                    print(f"[NAI] Vibe {i+1}: using raw image for V3")
+
+                info_extracted_list.append(info_extracted)
+                strength_list.append(strength)
             except Exception as e:
                 print(f"[NAI] Vibe {i+1} error: {e}")
-                vibe_images.append(v["image"])
-                info_extracted_list.append(v.get("info_extracted", 1.0))
-                strength_list.append(v.get("strength", 0.6))
+                raise
+
         params["reference_image_multiple"] = vibe_images
         params["reference_information_extracted_multiple"] = info_extracted_list
         params["reference_strength_multiple"] = strength_list

@@ -578,9 +578,6 @@ async def call_nai_api(req: GenerateRequest):
         "uncond_scale": 1.0,
         "negative_prompt": req.negative_prompt,
         "prompt": req.prompt,
-        "reference_image_multiple": [],  # 아래에서 처리
-        "reference_information_extracted_multiple": [v.get("info_extracted", 1.0) for v in req.vibe_transfer] if req.vibe_transfer else [],
-        "reference_strength_multiple": [v.get("strength", 0.6) for v in req.vibe_transfer] if req.vibe_transfer else [],
         "extra_noise_seed": int(seed),
         "use_coords": False,
         "characterPrompts": [{"prompt": cp, "uc": "", "center": {"x": 0.5, "y": 0.5}, "enabled": True} for cp in req.character_prompts] if req.character_prompts else [],
@@ -609,8 +606,11 @@ async def call_nai_api(req: GenerateRequest):
 
     # Vibe Transfer 이미지 처리 (PNG로 재인코딩하여 전송)
     # bedovyy/ComfyUI_NAIDGenerator 방식 - PNG 포맷 보장
-    if req.vibe_transfer:
+    # 파라미터는 vibe가 있을 때만 추가 (빈 배열 전송 방지)
+    if req.vibe_transfer and len(req.vibe_transfer) > 0:
         vibe_images = []
+        info_extracted_list = []
+        strength_list = []
         for i, v in enumerate(req.vibe_transfer):
             try:
                 orig_size = get_image_size_from_base64(v["image"])
@@ -618,10 +618,16 @@ async def call_nai_api(req: GenerateRequest):
                 png_image = ensure_png_base64(v["image"])
                 print(f"[NAI] Vibe {i+1}: {orig_size[0]}x{orig_size[1]}, re-encoded to PNG, base64 len: {len(png_image)}")
                 vibe_images.append(png_image)
+                info_extracted_list.append(v.get("info_extracted", 1.0))
+                strength_list.append(v.get("strength", 0.6))
             except Exception as e:
                 print(f"[NAI] Vibe {i+1} error: {e}")
                 vibe_images.append(v["image"])
+                info_extracted_list.append(v.get("info_extracted", 1.0))
+                strength_list.append(v.get("strength", 0.6))
         params["reference_image_multiple"] = vibe_images
+        params["reference_information_extracted_multiple"] = info_extracted_list
+        params["reference_strength_multiple"] = strength_list
 
     # Character Reference (V4.5 only) - 이미지를 특정 캔버스 크기로 패딩
     if req.character_reference and req.character_reference.get("image"):

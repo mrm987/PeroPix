@@ -660,6 +660,66 @@
             background: rgba(255,100,100,0.8);
         }
 
+        /* Anlas Info */
+        .anlas-info {
+            background: var(--bg);
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 10px;
+        }
+
+        .anlas-balance {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .anlas-icon {
+            font-size: 1rem;
+        }
+
+        .anlas-refresh {
+            margin-left: auto;
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .anlas-refresh:hover {
+            background: var(--surface);
+            color: var(--text);
+        }
+
+        .anlas-cost {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .anlas-cost #anlasCost {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .free-tag {
+            background: #22c55e;
+            color: white;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 2px 5px;
+            border-radius: 3px;
+            margin-left: 4px;
+        }
+
         /* Button */
         .btn {
             width: 100%;
@@ -1751,6 +1811,20 @@
                     <div class="progress-fill" id="progressFill"></div>
                 </div>
                 
+                <!-- Anlas Info (NAI only) -->
+                <div id="anlasInfo" class="anlas-info" style="display: none;">
+                    <div class="anlas-balance">
+                        <span class="anlas-icon">💎</span>
+                        <span id="anlasBalance">--</span>
+                        <button type="button" class="anlas-refresh" id="refreshAnlasBtn" title="새로고침">↻</button>
+                    </div>
+                    <div class="anlas-cost" id="anlasCostInfo">
+                        <span>예상 소모: </span>
+                        <span id="anlasCost">0</span>
+                        <span id="anlasFreeTag" class="free-tag" style="display: none;">FREE</span>
+                    </div>
+                </div>
+
                 <div class="row" style="margin-bottom: 8px;">
                     <div style="flex: 1;">
                         <button class="btn" id="generateBtn">Queue (0)</button>
@@ -1788,8 +1862,8 @@
                         </div>
                     </div>
                     <div class="prefix-input-wrapper">
-                        <span class="prefix-label">Prefix:</span>
-                        <input type="text" id="savePrefix" value="Name_" placeholder="Name_" class="prefix-input">
+                        <span class="prefix-label">📁 Folder:</span>
+                        <input type="text" id="outputFolder" value="" placeholder="(outputs에 저장)" class="prefix-input">
                     </div>
                     <button type="button" class="header-btn" id="syncScrollBtn" title="Sync scroll across all slots">
                         <span>🔗</span>
@@ -2303,7 +2377,7 @@
                 }
                 
                 // Prefix 적용
-                document.getElementById('savePrefix').value = data.prefix || 'Name_';
+                document.getElementById('outputFolder').value = data.folder || '';
                 
                 currentPreset = { filename, name: data.name };
                 presetNameSpan.textContent = data.name;
@@ -2321,13 +2395,13 @@
             if (!name) return;
             
             const slots = getSlotList().map(s => ({ name: s.name, content: s.content }));
-            const prefix = document.getElementById('savePrefix').value || 'Name_';
-            
+            const folder = document.getElementById('outputFolder').value || '';
+
             try {
                 const res = await fetch(`${API_BASE}/api/presets`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, slots, prefix })
+                    body: JSON.stringify({ name, slots, folder })
                 });
                 const data = await res.json();
                 
@@ -2349,13 +2423,13 @@
             }
             
             const slots = getSlotList().map(s => ({ name: s.name, content: s.content }));
-            const prefix = document.getElementById('savePrefix').value || 'Name_';
-            
+            const folder = document.getElementById('outputFolder').value || '';
+
             try {
                 await fetch(`${API_BASE}/api/presets/${currentPreset.filename}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: currentPreset.name, slots, prefix })
+                    body: JSON.stringify({ name: currentPreset.name, slots, folder })
                 });
                 
                 showToast(`Saved: ${currentPreset.name}`, 'success');
@@ -2625,6 +2699,7 @@
                     s.classList.toggle('active', s.dataset.provider === currentProvider);
                 });
                 updateSamplerSchedulerOptions(currentProvider);
+                updateAnlasVisibility();
                 autoSaveSettings();
             });
         });
@@ -3072,7 +3147,7 @@
                 random_seed_per_image: document.getElementById('randomSeed').checked,
                 sampler: document.getElementById('sampler').value,
                 scheduler: document.getElementById('scheduler').value,
-                save_prefix: document.getElementById('savePrefix').value || 'Name_',
+                output_folder: document.getElementById('outputFolder').value || '',
             };
             
             if (currentProvider === 'nai') {
@@ -3789,7 +3864,98 @@
                 saveAppSettings();
             }
         };
-        
+
+        // ============================================================
+        // Anlas System
+        // ============================================================
+        let currentAnlas = null;
+        let isOpusTier = false;
+
+        async function fetchAnlasBalance() {
+            try {
+                const response = await fetch(`${API_BASE}/api/nai/subscription`);
+                const data = await response.json();
+
+                if (data.error) {
+                    document.getElementById('anlasBalance').textContent = 'Error';
+                    return;
+                }
+
+                currentAnlas = data.anlas;
+                isOpusTier = data.tier >= 3; // Tier 3 = Opus
+
+                document.getElementById('anlasBalance').textContent =
+                    currentAnlas !== null ? currentAnlas.toLocaleString() : '--';
+
+                updateAnlasCost();
+            } catch (e) {
+                document.getElementById('anlasBalance').textContent = '--';
+            }
+        }
+
+        async function updateAnlasCost() {
+            if (currentProvider !== 'nai') return;
+
+            const width = parseInt(document.getElementById('width').value) || 832;
+            const height = parseInt(document.getElementById('height').value) || 1216;
+            const steps = parseInt(document.getElementById('steps').value) || 28;
+            const vibeCount = document.getElementById('enableVibeTransfer').checked ? vibeList.length : 0;
+            const hasCharRef = document.getElementById('enableCharRef').checked && charRefData !== null;
+            const repeatCount = parseInt(document.getElementById('repeatCount').value) || 1;
+            const slotCount = document.querySelectorAll('.slot').length || 1;
+            const totalCount = repeatCount * slotCount;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/nai/calculate-cost`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        width, height, steps,
+                        is_opus: isOpusTier,
+                        vibe_count: vibeCount,
+                        has_char_ref: hasCharRef,
+                        count: totalCount
+                    })
+                });
+                const data = await response.json();
+
+                document.getElementById('anlasCost').textContent = data.total_cost.toLocaleString();
+                document.getElementById('anlasFreeTag').style.display = data.is_free ? 'inline' : 'none';
+            } catch (e) {
+                document.getElementById('anlasCost').textContent = '?';
+            }
+        }
+
+        // Anlas UI 표시/숨김 (provider에 따라)
+        function updateAnlasVisibility() {
+            const anlasInfo = document.getElementById('anlasInfo');
+            if (currentProvider === 'nai') {
+                anlasInfo.style.display = 'block';
+                fetchAnlasBalance();
+            } else {
+                anlasInfo.style.display = 'none';
+            }
+        }
+
+        // Anlas 새로고침 버튼
+        document.getElementById('refreshAnlasBtn').onclick = function() {
+            this.style.transform = 'rotate(360deg)';
+            setTimeout(() => this.style.transform = '', 300);
+            fetchAnlasBalance();
+        };
+
+        // 설정 변경시 비용 재계산
+        ['width', 'height', 'steps', 'repeatCount'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('change', updateAnlasCost);
+            }
+        });
+
+        // Vibe/CharRef 변경시 비용 재계산
+        document.getElementById('enableVibeTransfer').addEventListener('change', updateAnlasCost);
+        document.getElementById('enableCharRef').addEventListener('change', updateAnlasCost);
+
         // ============================================================
         // Settings Persistence (localStorage)
         // ============================================================
@@ -3845,7 +4011,7 @@
                 upscaleDenoise: document.getElementById('upscaleDenoise').value,
                 
                 // Output
-                savePrefix: document.getElementById('savePrefix').value,
+                outputFolder: document.getElementById('outputFolder').value,
                 repeatCount: document.getElementById('repeatCount').value,
                 
                 // Slots
@@ -3952,7 +4118,7 @@
                 }
                 
                 // Output
-                if (settings.savePrefix) document.getElementById('savePrefix').value = settings.savePrefix;
+                if (settings.outputFolder !== undefined) document.getElementById('outputFolder').value = settings.outputFolder;
                 if (settings.repeatCount) document.getElementById('repeatCount').value = settings.repeatCount;
                 
                 // Slots - 기존 슬롯 제거 후 복원
@@ -3987,7 +4153,7 @@
                 'sampler', 'scheduler', 'seed', 'randomSeed', 'naiModel', 'smea',
                 'ucPreset', 'qualityTags', 'localModel', 'enableUpscale', 'upscaleModel',
                 'downscaleRatio', 'sizeAlignment', 'upscaleSteps', 'upscaleCfg',
-                'upscaleDenoise', 'savePrefix', 'repeatCount', 'sizePreset'
+                'upscaleDenoise', 'outputFolder', 'repeatCount', 'sizePreset'
             ];
             
             inputs.forEach(id => {
@@ -4011,9 +4177,12 @@
         
         // Init
         loadAppSettings();  // 저장된 설정 먼저 로드
-        
+
         // 현재 provider에 맞게 샘플러/스케줄러 옵션 설정 및 복원
         updateSamplerSchedulerOptions(currentProvider);
+
+        // Anlas 정보 초기화 (NAI인 경우)
+        updateAnlasVisibility();
         if (window._pendingSampler) {
             const samplerSelect = document.getElementById('sampler');
             // 현재 옵션에 있는 값만 복원

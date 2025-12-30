@@ -32,13 +32,16 @@ CONFIG_FILE = APP_DIR / "config.json"
 PYTHON_ENV_DIR = APP_DIR / "python_env"  # 로컬 생성용 Python 환경
 
 # 카테고리별 이미지 순번 - 매번 실제 폴더 스캔
-def get_next_image_number(category: str) -> int:
+def get_next_image_number(category: str, save_dir: Path = None) -> int:
     """해당 카테고리의 다음 순번 반환 - 실제 폴더에서 스캔"""
+    if save_dir is None:
+        save_dir = OUTPUT_DIR
+
     max_num = 0
     pattern = re.compile(rf'^{re.escape(category)}_(\d{{7}})\.png$')
-    
-    if OUTPUT_DIR.exists():
-        for f in OUTPUT_DIR.iterdir():
+
+    if save_dir.exists():
+        for f in save_dir.iterdir():
             try:
                 if f.suffix == '.png':
                     match = pattern.match(f.name)
@@ -48,7 +51,7 @@ def get_next_image_number(category: str) -> int:
                             max_num = num
             except Exception:
                 pass
-    
+
     return max_num + 1
 
 # 디렉토리 생성
@@ -344,7 +347,7 @@ class MultiGenerateRequest(BaseModel):
     quality_tags: bool = True
     model: str = ""
     loras: List[dict] = []
-    save_prefix: str = "Name_"
+    output_folder: str = ""  # 비어있으면 outputs에 직접 저장, 있으면 outputs/폴더명에 저장
     
     # Upscale (Local only)
     enable_upscale: bool = False
@@ -877,17 +880,23 @@ async def process_job(job):
                 file_tag = "".join(c for c in tag if c.isalnum() or c in "_-")[:20]
             
             image_idx += 1
-            
-            # 카테고리 결정 및 해당 카테고리의 순번 획득
-            # 슬롯 인덱스를 파일명에 사용 (prefix 입력 그대로 적용)
-            if file_tag:
-                category = f"{req.save_prefix}{slot_index+1:03d}_{file_tag}"
+
+            # 저장 경로 결정
+            if req.output_folder:
+                save_dir = OUTPUT_DIR / req.output_folder
+                save_dir.mkdir(parents=True, exist_ok=True)
             else:
-                category = f"{req.save_prefix}{slot_index+1:03d}"
-            
-            file_num = get_next_image_number(category)
+                save_dir = OUTPUT_DIR
+
+            # 카테고리 결정 (슬롯 인덱스 + 파일 태그)
+            if file_tag:
+                category = f"{slot_index+1:03d}_{file_tag}"
+            else:
+                category = f"{slot_index+1:03d}"
+
+            file_num = get_next_image_number(category, save_dir)
             filename = f"{category}_{file_num:07d}.png"
-            image.save(OUTPUT_DIR / filename)
+            image.save(save_dir / filename)
             
             await gen_queue.broadcast({
                 "type": "image",
@@ -954,6 +963,109 @@ async def update_config(update: ConfigUpdate):
         CONFIG["lora_dir"] = update.lora_dir
     save_config(CONFIG)
     return {"success": True}
+
+
+@app.get("/api/nai/subscription")
+async def get_nai_subscription():
+    """NAI 구독 정보 및 Anlas 잔액 조회"""
+    import httpx
+
+    token = CONFIG.get("nai_token", "")
+    if not token:
+        return {"error": "NAI token not set", "anlas": None}
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.get(
+                "https://api.novelai.net/user/subscription",
+                headers={"Authorization": f"Bearer {token}"}
+            )
+
+            if response.status_code != 200:
+                return {"error": f"API error: {response.status_code}", "anlas": None}
+
+            data = response.json()
+            # trainingStepsLeft: 구독으로 받은 Anlas (매월 리셋)
+            # fixedTrainingStepsLeft: 구매한 Anlas (영구)
+            subscription_anlas = data.get("trainingStepsLeft", {}).get("fixedTrainingStepsLeft", 0)
+            fixed_anlas = data.get("trainingStepsLeft", {}).get("purchasedTrainingSteps", 0)
+
+            # 실제 응답 구조에 맞게 조정
+            total_anlas = subscription_anlas + fixed_anlas
+
+            return {
+                "anlas": total_anlas,
+                "subscription_anlas": subscription_anlas,
+                "fixed_anlas": fixed_anlas,
+                "tier": data.get("tier", 0),
+                "active": data.get("active", False),
+                "raw": data  # 디버깅용
+            }
+    except Exception as e:
+        return {"error": str(e), "anlas": None}
+
+
+def calculate_anlas_cost(width: int, height: int, steps: int, is_opus: bool = False,
+                         vibe_count: int = 0, has_char_ref: bool = False) -> int:
+    """NAI 이미지 생성 Anlas 소모량 계산"""
+    # Opus 구독자는 일정 조건에서 무료
+    # 기본 해상도(1024x1024 이하)에서 28 steps 이하면 무료
+
+    pixels = width * height
+    base_pixels = 1024 * 1024  # 기준 해상도
+
+    # Opus 무료 조건 체크
+    if is_opus and pixels <= base_pixels and steps <= 28 and vibe_count <= 0 and not has_char_ref:
+        return 0
+
+    # 기본 비용 계산 (해상도 기반)
+    if pixels <= 640 * 640:
+        base_cost = 4
+    elif pixels <= 832 * 1216:  # Portrait/Landscape
+        base_cost = 8
+    elif pixels <= 1024 * 1024:
+        base_cost = 10
+    elif pixels <= 1216 * 832:
+        base_cost = 8
+    elif pixels <= 1024 * 1536:
+        base_cost = 16
+    elif pixels <= 1536 * 1024:
+        base_cost = 16
+    else:
+        # 큰 해상도
+        base_cost = int(pixels / base_pixels * 20)
+
+    # Steps 보정 (28 초과시)
+    if steps > 28:
+        base_cost = int(base_cost * (steps / 28))
+
+    # Vibe Transfer 추가 비용 (4개 초과시 개당 2 Anlas)
+    if vibe_count > 4:
+        base_cost += (vibe_count - 4) * 2
+
+    return base_cost
+
+
+@app.post("/api/nai/calculate-cost")
+async def calculate_cost(request: dict):
+    """Anlas 소모량 계산"""
+    width = request.get("width", 832)
+    height = request.get("height", 1216)
+    steps = request.get("steps", 28)
+    is_opus = request.get("is_opus", False)
+    vibe_count = request.get("vibe_count", 0)
+    has_char_ref = request.get("has_char_ref", False)
+    count = request.get("count", 1)  # 생성 횟수
+
+    cost_per_image = calculate_anlas_cost(width, height, steps, is_opus, vibe_count, has_char_ref)
+    total_cost = cost_per_image * count
+
+    return {
+        "cost_per_image": cost_per_image,
+        "total_cost": total_cost,
+        "count": count,
+        "is_free": cost_per_image == 0
+    }
 
 
 @app.get("/api/models")

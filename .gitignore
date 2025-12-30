@@ -22,12 +22,10 @@ models/loras/*.safetensors
 models/upscale_models/*.pth
 models/upscale_models/*.safetensors
 
-# Rust/Tauri
-src-tauri/target/
-src-tauri/Cargo.lock
-
-# Node
-node_modules/
+# PyInstaller
+build/
+dist/
+*.spec
 
 # IDE
 .idea/
@@ -40,11 +38,8 @@ node_modules/
 Thumbs.db
 
 # Build outputs
-dist/
 *.msi
 *.exe
 *.dmg
 *.AppImage
-
-# Web assets (copied from root)
-web/
+*.zip

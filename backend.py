@@ -1382,7 +1382,7 @@ def calculate_anlas_cost(width: int, height: int, steps: int, is_opus: bool = Fa
 
 @app.post("/api/nai/calculate-cost")
 async def calculate_cost(request: dict):
-    """Anlas 소모량 계산"""
+    """Anlas 소모량 계산 (vibe 캐시 상태 포함)"""
     width = request.get("width", 832)
     height = request.get("height", 1216)
     steps = request.get("steps", 28)
@@ -1391,14 +1391,41 @@ async def calculate_cost(request: dict):
     has_char_ref = request.get("has_char_ref", False)
     count = request.get("count", 1)  # 생성 횟수
 
-    cost_per_image = calculate_anlas_cost(width, height, steps, is_opus, vibe_count, has_char_ref)
+    # Vibe 캐시 체크 (vibes 배열이 제공된 경우)
+    vibes = request.get("vibes", [])
+    model = request.get("model", "nai-diffusion-4-5-full")
+    uncached_vibe_count = 0
+
+    if vibes and "diffusion-4" in model:
+        for v in vibes:
+            image_base64 = v.get("image", "")
+            info_extracted = v.get("info_extracted", 1.0)
+            if image_base64:
+                # PNG로 변환 후 캐시 키 생성
+                try:
+                    png_image = ensure_png_base64(image_base64)
+                    cache_key = get_vibe_cache_key(png_image, model, info_extracted)
+                    if not get_cached_vibe(cache_key):
+                        uncached_vibe_count += 1
+                except:
+                    uncached_vibe_count += 1
+    else:
+        uncached_vibe_count = vibe_count
+
+    cost_per_image = calculate_anlas_cost(width, height, steps, is_opus, uncached_vibe_count, has_char_ref)
     total_cost = cost_per_image * count
+
+    # Vibe 인코딩 비용 (캐시되지 않은 것만, 첫 이미지에서만 발생)
+    vibe_encoding_cost = uncached_vibe_count * 2 if uncached_vibe_count > 0 else 0
 
     return {
         "cost_per_image": cost_per_image,
         "total_cost": total_cost,
         "count": count,
-        "is_free": cost_per_image == 0
+        "is_free": cost_per_image == 0,
+        "vibe_encoding_cost": vibe_encoding_cost,
+        "cached_vibes": len(vibes) - uncached_vibe_count if vibes else 0,
+        "uncached_vibes": uncached_vibe_count
     }
 
 

@@ -1575,6 +1575,8 @@
                                 최대 16개 이미지. 강도 합계가 1.0 이하가 되도록 권장.
                             </small>
 
+                            <div id="vibeCacheInfo" style="display: none; font-size: 12px; margin-bottom: 8px; padding: 4px 8px; background: rgba(0,0,0,0.2); border-radius: 4px;"></div>
+
                             <div id="vibeList" class="vibe-list"></div>
 
                             <button type="button" class="btn btn-secondary" id="addVibeBtn" style="width: 100%; margin-top: 8px;">
@@ -3272,6 +3274,11 @@
                     break;
                     
                 case 'job_done':
+                    // Anlas 잔액 및 비용 갱신 (생성 완료 시)
+                    if (currentProvider === 'nai') {
+                        fetchAnlasBalance();
+                        updateAnlasCost();  // Vibe 캐시 상태 갱신
+                    }
                     if (data.queue_length === 0) {
                         // SSE 누락 보정: 완료 시 강제 동기화
                         currentIndex = totalImages;
@@ -3781,6 +3788,7 @@
                     vibeList[idx].info_extracted = parseFloat(this.value);
                     this.nextElementSibling.textContent = this.value;
                     saveAppSettings();
+                    updateAnlasCost();  // info_extracted 변경시 캐시 상태 재확인
                 };
             });
         }
@@ -3879,11 +3887,19 @@
             const width = parseInt(document.getElementById('width').value) || 832;
             const height = parseInt(document.getElementById('height').value) || 1216;
             const steps = parseInt(document.getElementById('steps').value) || 28;
-            const vibeCount = document.getElementById('enableVibeTransfer').checked ? vibeList.length : 0;
+            const vibeEnabled = document.getElementById('enableVibeTransfer').checked;
+            const vibeCount = vibeEnabled ? vibeList.length : 0;
             const hasCharRef = document.getElementById('enableCharRef').checked && charRefData !== null;
             const repeatCount = parseInt(document.getElementById('repeatCount').value) || 1;
             const slotCount = document.querySelectorAll('.slot').length || 1;
             const totalCount = repeatCount * slotCount;
+            const naiModel = document.getElementById('naiModel').value;
+
+            // Vibe 데이터 (캐시 체크용)
+            const vibes = vibeEnabled ? vibeList.map(v => ({
+                image: v.image,
+                info_extracted: v.info_extracted
+            })) : [];
 
             try {
                 const response = await fetch(`${API_BASE}/api/nai/calculate-cost`, {
@@ -3894,7 +3910,9 @@
                         is_opus: isOpusTier,
                         vibe_count: vibeCount,
                         has_char_ref: hasCharRef,
-                        count: totalCount
+                        count: totalCount,
+                        vibes: vibes,
+                        model: naiModel
                     })
                 });
                 const data = await response.json();
@@ -3904,8 +3922,28 @@
                     document.getElementById('anlasFreeTag').style.display = 'inline';
                 } else {
                     document.getElementById('anlasCost').style.display = 'inline';
-                    document.getElementById('anlasCost').textContent = data.total_cost.toLocaleString();
+                    // Vibe 인코딩 비용 표시
+                    let costText = data.total_cost.toLocaleString();
+                    if (data.vibe_encoding_cost > 0) {
+                        costText += ` (+${data.vibe_encoding_cost} vibe)`;
+                    }
+                    document.getElementById('anlasCost').textContent = costText;
                     document.getElementById('anlasFreeTag').style.display = 'none';
+                }
+
+                // Vibe 캐시 상태 표시
+                const vibeCacheInfo = document.getElementById('vibeCacheInfo');
+                if (vibeCacheInfo && vibes.length > 0) {
+                    if (data.cached_vibes > 0 && data.uncached_vibes === 0) {
+                        vibeCacheInfo.textContent = `✓ ${data.cached_vibes}개 캐시됨 (무료)`;
+                        vibeCacheInfo.style.color = '#4ade80';
+                    } else if (data.uncached_vibes > 0) {
+                        vibeCacheInfo.textContent = `${data.uncached_vibes}개 인코딩 필요 (+${data.vibe_encoding_cost} Anlas)`;
+                        vibeCacheInfo.style.color = '#fbbf24';
+                    }
+                    vibeCacheInfo.style.display = 'block';
+                } else if (vibeCacheInfo) {
+                    vibeCacheInfo.style.display = 'none';
                 }
             } catch (e) {
                 document.getElementById('anlasCost').textContent = '?';

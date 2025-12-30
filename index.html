@@ -546,7 +546,120 @@
             margin: 0;
             font-size: 0.8rem;
         }
-        
+
+        /* Vibe Transfer */
+        .vibe-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .vibe-item {
+            background: var(--bg);
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .vibe-item-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .vibe-item-header img {
+            width: 48px;
+            height: 48px;
+            object-fit: cover;
+            border-radius: 6px;
+        }
+
+        .vibe-item-header .vibe-info {
+            flex: 1;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .vibe-item-header .remove-btn {
+            width: 24px;
+            height: 24px;
+            border: none;
+            background: rgba(255,100,100,0.2);
+            color: #ff6666;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1;
+        }
+
+        .vibe-item-header .remove-btn:hover {
+            background: rgba(255,100,100,0.4);
+        }
+
+        .vibe-sliders {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .vibe-slider-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.75rem;
+        }
+
+        .vibe-slider-row label {
+            width: 70px;
+            color: var(--text-dim);
+        }
+
+        .vibe-slider-row input[type="range"] {
+            flex: 1;
+        }
+
+        .vibe-slider-row .value {
+            width: 35px;
+            text-align: right;
+            color: var(--text);
+        }
+
+        /* Character Reference */
+        .char-ref-preview {
+            position: relative;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        .char-ref-preview img {
+            max-width: 100%;
+            max-height: 150px;
+            border-radius: 8px;
+            object-fit: contain;
+        }
+
+        .char-ref-preview .remove-btn {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 24px;
+            height: 24px;
+            border: none;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1;
+        }
+
+        .char-ref-preview .remove-btn:hover {
+            background: rgba(255,100,100,0.8);
+        }
+
         /* Button */
         .btn {
             width: 100%;
@@ -1409,8 +1522,75 @@
                             <label for="qualityTags">Add Quality Tags</label>
                         </div>
                     </div>
+
+                    <!-- Vibe Transfer -->
+                    <div class="section">
+                        <div class="section-title">
+                            <span>Vibe Transfer</span>
+                            <label class="section-toggle">
+                                <input type="checkbox" id="enableVibeTransfer">
+                                <span>Active</span>
+                            </label>
+                        </div>
+
+                        <div id="vibeTransferSettings" style="display: none;">
+                            <small style="color: var(--text-dim); display: block; margin-bottom: 8px;">
+                                최대 16개 이미지. 강도 합계가 1.0 이하가 되도록 권장.
+                            </small>
+
+                            <div id="vibeList" class="vibe-list"></div>
+
+                            <button type="button" class="btn btn-secondary" id="addVibeBtn" style="width: 100%; margin-top: 8px;">
+                                + 바이브 추가
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Character Reference (V4.5 only) -->
+                    <div class="section" id="charRefSection">
+                        <div class="section-title">
+                            <span>Character Reference</span>
+                            <label class="section-toggle">
+                                <input type="checkbox" id="enableCharRef">
+                                <span>Active</span>
+                            </label>
+                        </div>
+
+                        <div id="charRefSettings" style="display: none;">
+                            <small style="color: var(--text-dim); display: block; margin-bottom: 8px;">
+                                V4.5 전용. Vibe Transfer와 동시 사용 불가.
+                            </small>
+
+                            <div id="charRefPreview" class="char-ref-preview" style="display: none;">
+                                <img id="charRefImage" src="" alt="Character Reference">
+                                <button type="button" class="remove-btn" id="removeCharRefBtn">×</button>
+                            </div>
+
+                            <button type="button" class="btn btn-secondary" id="uploadCharRefBtn" style="width: 100%;">
+                                이미지 선택
+                            </button>
+                            <input type="file" id="charRefInput" accept="image/*" style="display: none;">
+
+                            <div class="row" style="margin-top: 12px;">
+                                <div style="flex: 1;">
+                                    <label>Fidelity</label>
+                                    <input type="range" id="charRefFidelity" value="0.5" min="0" max="1" step="0.05" style="width: 100%;">
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-dim);">
+                                        <span>유연</span>
+                                        <span id="charRefFidelityValue">0.5</span>
+                                        <span>정밀</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="checkbox-row" style="margin-top: 8px;">
+                                <input type="checkbox" id="charRefStyleAware" checked>
+                                <label for="charRefStyleAware">Style Aware (스타일도 복사)</label>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                
+
                 <!-- Local Settings -->
                 <div class="provider-section" data-provider="local">
                     <div class="section">
@@ -2900,6 +3080,24 @@
                 request.smea = document.getElementById('smea').value;
                 request.uc_preset = document.getElementById('ucPreset').value;
                 request.quality_tags = document.getElementById('qualityTags').checked;
+
+                // Vibe Transfer
+                if (document.getElementById('enableVibeTransfer').checked && vibeList.length > 0) {
+                    request.vibe_transfer = vibeList.map(v => ({
+                        image: v.image,
+                        info_extracted: v.info_extracted,
+                        strength: v.strength
+                    }));
+                }
+
+                // Character Reference (V4.5 only)
+                if (document.getElementById('enableCharRef').checked && charRefData) {
+                    request.character_reference = {
+                        image: charRefData.image,
+                        fidelity: parseFloat(document.getElementById('charRefFidelity').value),
+                        style_aware: document.getElementById('charRefStyleAware').checked
+                    };
+                }
             } else {
                 request.model = document.getElementById('localModel').value;
                 request.loras = getSelectedLoras();
@@ -3423,10 +3621,173 @@
         document.getElementById('enableUpscale').onchange = function() {
             document.getElementById('upscaleSettings').style.display = this.checked ? 'block' : 'none';
         };
-        
+
         // Upscale denoise slider value display
         document.getElementById('upscaleDenoise').oninput = function() {
             document.getElementById('upscaleDenoiseValue').textContent = this.value;
+        };
+
+        // ============================================================
+        // Vibe Transfer
+        // ============================================================
+        let vibeList = []; // {image: base64, info_extracted: 1.0, strength: 0.6}
+
+        document.getElementById('enableVibeTransfer').onchange = function() {
+            document.getElementById('vibeTransferSettings').style.display = this.checked ? 'block' : 'none';
+            // Vibe Transfer와 Character Reference는 동시 사용 불가
+            if (this.checked && document.getElementById('enableCharRef').checked) {
+                document.getElementById('enableCharRef').checked = false;
+                document.getElementById('charRefSettings').style.display = 'none';
+            }
+            saveAppSettings();
+        };
+
+        document.getElementById('addVibeBtn').onclick = function() {
+            if (vibeList.length >= 16) {
+                alert('최대 16개까지만 추가할 수 있습니다.');
+                return;
+            }
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const base64 = await fileToBase64(file);
+                vibeList.push({
+                    image: base64,
+                    info_extracted: 1.0,
+                    strength: 0.6,
+                    name: file.name
+                });
+                renderVibeList();
+                saveAppSettings();
+            };
+            input.click();
+        };
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    // data:image/png;base64,XXXXX -> XXXXX 만 추출
+                    const base64 = reader.result.split(',')[1];
+                    resolve(base64);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function renderVibeList() {
+            const container = document.getElementById('vibeList');
+            container.innerHTML = '';
+            vibeList.forEach((vibe, idx) => {
+                const item = document.createElement('div');
+                item.className = 'vibe-item';
+                item.innerHTML = `
+                    <div class="vibe-item-header">
+                        <img src="data:image/png;base64,${vibe.image}" alt="vibe">
+                        <span class="vibe-info">${vibe.name || 'Vibe ' + (idx + 1)}</span>
+                        <button type="button" class="remove-btn" data-idx="${idx}">×</button>
+                    </div>
+                    <div class="vibe-sliders">
+                        <div class="vibe-slider-row">
+                            <label>Strength</label>
+                            <input type="range" class="vibe-strength" data-idx="${idx}" value="${vibe.strength}" min="0" max="1" step="0.05">
+                            <span class="value">${vibe.strength}</span>
+                        </div>
+                        <div class="vibe-slider-row">
+                            <label>Info Extract</label>
+                            <input type="range" class="vibe-info" data-idx="${idx}" value="${vibe.info_extracted}" min="0.01" max="1" step="0.01">
+                            <span class="value">${vibe.info_extracted}</span>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+
+            // Event listeners
+            container.querySelectorAll('.remove-btn').forEach(btn => {
+                btn.onclick = function() {
+                    vibeList.splice(parseInt(this.dataset.idx), 1);
+                    renderVibeList();
+                    saveAppSettings();
+                };
+            });
+            container.querySelectorAll('.vibe-strength').forEach(slider => {
+                slider.oninput = function() {
+                    const idx = parseInt(this.dataset.idx);
+                    vibeList[idx].strength = parseFloat(this.value);
+                    this.nextElementSibling.textContent = this.value;
+                    saveAppSettings();
+                };
+            });
+            container.querySelectorAll('.vibe-info').forEach(slider => {
+                slider.oninput = function() {
+                    const idx = parseInt(this.dataset.idx);
+                    vibeList[idx].info_extracted = parseFloat(this.value);
+                    this.nextElementSibling.textContent = this.value;
+                    saveAppSettings();
+                };
+            });
+        }
+
+        // ============================================================
+        // Character Reference (V4.5 only)
+        // ============================================================
+        let charRefData = null; // {image: base64, fidelity: 0.5, style_aware: true}
+
+        document.getElementById('enableCharRef').onchange = function() {
+            document.getElementById('charRefSettings').style.display = this.checked ? 'block' : 'none';
+            // Vibe Transfer와 Character Reference는 동시 사용 불가
+            if (this.checked && document.getElementById('enableVibeTransfer').checked) {
+                document.getElementById('enableVibeTransfer').checked = false;
+                document.getElementById('vibeTransferSettings').style.display = 'none';
+            }
+            saveAppSettings();
+        };
+
+        document.getElementById('uploadCharRefBtn').onclick = function() {
+            document.getElementById('charRefInput').click();
+        };
+
+        document.getElementById('charRefInput').onchange = async function() {
+            const file = this.files[0];
+            if (!file) return;
+            const base64 = await fileToBase64(file);
+            charRefData = {
+                image: base64,
+                fidelity: parseFloat(document.getElementById('charRefFidelity').value),
+                style_aware: document.getElementById('charRefStyleAware').checked
+            };
+            document.getElementById('charRefImage').src = 'data:image/png;base64,' + base64;
+            document.getElementById('charRefPreview').style.display = 'block';
+            document.getElementById('uploadCharRefBtn').textContent = '이미지 변경';
+            saveAppSettings();
+        };
+
+        document.getElementById('removeCharRefBtn').onclick = function() {
+            charRefData = null;
+            document.getElementById('charRefPreview').style.display = 'none';
+            document.getElementById('uploadCharRefBtn').textContent = '이미지 선택';
+            document.getElementById('charRefInput').value = '';
+            saveAppSettings();
+        };
+
+        document.getElementById('charRefFidelity').oninput = function() {
+            document.getElementById('charRefFidelityValue').textContent = this.value;
+            if (charRefData) {
+                charRefData.fidelity = parseFloat(this.value);
+                saveAppSettings();
+            }
+        };
+
+        document.getElementById('charRefStyleAware').onchange = function() {
+            if (charRefData) {
+                charRefData.style_aware = this.checked;
+                saveAppSettings();
+            }
         };
         
         // ============================================================
@@ -3460,7 +3821,17 @@
                 smea: document.getElementById('smea').value,
                 ucPreset: document.getElementById('ucPreset').value,
                 qualityTags: document.getElementById('qualityTags').checked,
-                
+
+                // Vibe Transfer
+                enableVibeTransfer: document.getElementById('enableVibeTransfer').checked,
+                vibeList: vibeList,
+
+                // Character Reference
+                enableCharRef: document.getElementById('enableCharRef').checked,
+                charRefData: charRefData,
+                charRefFidelity: document.getElementById('charRefFidelity').value,
+                charRefStyleAware: document.getElementById('charRefStyleAware').checked,
+
                 // Local
                 localModel: document.getElementById('localModel').value,
                 
@@ -3532,7 +3903,36 @@
                 if (settings.smea) document.getElementById('smea').value = settings.smea;
                 if (settings.ucPreset) document.getElementById('ucPreset').value = settings.ucPreset;
                 if (settings.qualityTags !== undefined) document.getElementById('qualityTags').checked = settings.qualityTags;
-                
+
+                // Vibe Transfer
+                if (settings.enableVibeTransfer !== undefined) {
+                    document.getElementById('enableVibeTransfer').checked = settings.enableVibeTransfer;
+                    document.getElementById('vibeTransferSettings').style.display = settings.enableVibeTransfer ? 'block' : 'none';
+                }
+                if (settings.vibeList && settings.vibeList.length > 0) {
+                    vibeList = settings.vibeList;
+                    renderVibeList();
+                }
+
+                // Character Reference
+                if (settings.enableCharRef !== undefined) {
+                    document.getElementById('enableCharRef').checked = settings.enableCharRef;
+                    document.getElementById('charRefSettings').style.display = settings.enableCharRef ? 'block' : 'none';
+                }
+                if (settings.charRefData) {
+                    charRefData = settings.charRefData;
+                    document.getElementById('charRefImage').src = 'data:image/png;base64,' + charRefData.image;
+                    document.getElementById('charRefPreview').style.display = 'block';
+                    document.getElementById('uploadCharRefBtn').textContent = '이미지 변경';
+                }
+                if (settings.charRefFidelity) {
+                    document.getElementById('charRefFidelity').value = settings.charRefFidelity;
+                    document.getElementById('charRefFidelityValue').textContent = settings.charRefFidelity;
+                }
+                if (settings.charRefStyleAware !== undefined) {
+                    document.getElementById('charRefStyleAware').checked = settings.charRefStyleAware;
+                }
+
                 // Local - 모델은 loadResources 후에 설정해야 함
                 window._pendingLocalModel = settings.localModel;
                 window._pendingUpscaleModel = settings.upscaleModel;

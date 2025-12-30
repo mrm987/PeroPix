@@ -297,6 +297,12 @@ class GenerateRequest(BaseModel):
     smea: str = "none"
     uc_preset: str = "Heavy"
     quality_tags: bool = True
+
+    # NAI Vibe Transfer (최대 16개)
+    vibe_transfer: List[dict] = []  # [{"image": base64, "info_extracted": 1.0, "strength": 0.6}, ...]
+
+    # NAI Character Reference (V4.5 only)
+    character_reference: Optional[dict] = None  # {"image": base64, "fidelity": 0.5, "style_aware": True}
     
     # Local
     model: str = ""
@@ -427,9 +433,9 @@ async def call_nai_api(req: GenerateRequest):
         "uncond_scale": 1.0,
         "negative_prompt": req.negative_prompt,
         "prompt": req.prompt,
-        "reference_image_multiple": [],
-        "reference_information_extracted_multiple": [],
-        "reference_strength_multiple": [],
+        "reference_image_multiple": [v["image"] for v in req.vibe_transfer] if req.vibe_transfer else [],
+        "reference_information_extracted_multiple": [v.get("info_extracted", 1.0) for v in req.vibe_transfer] if req.vibe_transfer else [],
+        "reference_strength_multiple": [v.get("strength", 0.6) for v in req.vibe_transfer] if req.vibe_transfer else [],
         "extra_noise_seed": int(seed),
         "use_coords": False,
         "characterPrompts": [{"prompt": cp, "uc": "", "center": {"x": 0.5, "y": 0.5}, "enabled": True} for cp in req.character_prompts] if req.character_prompts else [],
@@ -444,12 +450,32 @@ async def call_nai_api(req: GenerateRequest):
         "v4_negative_prompt": {
             "legacy_uc": False,
             "caption": {
-                "base_caption": req.negative_prompt, 
+                "base_caption": req.negative_prompt,
                 "char_captions": [{"char_caption": "", "centers": [{"x": 0.5, "y": 0.5}]} for _ in req.character_prompts] if req.character_prompts else []
             }
         }
     }
-    
+
+    # Character Reference (V4.5 only)
+    if req.character_reference and req.character_reference.get("image"):
+        fidelity = req.character_reference.get("fidelity", 0.5)
+        style_aware = req.character_reference.get("style_aware", True)
+        caption_type = "character&style" if style_aware else "character"
+
+        params["director_reference_images"] = [req.character_reference["image"]]
+        params["director_reference_descriptions"] = [{
+            "use_coords": False,
+            "use_order": False,
+            "legacy_uc": False,
+            "caption": {
+                "base_caption": caption_type,
+                "char_captions": []
+            }
+        }]
+        params["director_reference_strength_values"] = [1.0]
+        params["director_reference_secondary_strength_values"] = [1.0 - fidelity]
+        params["director_reference_information_extracted"] = [1.0]
+
     payload = {
         "input": req.prompt,
         "model": req.nai_model,

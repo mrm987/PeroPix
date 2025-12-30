@@ -76,7 +76,7 @@ fn main() {
                 if let Some(mut child) = app.state::<BackendProcess>().0.lock().unwrap().take() {
                     let _ = child.kill();
                     let _ = child.wait();
-                }
+                };
             }
         })
         .run(tauri::generate_context!())

@@ -456,12 +456,25 @@ async def call_nai_api(req: GenerateRequest):
         }
     }
 
-    # Character Reference (V4.5 only) - 정확한 API 파라미터가 공개되지 않아 주석 처리
-    # TODO: NAI에서 공식 API 문서가 공개되면 아래 파라미터 활성화
-    # if req.character_reference:
-    #     params["character_reference_image"] = req.character_reference["image"]
-    #     params["character_reference_fidelity"] = req.character_reference.get("fidelity", 0.5)
-    #     params["character_reference_style_aware"] = req.character_reference.get("style_aware", True)
+    # Character Reference (V4.5 only)
+    if req.character_reference and req.character_reference.get("image"):
+        fidelity = req.character_reference.get("fidelity", 0.5)
+        style_aware = req.character_reference.get("style_aware", True)
+        caption_type = "character&style" if style_aware else "character"
+
+        params["director_reference_images"] = [req.character_reference["image"]]
+        params["director_reference_descriptions"] = [{
+            "use_coords": False,
+            "use_order": False,
+            "legacy_uc": False,
+            "caption": {
+                "base_caption": caption_type,
+                "char_captions": []
+            }
+        }]
+        params["director_reference_strength_values"] = [1.0]
+        params["director_reference_secondary_strength_values"] = [1.0 - fidelity]
+        params["director_reference_information_extracted"] = [1.0]
 
     payload = {
         "input": req.prompt,

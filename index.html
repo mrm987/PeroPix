@@ -660,49 +660,51 @@
             background: rgba(255,100,100,0.8);
         }
 
-        /* Anlas Info */
+        /* Anlas Info - Single line */
         .anlas-info {
-            background: var(--bg);
-            border-radius: 8px;
-            padding: 10px 12px;
-            margin-bottom: 10px;
-        }
-
-        .anlas-balance {
             display: flex;
             align-items: center;
-            gap: 6px;
-            font-size: 0.95rem;
-            font-weight: 600;
-            margin-bottom: 4px;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            margin-bottom: 6px;
+            gap: 8px;
         }
 
-        .anlas-icon {
-            font-size: 1rem;
+        .anlas-left {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .anlas-left .anlas-icon {
+            font-size: 0.8rem;
+        }
+
+        .anlas-left #anlasBalance {
+            font-weight: 600;
+            color: var(--text);
         }
 
         .anlas-refresh {
-            margin-left: auto;
             background: none;
             border: none;
             color: var(--text-dim);
             cursor: pointer;
-            font-size: 1rem;
-            padding: 2px 6px;
-            border-radius: 4px;
+            font-size: 0.75rem;
+            padding: 0 4px;
+            opacity: 0.7;
         }
 
         .anlas-refresh:hover {
-            background: var(--surface);
+            opacity: 1;
             color: var(--text);
         }
 
         .anlas-cost {
-            font-size: 0.8rem;
-            color: var(--text-dim);
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 3px;
         }
 
         .anlas-cost #anlasCost {
@@ -713,11 +715,10 @@
         .free-tag {
             background: #22c55e;
             color: white;
-            font-size: 0.65rem;
+            font-size: 0.6rem;
             font-weight: 700;
-            padding: 2px 5px;
-            border-radius: 3px;
-            margin-left: 4px;
+            padding: 1px 4px;
+            border-radius: 2px;
         }
 
         /* Button */
@@ -1807,22 +1808,22 @@
             
             <div class="sidebar-footer">
                 <div class="status-text" id="statusText" style="text-align: left; margin-bottom: 4px;">Ready</div>
-                <div class="progress-bar" style="margin-bottom: 12px;">
-                    <div class="progress-fill" id="progressFill"></div>
-                </div>
-                
-                <!-- Anlas Info (NAI only) -->
+                <!-- Anlas Info (NAI only) - Single line above progress -->
                 <div id="anlasInfo" class="anlas-info" style="display: none;">
-                    <div class="anlas-balance">
+                    <div class="anlas-left">
                         <span class="anlas-icon">💎</span>
                         <span id="anlasBalance">--</span>
                         <button type="button" class="anlas-refresh" id="refreshAnlasBtn" title="새로고침">↻</button>
                     </div>
                     <div class="anlas-cost" id="anlasCostInfo">
-                        <span>예상 소모: </span>
+                        <span>-</span>
                         <span id="anlasCost">0</span>
                         <span id="anlasFreeTag" class="free-tag" style="display: none;">FREE</span>
                     </div>
+                </div>
+
+                <div class="progress-bar" style="margin-bottom: 12px;">
+                    <div class="progress-fill" id="progressFill"></div>
                 </div>
 
                 <div class="row" style="margin-bottom: 8px;">

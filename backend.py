@@ -985,21 +985,31 @@ async def get_nai_subscription():
                 return {"error": f"API error: {response.status_code}", "anlas": None}
 
             data = response.json()
-            # trainingStepsLeft: 구독으로 받은 Anlas (매월 리셋)
-            # fixedTrainingStepsLeft: 구매한 Anlas (영구)
-            subscription_anlas = data.get("trainingStepsLeft", {}).get("fixedTrainingStepsLeft", 0)
-            fixed_anlas = data.get("trainingStepsLeft", {}).get("purchasedTrainingSteps", 0)
 
-            # 실제 응답 구조에 맞게 조정
-            total_anlas = subscription_anlas + fixed_anlas
+            # trainingStepsLeft 구조 확인
+            training_steps = data.get("trainingStepsLeft", {})
+
+            # trainingStepsLeft가 숫자인 경우 (구버전 API)
+            if isinstance(training_steps, (int, float)):
+                total_anlas = int(training_steps)
+                subscription_anlas = total_anlas
+                fixed_anlas = 0
+            # trainingStepsLeft가 dict인 경우 (현재 API)
+            elif isinstance(training_steps, dict):
+                subscription_anlas = training_steps.get("fixedTrainingStepsLeft", 0) or 0
+                fixed_anlas = training_steps.get("purchasedTrainingSteps", 0) or 0
+                total_anlas = subscription_anlas + fixed_anlas
+            else:
+                total_anlas = 0
+                subscription_anlas = 0
+                fixed_anlas = 0
 
             return {
                 "anlas": total_anlas,
                 "subscription_anlas": subscription_anlas,
                 "fixed_anlas": fixed_anlas,
                 "tier": data.get("tier", 0),
-                "active": data.get("active", False),
-                "raw": data  # 디버깅용
+                "active": data.get("active", False)
             }
     except Exception as e:
         return {"error": str(e), "anlas": None}

@@ -956,6 +956,109 @@ async def update_config(update: ConfigUpdate):
     return {"success": True}
 
 
+@app.get("/api/nai/subscription")
+async def get_nai_subscription():
+    """NAI 구독 정보 및 Anlas 잔액 조회"""
+    import httpx
+
+    token = CONFIG.get("nai_token", "")
+    if not token:
+        return {"error": "NAI token not set", "anlas": None}
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.get(
+                "https://api.novelai.net/user/subscription",
+                headers={"Authorization": f"Bearer {token}"}
+            )
+
+            if response.status_code != 200:
+                return {"error": f"API error: {response.status_code}", "anlas": None}
+
+            data = response.json()
+            # trainingStepsLeft: 구독으로 받은 Anlas (매월 리셋)
+            # fixedTrainingStepsLeft: 구매한 Anlas (영구)
+            subscription_anlas = data.get("trainingStepsLeft", {}).get("fixedTrainingStepsLeft", 0)
+            fixed_anlas = data.get("trainingStepsLeft", {}).get("purchasedTrainingSteps", 0)
+
+            # 실제 응답 구조에 맞게 조정
+            total_anlas = subscription_anlas + fixed_anlas
+
+            return {
+                "anlas": total_anlas,
+                "subscription_anlas": subscription_anlas,
+                "fixed_anlas": fixed_anlas,
+                "tier": data.get("tier", 0),
+                "active": data.get("active", False),
+                "raw": data  # 디버깅용
+            }
+    except Exception as e:
+        return {"error": str(e), "anlas": None}
+
+
+def calculate_anlas_cost(width: int, height: int, steps: int, is_opus: bool = False,
+                         vibe_count: int = 0, has_char_ref: bool = False) -> int:
+    """NAI 이미지 생성 Anlas 소모량 계산"""
+    # Opus 구독자는 일정 조건에서 무료
+    # 기본 해상도(1024x1024 이하)에서 28 steps 이하면 무료
+
+    pixels = width * height
+    base_pixels = 1024 * 1024  # 기준 해상도
+
+    # Opus 무료 조건 체크
+    if is_opus and pixels <= base_pixels and steps <= 28 and vibe_count <= 0 and not has_char_ref:
+        return 0
+
+    # 기본 비용 계산 (해상도 기반)
+    if pixels <= 640 * 640:
+        base_cost = 4
+    elif pixels <= 832 * 1216:  # Portrait/Landscape
+        base_cost = 8
+    elif pixels <= 1024 * 1024:
+        base_cost = 10
+    elif pixels <= 1216 * 832:
+        base_cost = 8
+    elif pixels <= 1024 * 1536:
+        base_cost = 16
+    elif pixels <= 1536 * 1024:
+        base_cost = 16
+    else:
+        # 큰 해상도
+        base_cost = int(pixels / base_pixels * 20)
+
+    # Steps 보정 (28 초과시)
+    if steps > 28:
+        base_cost = int(base_cost * (steps / 28))
+
+    # Vibe Transfer 추가 비용 (4개 초과시 개당 2 Anlas)
+    if vibe_count > 4:
+        base_cost += (vibe_count - 4) * 2
+
+    return base_cost
+
+
+@app.post("/api/nai/calculate-cost")
+async def calculate_cost(request: dict):
+    """Anlas 소모량 계산"""
+    width = request.get("width", 832)
+    height = request.get("height", 1216)
+    steps = request.get("steps", 28)
+    is_opus = request.get("is_opus", False)
+    vibe_count = request.get("vibe_count", 0)
+    has_char_ref = request.get("has_char_ref", False)
+    count = request.get("count", 1)  # 생성 횟수
+
+    cost_per_image = calculate_anlas_cost(width, height, steps, is_opus, vibe_count, has_char_ref)
+    total_cost = cost_per_image * count
+
+    return {
+        "cost_per_image": cost_per_image,
+        "total_cost": total_cost,
+        "count": count,
+        "is_free": cost_per_image == 0
+    }
+
+
 @app.get("/api/models")
 async def list_models():
     checkpoints_dir = Path(CONFIG.get("checkpoints_dir", CHECKPOINTS_DIR))

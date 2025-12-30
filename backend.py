@@ -903,6 +903,7 @@ class GenerationQueue:
         job_id = str(uuid.uuid4())[:8]
         job = {"id": job_id, "request": request}
         self.queue.append(job)
+        print(f"[Queue] Job added: {job_id}, queue size: {len(self.queue)}")
         return job_id
     
     def get_next_job(self):
@@ -946,22 +947,30 @@ gen_queue = GenerationQueue()
 
 async def process_queue():
     """큐 처리 루프"""
+    print("[Queue] Queue processor started")
     while True:
         if not gen_queue.is_processing and gen_queue.queue:
+            print(f"[Queue] Found job in queue, processing... (queue size: {len(gen_queue.queue)})")
             job = gen_queue.get_next_job()
             if job:
                 gen_queue.is_processing = True
                 gen_queue.current_job = job
                 gen_queue.current_job_id = job["id"]
                 gen_queue.cancel_current = False
-                
-                await process_job(job)
-                
+
+                try:
+                    await process_job(job)
+                except Exception as e:
+                    print(f"[Queue] Error processing job: {e}")
+                    import traceback
+                    traceback.print_exc()
+
                 gen_queue.is_processing = False
                 gen_queue.current_job = None
                 gen_queue.current_job_id = None
                 gen_queue.cancel_current = False
-        
+                print(f"[Queue] Job completed")
+
         await asyncio.sleep(0.1)
 
 

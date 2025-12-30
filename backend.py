@@ -463,13 +463,13 @@ class MultiGenerateRequest(BaseModel):
     model: str = ""
     loras: List[dict] = []
     output_folder: str = ""  # 비어있으면 outputs에 직접 저장, 있으면 outputs/폴더명에 저장
-    
+
     # NAI Vibe Transfer
     vibe_transfer: List[dict] = []
-    
-    # NAI Character Reference
+
+    # NAI Character Reference (V4.5 only)
     character_reference: Optional[dict] = None
-    
+
     # Upscale (Local only)
     enable_upscale: bool = False
     upscale_model: str = ""

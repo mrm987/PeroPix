@@ -1197,10 +1197,14 @@ class GenerationQueue:
     
     async def broadcast(self, data):
         """모든 클라이언트에 메시지 전송"""
+        msg_type = data.get('type', 'unknown')
+        if msg_type == 'image':
+            print(f"[Broadcast] Sending image to {len(self.clients)} clients")
         for client in self.clients[:]:
             try:
                 await client.put(data)
-            except:
+            except Exception as e:
+                print(f"[Broadcast] Failed to send to client: {e}")
                 self.clients.remove(client)
 
 gen_queue = GenerationQueue()
@@ -1353,6 +1357,7 @@ async def process_job(job):
             gen_queue.completed_images += 1
             gen_queue.current_job_progress += 1
 
+            print(f"[Backend] Broadcasting image: {filename}, slot_index={slot_index}, clients={len(gen_queue.clients)}")
             await gen_queue.broadcast({
                 "type": "image",
                 "job_id": job_id,

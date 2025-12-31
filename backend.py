@@ -1376,6 +1376,41 @@ async def get_config():
     }
 
 
+@app.post("/api/open-folder")
+async def open_folder(request: dict):
+    """폴더를 파일 탐색기로 열기"""
+    import subprocess
+    import platform
+
+    folder_type = request.get("folder", "")
+
+    folder_map = {
+        "outputs": OUTPUT_DIR,
+        "vibe_cache": VIBE_CACHE_DIR,
+        "checkpoints": Path(CONFIG.get("checkpoints_dir", CHECKPOINTS_DIR)),
+        "loras": Path(CONFIG.get("lora_dir", LORA_DIR)),
+    }
+
+    folder_path = folder_map.get(folder_type)
+    if not folder_path:
+        return {"error": "Unknown folder type"}
+
+    # 폴더가 없으면 생성
+    folder_path.mkdir(parents=True, exist_ok=True)
+
+    try:
+        system = platform.system()
+        if system == "Windows":
+            subprocess.Popen(["explorer", str(folder_path)])
+        elif system == "Darwin":  # macOS
+            subprocess.Popen(["open", str(folder_path)])
+        else:  # Linux
+            subprocess.Popen(["xdg-open", str(folder_path)])
+        return {"success": True, "path": str(folder_path)}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @app.post("/api/config")
 async def update_config(update: ConfigUpdate):
     global CONFIG

@@ -1579,9 +1579,14 @@
 
                             <div id="vibeList" class="vibe-list"></div>
 
-                            <button type="button" class="btn btn-secondary" id="addVibeBtn" style="width: 100%; margin-top: 8px;">
-                                + 바이브 추가
-                            </button>
+                            <div style="display: flex; gap: 8px; margin-top: 8px;">
+                                <button type="button" class="btn btn-secondary" id="addVibeBtn" style="flex: 1;">
+                                    + 바이브 추가
+                                </button>
+                                <button type="button" class="btn btn-secondary" id="openVibeFolderBtn" title="바이브 캐시 폴더 열기" style="padding: 8px 12px;">
+                                    📁
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -1636,14 +1641,22 @@
                         <div class="section-title">Local Settings</div>
                         
                         <label>Model</label>
-                        <select id="localModel">
-                            <option value="">-- Select Model --</option>
-                        </select>
-                        
+                        <div style="display: flex; gap: 8px;">
+                            <select id="localModel" style="flex: 1;">
+                                <option value="">-- Select Model --</option>
+                            </select>
+                            <button type="button" class="btn btn-secondary" id="openCheckpointsFolderBtn" title="체크포인트 폴더 열기" style="padding: 8px 12px;">
+                                📁
+                            </button>
+                        </div>
+
                         <label>LoRAs</label>
                         <div class="lora-list" id="loraList">
                             <div style="color: var(--text-dim); font-size: 0.85rem; padding: 8px;">Loading...</div>
                         </div>
+                        <button type="button" class="btn btn-secondary" id="openLorasFolderBtn" title="LoRA 폴더 열기" style="width: 100%; margin-top: 8px;">
+                            📁 LoRA 폴더 열기
+                        </button>
                     </div>
                     
                     <div class="section">
@@ -1844,6 +1857,10 @@
                     <button type="button" class="header-btn" id="syncScrollBtn" title="Sync scroll across all slots">
                         <span>🔗</span>
                         <span>Sync</span>
+                    </button>
+                    <button type="button" class="header-btn" id="openOutputFolderBtn" title="출력 폴더 열기">
+                        <span>📁</span>
+                        <span>Open Folder</span>
                     </button>
                     <button type="button" class="header-btn" id="clearImagesBtn" title="Clear preview images (files are not deleted)">
                         <span>🧹</span>
@@ -3621,7 +3638,29 @@
         cancelCurrentBtn.onclick = cancelCurrent;
         clearQueueBtn.onclick = clearQueue;
         document.getElementById('clearImagesBtn').onclick = clearResults;
-        
+
+        // 폴더 열기 버튼 핸들러
+        async function openFolder(folderType) {
+            try {
+                const response = await fetch(`${API_BASE}/api/open-folder`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ folder: folderType })
+                });
+                const data = await response.json();
+                if (data.error) {
+                    showToast(`폴더 열기 실패: ${data.error}`, 'error');
+                }
+            } catch (e) {
+                showToast('폴더 열기 실패', 'error');
+            }
+        }
+
+        document.getElementById('openOutputFolderBtn').onclick = () => openFolder('outputs');
+        document.getElementById('openVibeFolderBtn').onclick = () => openFolder('vibe_cache');
+        document.getElementById('openCheckpointsFolderBtn').onclick = () => openFolder('checkpoints');
+        document.getElementById('openLorasFolderBtn').onclick = () => openFolder('loras');
+
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 lightbox.classList.remove('active');

@@ -1659,6 +1659,39 @@ async def delete_gallery_image(filename: str):
         return {"success": False, "error": str(e)}
 
 
+@app.patch("/api/gallery/{filename}")
+async def rename_gallery_image(filename: str, request: Request):
+    """갤러리 이미지 이름 변경"""
+    data = await request.json()
+    new_name = data.get("new_name", "").strip()
+
+    if not new_name:
+        return {"success": False, "error": "New name is required"}
+
+    # 확장자 처리
+    if not new_name.lower().endswith(".png"):
+        new_name += ".png"
+
+    # 안전한 파일명인지 확인
+    if "/" in new_name or "\\" in new_name or ".." in new_name:
+        return {"success": False, "error": "Invalid filename"}
+
+    old_path = GALLERY_DIR / filename
+    new_path = GALLERY_DIR / new_name
+
+    if not old_path.exists():
+        return {"success": False, "error": "Image not found"}
+
+    if new_path.exists() and old_path != new_path:
+        return {"success": False, "error": "File with this name already exists"}
+
+    try:
+        old_path.rename(new_path)
+        return {"success": True, "new_filename": new_name}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 @app.get("/")
 async def serve_index():
     """Serve index.html"""

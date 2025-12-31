@@ -1550,7 +1550,7 @@
         }
         .gallery-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
             gap: 16px;
             width: 100%;
             align-items: start;
@@ -1574,13 +1574,46 @@
         .gallery-item-info {
             padding: 12px;
         }
+        .gallery-item-info .filename-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 4px;
+        }
         .gallery-item-info .filename {
             font-size: 0.85rem;
             color: var(--text);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            margin-bottom: 4px;
+            flex: 1;
+            min-width: 0;
+            cursor: pointer;
+        }
+        .gallery-item-info .filename:hover {
+            color: var(--accent-gold);
+        }
+        .gallery-item-info .filename-input {
+            flex: 1;
+            min-width: 0;
+            font-size: 0.85rem;
+            padding: 2px 6px;
+            border: 1px solid var(--accent-gold);
+            border-radius: 4px;
+            background: var(--bg);
+            color: var(--text);
+        }
+        .gallery-item-info .rename-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.75rem;
+            padding: 2px;
+            opacity: 0.5;
+            transition: opacity 0.2s;
+        }
+        .gallery-item-info .rename-btn:hover {
+            opacity: 1;
         }
         .gallery-item-info .seed {
             font-size: 0.75rem;
@@ -5340,10 +5373,14 @@
             images.forEach(img => {
                 const item = document.createElement('div');
                 item.className = 'gallery-item';
+                item._filename = img.filename;
                 item.innerHTML = `
                     <img src="data:image/png;base64,${img.thumbnail}" alt="">
                     <div class="gallery-item-info">
-                        <div class="filename">${img.filename}</div>
+                        <div class="filename-row">
+                            <span class="filename" title="${img.filename}">${img.filename.replace('.png', '')}</span>
+                            <button class="rename-btn" title="이름 변경">✏️</button>
+                        </div>
                         <div class="seed">${img.seed ? 'Seed: ' + img.seed : '메타데이터 없음'}</div>
                     </div>
                     <div class="gallery-item-actions">
@@ -5354,10 +5391,10 @@
                     </div>
                 `;
 
-                // 이미지 클릭 - 라이트박스
-                item.querySelector('img').onclick = async () => {
+                // 라이트박스 표시 함수
+                const showLightbox = async () => {
                     try {
-                        const response = await fetch(`${API_BASE}/api/gallery/${img.filename}`);
+                        const response = await fetch(`${API_BASE}/api/gallery/${item._filename}`);
                         const result = await response.json();
                         if (result.success) {
                             lightboxImg.src = 'data:image/png;base64,' + result.image;
@@ -5368,15 +5405,96 @@
                     }
                 };
 
-                // 프롬프트 복사
+                // 이미지 클릭 - 라이트박스
+                item.querySelector('img').onclick = showLightbox;
+
+                // 파일명 클릭 - 라이트박스
+                item.querySelector('.filename').onclick = (e) => {
+                    e.stopPropagation();
+                    showLightbox();
+                };
+
+                // 이름 변경
+                item.querySelector('.rename-btn').onclick = (e) => {
+                    e.stopPropagation();
+                    const filenameRow = item.querySelector('.filename-row');
+                    const filenameSpan = item.querySelector('.filename');
+                    const currentName = item._filename.replace('.png', '');
+
+                    // 입력 필드로 교체
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.className = 'filename-input';
+                    input.value = currentName;
+
+                    filenameSpan.style.display = 'none';
+                    filenameRow.insertBefore(input, filenameRow.querySelector('.rename-btn'));
+                    input.focus();
+                    input.select();
+
+                    const saveRename = async () => {
+                        const newName = input.value.trim();
+                        if (!newName || newName === currentName) {
+                            // 취소
+                            input.remove();
+                            filenameSpan.style.display = '';
+                            return;
+                        }
+
+                        try {
+                            const response = await fetch(`${API_BASE}/api/gallery/${item._filename}`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ new_name: newName })
+                            });
+                            const result = await response.json();
+                            if (result.success) {
+                                item._filename = result.new_filename;
+                                filenameSpan.textContent = newName;
+                                filenameSpan.title = result.new_filename;
+                                showToast('이름 변경됨', 'success');
+                            } else {
+                                showToast(result.error || '이름 변경 실패', 'error');
+                            }
+                        } catch (err) {
+                            showToast('이름 변경 오류', 'error');
+                        }
+
+                        input.remove();
+                        filenameSpan.style.display = '';
+                    };
+
+                    input.onblur = saveRename;
+                    input.onkeydown = (ke) => {
+                        if (ke.key === 'Enter') {
+                            ke.preventDefault();
+                            input.blur();
+                        } else if (ke.key === 'Escape') {
+                            input.value = currentName;
+                            input.blur();
+                        }
+                    };
+                };
+
+                // 프롬프트 적용 (확인 팝업)
                 item.querySelector('.copy-prompt-btn').onclick = async (e) => {
                     e.stopPropagation();
                     try {
-                        const response = await fetch(`${API_BASE}/api/gallery/${img.filename}`);
+                        const response = await fetch(`${API_BASE}/api/gallery/${item._filename}`);
                         const result = await response.json();
                         if (result.success && result.metadata && result.metadata.prompt) {
-                            await navigator.clipboard.writeText(result.metadata.prompt);
-                            showToast('프롬프트 복사됨', 'success');
+                            const prompt = result.metadata.prompt;
+                            const previewPrompt = prompt.length > 100 ? prompt.substring(0, 100) + '...' : prompt;
+                            showConfirmModal(
+                                '📋 프롬프트 적용',
+                                `<p>이 프롬프트를 적용하시겠습니까?</p><div class="metadata" style="max-height: 150px; overflow-y: auto; font-size: 0.8rem; color: var(--text-dim); margin-top: 8px;">${previewPrompt}</div>`,
+                                async () => {
+                                    document.getElementById('prompt').value = prompt;
+                                    await navigator.clipboard.writeText(prompt);
+                                    showToast('프롬프트 적용 및 복사됨', 'success');
+                                },
+                                '적용'
+                            );
                         } else {
                             showToast('프롬프트 없음', 'warning');
                         }
@@ -5385,13 +5503,20 @@
                     }
                 };
 
-                // 시드 복사
+                // 시드 적용 (확인 팝업)
                 item.querySelector('.copy-seed-btn').onclick = async (e) => {
                     e.stopPropagation();
                     if (img.seed) {
-                        await navigator.clipboard.writeText(String(img.seed));
-                        document.getElementById('seed').value = img.seed;
-                        showToast('시드 복사 및 적용됨', 'success');
+                        showConfirmModal(
+                            '🎲 시드 적용',
+                            `<p>이 시드를 적용하시겠습니까?</p><div class="metadata" style="font-size: 0.9rem; margin-top: 8px;"><strong>Seed:</strong> ${img.seed}</div>`,
+                            async () => {
+                                document.getElementById('seed').value = img.seed;
+                                await navigator.clipboard.writeText(String(img.seed));
+                                showToast('시드 적용 및 복사됨', 'success');
+                            },
+                            '적용'
+                        );
                     } else {
                         showToast('시드 정보 없음', 'warning');
                     }
@@ -5401,7 +5526,7 @@
                 item.querySelector('.apply-all-btn').onclick = async (e) => {
                     e.stopPropagation();
                     try {
-                        const response = await fetch(`${API_BASE}/api/gallery/${img.filename}`);
+                        const response = await fetch(`${API_BASE}/api/gallery/${item._filename}`);
                         const result = await response.json();
                         if (result.success && result.metadata) {
                             const meta = result.metadata;
@@ -5437,7 +5562,7 @@
                         '<p>이 이미지를 갤러리에서 삭제하시겠습니까?</p>',
                         async () => {
                             try {
-                                const response = await fetch(`${API_BASE}/api/gallery/${img.filename}`, {
+                                const response = await fetch(`${API_BASE}/api/gallery/${item._filename}`, {
                                     method: 'DELETE'
                                 });
                                 const result = await response.json();

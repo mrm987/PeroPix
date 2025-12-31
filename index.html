@@ -138,7 +138,7 @@
             display: block;
             font-size: 0.85rem;
             margin-bottom: 4px;
-            color: var(--text-dim);
+            color: #c8d0dc;
         }
         
         input, select, textarea {
@@ -1155,6 +1155,7 @@
         }
         
         .slot-image-card {
+            position: relative;
             background: var(--bg);
             border-radius: 8px;
             overflow: hidden;
@@ -1278,7 +1279,185 @@
         }
         
         .lightbox .close:hover { opacity: 1; }
-        
+
+        /* Drop Overlay */
+        .drop-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(59, 130, 246, 0.15);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            border: 4px dashed #3b82f6;
+            pointer-events: none;
+        }
+        .drop-overlay.active { display: flex; }
+        .drop-overlay-content {
+            background: var(--bg-light);
+            padding: 40px 60px;
+            border-radius: 16px;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+        .drop-overlay-content .icon { font-size: 48px; margin-bottom: 16px; }
+        .drop-overlay-content h3 { margin: 0 0 8px 0; font-size: 1.5rem; }
+        .drop-overlay-content p { margin: 0; color: var(--text-dim); }
+
+        /* Drop Confirm Modal */
+        .drop-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 10000;
+            justify-content: center;
+            align-items: center;
+        }
+        .drop-modal.active { display: flex; }
+        .drop-modal-content {
+            background: var(--bg-light);
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+        }
+        .drop-modal-content h3 { margin: 0 0 16px 0; }
+        .drop-modal-content .preview {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+        .drop-modal-content .metadata {
+            background: var(--bg);
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 16px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        .drop-modal-content .metadata div { margin-bottom: 4px; }
+        .drop-modal-content .buttons { display: flex; gap: 12px; justify-content: flex-end; }
+
+        /* Mode Toggle */
+        .mode-toggle {
+            display: flex;
+            background: var(--bg);
+            border-radius: 8px;
+            padding: 4px;
+            gap: 4px;
+        }
+        .mode-btn {
+            padding: 8px 16px;
+            border: none;
+            background: transparent;
+            color: var(--text-dim);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        .mode-btn:hover { color: var(--text); }
+        .mode-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Gallery */
+        .gallery-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 16px;
+        }
+        .gallery-item {
+            background: var(--bg-light);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: transform 0.2s;
+            cursor: pointer;
+        }
+        .gallery-item:hover { transform: translateY(-4px); }
+        .gallery-item img {
+            width: 100%;
+            aspect-ratio: 1;
+            object-fit: cover;
+        }
+        .gallery-item-info {
+            padding: 12px;
+        }
+        .gallery-item-info .filename {
+            font-size: 0.85rem;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 4px;
+        }
+        .gallery-item-info .seed {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+        }
+        .gallery-item-actions {
+            display: flex;
+            gap: 8px;
+            padding: 8px 12px 12px;
+        }
+        .gallery-item-actions button {
+            flex: 1;
+            padding: 6px 8px;
+            font-size: 0.75rem;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .gallery-item-actions button:hover {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+        .gallery-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            min-height: 300px;
+            color: var(--text-dim);
+            text-align: center;
+        }
+        .gallery-empty .icon { font-size: 64px; margin-bottom: 16px; opacity: 0.5; }
+        .gallery-empty p { margin: 0 0 8px 0; font-size: 1.1rem; }
+        .gallery-empty small { opacity: 0.7; }
+
+        /* Slot image save button */
+        .slot-image-card .save-gallery-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(0,0,0,0.7);
+            border: none;
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s;
+            font-size: 14px;
+        }
+        .slot-image-card:hover .save-gallery-btn { opacity: 1; }
+        .slot-image-card .save-gallery-btn:hover { background: var(--primary); }
+        .slot-image-card .save-gallery-btn.saved { color: gold; opacity: 1; }
+
         /* Settings Modal */
         .modal {
             display: none;
@@ -1580,10 +1759,10 @@
                             <div id="vibeList" class="vibe-list"></div>
 
                             <div style="display: flex; gap: 8px; margin-top: 8px;">
-                                <button type="button" class="btn btn-secondary" id="addVibeBtn" style="flex: 1;">
+                                <button type="button" class="btn btn-secondary" id="addVibeBtn" style="flex: 1; padding: 10px 12px; font-size: 14px;">
                                     + 바이브 추가
                                 </button>
-                                <button type="button" class="btn btn-secondary" id="openVibeFolderBtn" title="바이브 캐시 폴더 열기" style="padding: 8px 12px;">
+                                <button type="button" class="btn btn-secondary" id="openVibeFolderBtn" title="바이브 캐시 폴더 열기" style="padding: 6px 8px; font-size: 12px;">
                                     📁
                                 </button>
                             </div>
@@ -1832,7 +2011,10 @@
         <!-- Main -->
         <main class="main">
             <div class="slots-header">
-                <span>Prompt Slots</span>
+                <div class="mode-toggle">
+                    <button type="button" class="mode-btn active" id="slotModeBtn">Slot Mode</button>
+                    <button type="button" class="mode-btn" id="galleryModeBtn">Gallery</button>
+                </div>
                 <div style="display: flex; gap: 8px; align-items: center;">
                     <div class="preset-dropdown" id="presetDropdown">
                         <button type="button" class="header-btn preset-btn" id="presetBtn">
@@ -1851,8 +2033,8 @@
                         </div>
                     </div>
                     <div class="prefix-input-wrapper">
-                        <span class="prefix-label">📁 Folder:</span>
-                        <input type="text" id="outputFolder" value="" placeholder="(outputs에 저장)" class="prefix-input">
+                        <span class="prefix-label">📁 Sub Folder:</span>
+                        <input type="text" id="outputFolder" value="" placeholder="optional" class="prefix-input">
                     </div>
                     <button type="button" class="header-btn" id="syncScrollBtn" title="Sync scroll across all slots">
                         <span>🔗</span>
@@ -1874,6 +2056,16 @@
                     <!-- 슬롯들이 가로로 배치됨 -->
                 </div>
             </div>
+            <div class="gallery-container" id="galleryContainer" style="display: none;">
+                <div class="gallery-grid" id="galleryGrid">
+                    <!-- 갤러리 이미지들 -->
+                </div>
+                <div class="gallery-empty" id="galleryEmpty">
+                    <div class="icon">🖼️</div>
+                    <p>갤러리가 비어있습니다</p>
+                    <small>이미지에서 ⭐ 버튼을 눌러 갤러리에 저장하세요</small>
+                </div>
+            </div>
         </main>
     </div>
     
@@ -1882,7 +2074,29 @@
         <span class="close">&times;</span>
         <img src="" alt="">
     </div>
-    
+
+    <!-- Drop Overlay -->
+    <div class="drop-overlay" id="dropOverlay">
+        <div class="drop-overlay-content">
+            <div class="icon">📥</div>
+            <h3>이미지 드롭</h3>
+            <p>바이브 또는 생성 이미지를 드롭하세요</p>
+        </div>
+    </div>
+
+    <!-- Drop Confirm Modal -->
+    <div class="drop-modal" id="dropModal">
+        <div class="drop-modal-content">
+            <h3 id="dropModalTitle">이미지 가져오기</h3>
+            <img id="dropModalPreview" class="preview" src="" alt="">
+            <div id="dropModalMetadata" class="metadata"></div>
+            <div class="buttons">
+                <button type="button" class="btn btn-secondary" id="dropModalCancel">취소</button>
+                <button type="button" class="btn btn-primary" id="dropModalConfirm">적용</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Settings Modal -->
     <div class="modal" id="settingsModal">
         <div class="modal-content">
@@ -2221,34 +2435,81 @@
             // slotIndex로 슬롯 찾기
             const slots = slotsContainer.querySelectorAll('.slot');
             if (slotIndex >= slots.length) return;
-            
+
             const slot = slots[slotIndex];
             const imagesContainer = slot.querySelector('.slot-images');
-            
+
             // 빈 상태 제거
             const empty = imagesContainer.querySelector('.slot-empty');
             if (empty) empty.remove();
-            
+
             const card = document.createElement('div');
             card.className = 'slot-image-card';
             card.innerHTML = `
                 <img src="data:image/png;base64,${data.image}" alt="" draggable="false">
+                <button type="button" class="save-gallery-btn" title="갤러리에 저장">⭐</button>
                 <div class="info">
                     <div class="filename" title="${data.filename}">${data.filename}</div>
                     <div class="seed">Seed: ${data.seed}</div>
                 </div>
             `;
-            
+
+            // 이미지 데이터 저장 (갤러리 저장용)
+            card._imageData = {
+                image: data.image,
+                filename: data.filename,
+                seed: data.seed,
+                prompt: data.prompt || ''
+            };
+
+            // 갤러리 저장 버튼
+            const saveBtn = card.querySelector('.save-gallery-btn');
+            saveBtn.onclick = async (e) => {
+                e.stopPropagation();
+                if (saveBtn.classList.contains('saved')) return;
+
+                try {
+                    const response = await fetch(`${API_BASE}/api/gallery/save`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            image: card._imageData.image,
+                            filename: card._imageData.filename,
+                            metadata: {
+                                seed: card._imageData.seed,
+                                prompt: card._imageData.prompt,
+                                // 현재 설정값도 저장
+                                width: parseInt(document.getElementById('width').value),
+                                height: parseInt(document.getElementById('height').value),
+                                steps: parseInt(document.getElementById('steps').value),
+                                scale: parseFloat(document.getElementById('cfg').value),
+                                sampler: document.getElementById('sampler').value,
+                                uc: document.getElementById('negativePrompt').value
+                            }
+                        })
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        saveBtn.classList.add('saved');
+                        showToast('갤러리에 저장됨', 'success');
+                    } else {
+                        showToast('저장 실패: ' + result.error, 'error');
+                    }
+                } catch (err) {
+                    showToast('저장 오류: ' + err.message, 'error');
+                }
+            };
+
             // 드래그와 클릭 구분
             const img = card.querySelector('img');
             let imgMouseDownX = 0;
             let imgMouseDownY = 0;
-            
+
             img.addEventListener('mousedown', (e) => {
                 imgMouseDownX = e.clientX;
                 imgMouseDownY = e.clientY;
             });
-            
+
             img.addEventListener('mouseup', (e) => {
                 const dx = Math.abs(e.clientX - imgMouseDownX);
                 const dy = Math.abs(e.clientY - imgMouseDownY);
@@ -2258,7 +2519,7 @@
                     lightbox.classList.add('active');
                 }
             });
-            
+
             // 최신 이미지를 위에 추가
             imagesContainer.insertBefore(card, imagesContainer.firstChild);
         }
@@ -3154,7 +3415,8 @@
                     request.vibe_transfer = vibeList.map(v => ({
                         image: v.image,
                         info_extracted: v.info_extracted,
-                        strength: v.strength
+                        strength: v.strength,
+                        name: v.name || 'vibe'
                     }));
                 }
 
@@ -4364,6 +4626,366 @@
         
         // 페이지 떠날 때 저장
         window.addEventListener('beforeunload', saveAppSettings);
+
+        // ============================================================
+        // Gallery Mode
+        // ============================================================
+        const slotModeBtn = document.getElementById('slotModeBtn');
+        const galleryModeBtn = document.getElementById('galleryModeBtn');
+        const slotsWrapper = document.getElementById('slotsWrapper');
+        const galleryContainer = document.getElementById('galleryContainer');
+        const galleryGrid = document.getElementById('galleryGrid');
+        const galleryEmpty = document.getElementById('galleryEmpty');
+
+        let currentMode = 'slot'; // 'slot' or 'gallery'
+
+        slotModeBtn.onclick = () => {
+            if (currentMode === 'slot') return;
+            currentMode = 'slot';
+            slotModeBtn.classList.add('active');
+            galleryModeBtn.classList.remove('active');
+            slotsWrapper.style.display = 'flex';
+            galleryContainer.style.display = 'none';
+        };
+
+        galleryModeBtn.onclick = () => {
+            if (currentMode === 'gallery') return;
+            currentMode = 'gallery';
+            galleryModeBtn.classList.add('active');
+            slotModeBtn.classList.remove('active');
+            slotsWrapper.style.display = 'none';
+            galleryContainer.style.display = 'flex';
+            loadGallery();
+        };
+
+        async function loadGallery() {
+            try {
+                const response = await fetch(`${API_BASE}/api/gallery`);
+                const result = await response.json();
+
+                if (result.images && result.images.length > 0) {
+                    galleryEmpty.style.display = 'none';
+                    galleryGrid.style.display = 'grid';
+                    renderGallery(result.images);
+                } else {
+                    galleryEmpty.style.display = 'flex';
+                    galleryGrid.style.display = 'none';
+                    galleryGrid.innerHTML = '';
+                }
+            } catch (err) {
+                showToast('갤러리 로드 실패: ' + err.message, 'error');
+            }
+        }
+
+        function renderGallery(images) {
+            galleryGrid.innerHTML = '';
+
+            images.forEach(img => {
+                const item = document.createElement('div');
+                item.className = 'gallery-item';
+                item.innerHTML = `
+                    <img src="data:image/png;base64,${img.thumbnail}" alt="">
+                    <div class="gallery-item-info">
+                        <div class="filename">${img.filename}</div>
+                        <div class="seed">${img.seed ? 'Seed: ' + img.seed : '메타데이터 없음'}</div>
+                    </div>
+                    <div class="gallery-item-actions">
+                        <button class="copy-prompt-btn" title="프롬프트 복사">📋 Prompt</button>
+                        <button class="copy-seed-btn" title="시드 복사">🎲 Seed</button>
+                        <button class="apply-all-btn" title="전체 설정 적용">📥 Apply</button>
+                        <button class="delete-btn" title="삭제">🗑️</button>
+                    </div>
+                `;
+
+                // 이미지 클릭 - 라이트박스
+                item.querySelector('img').onclick = async () => {
+                    try {
+                        const response = await fetch(`${API_BASE}/api/gallery/${img.filename}`);
+                        const result = await response.json();
+                        if (result.success) {
+                            lightboxImg.src = 'data:image/png;base64,' + result.image;
+                            lightbox.classList.add('active');
+                        }
+                    } catch (err) {
+                        showToast('이미지 로드 실패', 'error');
+                    }
+                };
+
+                // 프롬프트 복사
+                item.querySelector('.copy-prompt-btn').onclick = async (e) => {
+                    e.stopPropagation();
+                    try {
+                        const response = await fetch(`${API_BASE}/api/gallery/${img.filename}`);
+                        const result = await response.json();
+                        if (result.success && result.metadata && result.metadata.prompt) {
+                            await navigator.clipboard.writeText(result.metadata.prompt);
+                            showToast('프롬프트 복사됨', 'success');
+                        } else {
+                            showToast('프롬프트 없음', 'warning');
+                        }
+                    } catch (err) {
+                        showToast('복사 실패', 'error');
+                    }
+                };
+
+                // 시드 복사
+                item.querySelector('.copy-seed-btn').onclick = async (e) => {
+                    e.stopPropagation();
+                    if (img.seed) {
+                        await navigator.clipboard.writeText(String(img.seed));
+                        document.getElementById('seed').value = img.seed;
+                        showToast('시드 복사 및 적용됨', 'success');
+                    } else {
+                        showToast('시드 정보 없음', 'warning');
+                    }
+                };
+
+                // 전체 설정 적용
+                item.querySelector('.apply-all-btn').onclick = async (e) => {
+                    e.stopPropagation();
+                    try {
+                        const response = await fetch(`${API_BASE}/api/gallery/${img.filename}`);
+                        const result = await response.json();
+                        if (result.success && result.metadata) {
+                            const meta = result.metadata;
+                            if (meta.prompt) document.getElementById('basePrompt').value = meta.prompt;
+                            if (meta.uc) document.getElementById('negativePrompt').value = meta.uc;
+                            if (meta.seed) document.getElementById('seed').value = meta.seed;
+                            if (meta.width) document.getElementById('width').value = meta.width;
+                            if (meta.height) document.getElementById('height').value = meta.height;
+                            if (meta.steps) document.getElementById('steps').value = meta.steps;
+                            if (meta.scale) document.getElementById('cfg').value = meta.scale;
+                            if (meta.sampler) {
+                                const samplerSelect = document.getElementById('sampler');
+                                if ([...samplerSelect.options].some(o => o.value === meta.sampler)) {
+                                    samplerSelect.value = meta.sampler;
+                                }
+                            }
+                            saveAppSettings();
+                            showToast('설정 적용됨', 'success');
+                        } else {
+                            showToast('메타데이터 없음', 'warning');
+                        }
+                    } catch (err) {
+                        showToast('적용 실패: ' + err.message, 'error');
+                    }
+                };
+
+                // 삭제
+                item.querySelector('.delete-btn').onclick = async (e) => {
+                    e.stopPropagation();
+                    if (!confirm('이 이미지를 갤러리에서 삭제하시겠습니까?')) return;
+                    try {
+                        const response = await fetch(`${API_BASE}/api/gallery/${img.filename}`, {
+                            method: 'DELETE'
+                        });
+                        const result = await response.json();
+                        if (result.success) {
+                            item.remove();
+                            showToast('삭제됨', 'success');
+                            // 갤러리가 비었는지 확인
+                            if (galleryGrid.children.length === 0) {
+                                galleryEmpty.style.display = 'flex';
+                                galleryGrid.style.display = 'none';
+                            }
+                        } else {
+                            showToast('삭제 실패', 'error');
+                        }
+                    } catch (err) {
+                        showToast('삭제 오류: ' + err.message, 'error');
+                    }
+                };
+
+                galleryGrid.appendChild(item);
+            });
+        }
+
+        // ============================================================
+        // 외부 이미지 드롭 처리
+        // ============================================================
+        const dropOverlay = document.getElementById('dropOverlay');
+        const dropModal = document.getElementById('dropModal');
+        let pendingDropData = null;
+
+        // 드래그 이벤트 처리
+        let dragCounter = 0;
+        document.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            dragCounter++;
+            if (e.dataTransfer.types.includes('Files')) {
+                dropOverlay.classList.add('active');
+            }
+        });
+
+        document.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dragCounter--;
+            if (dragCounter === 0) {
+                dropOverlay.classList.remove('active');
+            }
+        });
+
+        document.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+
+        document.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            dragCounter = 0;
+            dropOverlay.classList.remove('active');
+
+            const files = e.dataTransfer.files;
+            if (files.length === 0) return;
+
+            const file = files[0];
+            if (!file.type.startsWith('image/')) {
+                showToast('이미지 파일만 드롭할 수 있습니다', 'error');
+                return;
+            }
+
+            // 이미지를 base64로 변환
+            const base64 = await fileToBase64(file);
+
+            // 서버에서 메타데이터 추출
+            try {
+                const response = await fetch(`${API_BASE}/api/extract-metadata`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: base64 })
+                });
+                const result = await response.json();
+
+                if (!result.success) {
+                    showToast('메타데이터 추출 실패: ' + result.error, 'error');
+                    return;
+                }
+
+                // 모달 표시 준비
+                document.getElementById('dropModalPreview').src = 'data:image/png;base64,' + base64;
+                const metadataDiv = document.getElementById('dropModalMetadata');
+
+                if (result.is_vibe) {
+                    // 바이브 파일
+                    document.getElementById('dropModalTitle').textContent = '🎨 바이브 파일 감지됨';
+                    metadataDiv.innerHTML = `
+                        <div><strong>Strength:</strong> ${result.vibe_strength}</div>
+                        <div><strong>Info Extracted:</strong> ${result.vibe_info_extracted}</div>
+                    `;
+                    document.getElementById('dropModalConfirm').textContent = '바이브에 추가';
+                    pendingDropData = {
+                        type: 'vibe',
+                        image: base64,
+                        strength: result.vibe_strength,
+                        info_extracted: result.vibe_info_extracted,
+                        name: file.name
+                    };
+                } else if (result.is_nai && result.nai_metadata) {
+                    // NAI 생성 이미지
+                    const meta = result.nai_metadata;
+                    document.getElementById('dropModalTitle').textContent = '🖼️ 생성 이미지 메타데이터';
+                    metadataDiv.innerHTML = `
+                        <div><strong>Prompt:</strong> ${(meta.prompt || '').substring(0, 100)}${(meta.prompt || '').length > 100 ? '...' : ''}</div>
+                        <div><strong>Negative:</strong> ${(meta.uc || '').substring(0, 50)}${(meta.uc || '').length > 50 ? '...' : ''}</div>
+                        <div><strong>Seed:</strong> ${meta.seed || 'N/A'}</div>
+                        <div><strong>Size:</strong> ${meta.width}x${meta.height}</div>
+                        <div><strong>Steps:</strong> ${meta.steps}, <strong>CFG:</strong> ${meta.scale}</div>
+                        <div><strong>Sampler:</strong> ${meta.sampler}</div>
+                    `;
+                    document.getElementById('dropModalConfirm').textContent = '설정에 적용';
+                    pendingDropData = {
+                        type: 'nai',
+                        metadata: meta,
+                        image: base64,
+                        name: file.name
+                    };
+                } else {
+                    // 일반 이미지 - 바이브로 추가 제안
+                    document.getElementById('dropModalTitle').textContent = '📷 일반 이미지';
+                    metadataDiv.innerHTML = '<div>메타데이터가 없습니다. 바이브로 추가할 수 있습니다.</div>';
+                    document.getElementById('dropModalConfirm').textContent = '바이브에 추가';
+                    pendingDropData = {
+                        type: 'plain',
+                        image: base64,
+                        name: file.name
+                    };
+                }
+
+                dropModal.classList.add('active');
+
+            } catch (err) {
+                showToast('메타데이터 추출 오류: ' + err.message, 'error');
+            }
+        });
+
+        // 모달 버튼 이벤트
+        document.getElementById('dropModalCancel').onclick = () => {
+            dropModal.classList.remove('active');
+            pendingDropData = null;
+        };
+
+        document.getElementById('dropModalConfirm').onclick = () => {
+            if (!pendingDropData) return;
+
+            if (pendingDropData.type === 'vibe') {
+                // 바이브 리스트에 추가
+                if (vibeList.length >= 16) {
+                    showToast('바이브는 최대 16개까지만 추가할 수 있습니다', 'error');
+                } else {
+                    vibeList.push({
+                        image: pendingDropData.image,
+                        strength: pendingDropData.strength || 0.6,
+                        info_extracted: pendingDropData.info_extracted || 1.0,
+                        name: pendingDropData.name
+                    });
+                    renderVibeList();
+                    saveAppSettings();
+                    updateAnlasCost();
+                    // Vibe Transfer 활성화
+                    document.getElementById('enableVibeTransfer').checked = true;
+                    document.getElementById('vibeTransferSettings').style.display = 'block';
+                    showToast('바이브에 추가됨', 'success');
+                }
+            } else if (pendingDropData.type === 'nai') {
+                // NAI 메타데이터 적용
+                const meta = pendingDropData.metadata;
+                if (meta.prompt) document.getElementById('basePrompt').value = meta.prompt;
+                if (meta.uc) document.getElementById('negativePrompt').value = meta.uc;
+                if (meta.seed) document.getElementById('seed').value = meta.seed;
+                if (meta.width) document.getElementById('width').value = meta.width;
+                if (meta.height) document.getElementById('height').value = meta.height;
+                if (meta.steps) document.getElementById('steps').value = meta.steps;
+                if (meta.scale) document.getElementById('cfg').value = meta.scale;
+                if (meta.sampler) {
+                    const samplerSelect = document.getElementById('sampler');
+                    if ([...samplerSelect.options].some(o => o.value === meta.sampler)) {
+                        samplerSelect.value = meta.sampler;
+                    }
+                }
+                saveAppSettings();
+                showToast('설정이 적용됨', 'success');
+            } else if (pendingDropData.type === 'plain') {
+                // 일반 이미지를 바이브로 추가
+                if (vibeList.length >= 16) {
+                    showToast('바이브는 최대 16개까지만 추가할 수 있습니다', 'error');
+                } else {
+                    vibeList.push({
+                        image: pendingDropData.image,
+                        strength: 0.6,
+                        info_extracted: 1.0,
+                        name: pendingDropData.name
+                    });
+                    renderVibeList();
+                    saveAppSettings();
+                    updateAnlasCost();
+                    document.getElementById('enableVibeTransfer').checked = true;
+                    document.getElementById('vibeTransferSettings').style.display = 'block';
+                    showToast('바이브에 추가됨', 'success');
+                }
+            }
+
+            dropModal.classList.remove('active');
+            pendingDropData = null;
+        };
     </script>
 </body>
 </html>

@@ -539,6 +539,10 @@ NAI_SCHEDULER_MAP = {
 VIBE_CACHE_DIR = APP_DIR / "vibe_cache"
 VIBE_CACHE_DIR.mkdir(exist_ok=True)
 
+# 갤러리 디렉토리
+GALLERY_DIR = APP_DIR / "gallery"
+GALLERY_DIR.mkdir(exist_ok=True)
+
 
 def get_vibe_cache_key(image_base64: str, model: str, info_extracted: float) -> str:
     """이미지 + 모델 + info_extracted로 캐시 키 생성"""
@@ -1392,6 +1396,188 @@ async def health():
     return {"status": "ok"}
 
 
+@app.post("/api/extract-metadata")
+async def extract_metadata(request: dict):
+    """PNG 이미지에서 메타데이터 추출"""
+    lazy_imports()
+
+    image_base64 = request.get("image")
+    if not image_base64:
+        return {"success": False, "error": "No image provided"}
+
+    try:
+        image_data = base64.b64decode(image_base64)
+        image = Image.open(io.BytesIO(image_data))
+
+        metadata = {}
+
+        # PNG 텍스트 메타데이터 추출
+        if hasattr(image, 'info'):
+            for key, value in image.info.items():
+                if isinstance(value, str):
+                    metadata[key] = value
+
+        # 바이브 파일 여부 확인
+        is_vibe = 'vibe_data' in metadata
+
+        # NAI 생성 이미지 여부 확인 (Comment에 JSON 메타데이터)
+        nai_metadata = None
+        if 'Comment' in metadata:
+            try:
+                nai_metadata = json.loads(metadata['Comment'])
+            except:
+                pass
+
+        return {
+            "success": True,
+            "is_vibe": is_vibe,
+            "is_nai": nai_metadata is not None,
+            "vibe_data": metadata.get('vibe_data') if is_vibe else None,
+            "vibe_strength": float(metadata.get('strength', 0.6)) if is_vibe else None,
+            "vibe_info_extracted": float(metadata.get('info_extracted', 1.0)) if is_vibe else None,
+            "nai_metadata": nai_metadata,
+            "raw_metadata": metadata
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ============================================================
+# Gallery API
+# ============================================================
+
+@app.get("/api/gallery")
+async def get_gallery():
+    """갤러리 이미지 목록 조회"""
+    lazy_imports()
+    images = []
+
+    for filepath in sorted(GALLERY_DIR.glob("*.png"), key=lambda x: x.stat().st_mtime, reverse=True):
+        try:
+            image = Image.open(filepath)
+            metadata = {}
+            nai_metadata = None
+
+            if hasattr(image, 'info'):
+                for key, value in image.info.items():
+                    if isinstance(value, str):
+                        metadata[key] = value
+
+            if 'Comment' in metadata:
+                try:
+                    nai_metadata = json.loads(metadata['Comment'])
+                except:
+                    pass
+
+            # 썸네일 생성
+            thumb = image.copy()
+            thumb.thumbnail((300, 300), Image.LANCZOS)
+            buffer = io.BytesIO()
+            thumb.save(buffer, format="PNG")
+            thumb_base64 = base64.b64encode(buffer.getvalue()).decode()
+
+            images.append({
+                "filename": filepath.name,
+                "thumbnail": thumb_base64,
+                "seed": nai_metadata.get("seed") if nai_metadata else None,
+                "prompt": nai_metadata.get("prompt", "")[:100] if nai_metadata else "",
+                "has_metadata": nai_metadata is not None
+            })
+        except Exception as e:
+            print(f"[Gallery] Error loading {filepath}: {e}")
+            continue
+
+    return {"images": images}
+
+
+@app.post("/api/gallery/save")
+async def save_to_gallery(request: dict):
+    """이미지를 갤러리에 저장"""
+    lazy_imports()
+    from PIL.PngImagePlugin import PngInfo
+
+    image_base64 = request.get("image")
+    filename = request.get("filename", "gallery_image.png")
+    metadata = request.get("metadata", {})
+
+    if not image_base64:
+        return {"success": False, "error": "No image provided"}
+
+    try:
+        image_data = base64.b64decode(image_base64)
+        image = Image.open(io.BytesIO(image_data))
+
+        # 고유 파일명 생성
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        base_name = Path(filename).stem
+        new_filename = f"{base_name}_{timestamp}.png"
+        filepath = GALLERY_DIR / new_filename
+
+        # 메타데이터 보존
+        pnginfo = PngInfo()
+        if metadata:
+            pnginfo.add_text("Comment", json.dumps(metadata))
+
+        image.save(filepath, format="PNG", pnginfo=pnginfo)
+
+        return {"success": True, "filename": new_filename}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/api/gallery/{filename}")
+async def get_gallery_image(filename: str):
+    """갤러리 이미지 조회 (전체 크기 + 메타데이터)"""
+    lazy_imports()
+
+    filepath = GALLERY_DIR / filename
+    if not filepath.exists():
+        return {"success": False, "error": "Image not found"}
+
+    try:
+        image = Image.open(filepath)
+        metadata = {}
+        nai_metadata = None
+
+        if hasattr(image, 'info'):
+            for key, value in image.info.items():
+                if isinstance(value, str):
+                    metadata[key] = value
+
+        if 'Comment' in metadata:
+            try:
+                nai_metadata = json.loads(metadata['Comment'])
+            except:
+                pass
+
+        buffer = io.BytesIO()
+        image.save(buffer, format="PNG")
+        image_base64 = base64.b64encode(buffer.getvalue()).decode()
+
+        return {
+            "success": True,
+            "image": image_base64,
+            "metadata": nai_metadata,
+            "filename": filename
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.delete("/api/gallery/{filename}")
+async def delete_gallery_image(filename: str):
+    """갤러리 이미지 삭제"""
+    filepath = GALLERY_DIR / filename
+    if not filepath.exists():
+        return {"success": False, "error": "Image not found"}
+
+    try:
+        filepath.unlink()
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 @app.get("/")
 async def serve_index():
     """Serve index.html"""
@@ -1421,6 +1607,7 @@ async def open_folder(request: dict):
     folder_map = {
         "outputs": OUTPUT_DIR,
         "vibe_cache": VIBE_CACHE_DIR,
+        "gallery": GALLERY_DIR,
         "checkpoints": Path(CONFIG.get("checkpoints_dir", CHECKPOINTS_DIR)),
         "loras": Path(CONFIG.get("lora_dir", LORA_DIR)),
     }
@@ -1434,9 +1621,11 @@ async def open_folder(request: dict):
     try:
         system = platform.system()
         if system == "Windows":
-            subprocess.Popen(["explorer", str(folder_path)])
+            # /select로 열면 폴더 창이 포커스를 받음
+            subprocess.Popen(["explorer", "/select,", str(folder_path)])
         elif system == "Darwin":
-            subprocess.Popen(["open", str(folder_path)])
+            # -R 옵션으로 Finder에서 선택된 상태로 열림
+            subprocess.Popen(["open", "-R", str(folder_path)])
         else:
             subprocess.Popen(["xdg-open", str(folder_path)])
         return {"success": True, "path": str(folder_path)}

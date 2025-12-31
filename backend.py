@@ -1367,7 +1367,29 @@ async def process_job(job):
                         except:
                             pass
 
-            # 추가 메타데이터
+            # PeroPix 전체 설정 메타데이터 저장
+            peropix_metadata = {
+                "prompt": full_prompt,
+                "negative_prompt": req.negative_prompt or "",
+                "seed": actual_seed,
+                "width": req.width,
+                "height": req.height,
+                "steps": req.steps,
+                "cfg": req.cfg,
+                "sampler": req.sampler,
+                "scheduler": req.scheduler,
+                "provider": req.provider,
+                # NAI 설정
+                "nai_model": req.nai_model,
+                "smea": req.smea,
+                "uc_preset": req.uc_preset,
+                "quality_tags": req.quality_tags,
+                # Local 설정
+                "model": req.model,
+            }
+            pnginfo.add_text("peropix", json.dumps(peropix_metadata))
+
+            # 기존 호환성용 개별 필드
             pnginfo.add_text("prompt", full_prompt)
             pnginfo.add_text("seed", str(actual_seed))
             pnginfo.add_text("negative_prompt", req.negative_prompt or "")
@@ -1394,7 +1416,8 @@ async def process_job(job):
                 "filename": filename,
                 "queue_length": len(gen_queue.queue),
                 "global_completed": gen_queue.completed_images,
-                "global_total": gen_queue.total_images
+                "global_total": gen_queue.total_images,
+                "metadata": peropix_metadata  # 전체 설정 메타데이터
             })
             
         except Exception as e:

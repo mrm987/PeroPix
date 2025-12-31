@@ -1519,6 +1519,24 @@
         .slot-image-card .save-gallery-btn:hover { background: var(--primary); opacity: 1; }
         .slot-image-card .save-gallery-btn.saved { color: gold; opacity: 1; }
 
+        /* Load settings button */
+        .slot-image-card .load-settings-btn {
+            position: absolute;
+            bottom: 40px;
+            right: 8px;
+            background: rgba(0,0,0,0.7);
+            border: none;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s;
+            font-size: 11px;
+        }
+        .slot-image-card:hover .load-settings-btn { opacity: 1; }
+        .slot-image-card .load-settings-btn:hover { background: var(--primary); opacity: 1; }
+
         /* Settings Modal */
         .modal {
             display: none;
@@ -2619,19 +2637,21 @@
             card.innerHTML = `
                 <img src="${imgSrc}" alt="" draggable="false">
                 <button type="button" class="save-gallery-btn" title="갤러리에 저장">☆</button>
+                <button type="button" class="load-settings-btn" title="이 이미지의 설정 불러오기">📋 Load</button>
                 <div class="info">
                     <div class="filename" title="${data.filename}">${data.filename}</div>
                     <div class="seed">Seed: ${data.seed}</div>
                 </div>
             `;
 
-            // 이미지 데이터 저장 (갤러리 저장용)
+            // 이미지 데이터 저장 (갤러리 저장용 + 설정 불러오기용)
             card._imageData = {
                 image_path: data.image_path || null,
                 image: data.image || null,  // 하위 호환
                 filename: data.filename,
                 seed: data.seed,
-                prompt: data.prompt || ''
+                prompt: data.prompt || '',
+                metadata: data.metadata || null  // 전체 설정 메타데이터
             };
 
             // 갤러리 저장 버튼
@@ -2672,6 +2692,18 @@
                 } catch (err) {
                     showToast('저장 오류: ' + err.message, 'error');
                 }
+            };
+
+            // 설정 불러오기 버튼
+            const loadSettingsBtn = card.querySelector('.load-settings-btn');
+            loadSettingsBtn.onclick = (e) => {
+                e.stopPropagation();
+                const metadata = card._imageData.metadata;
+                if (!metadata) {
+                    showToast('메타데이터가 없습니다', 'error');
+                    return;
+                }
+                showLoadSettingsConfirm(metadata);
             };
 
             // 드래그와 클릭 구분
@@ -4139,7 +4171,63 @@
             toast.className = 'toast show ' + type;
             setTimeout(() => toast.classList.remove('show'), 3000);
         }
-        
+
+        // 설정 불러오기 확인 팝업
+        function showLoadSettingsConfirm(metadata) {
+            const details = `
+Prompt: ${metadata.prompt?.substring(0, 100)}${metadata.prompt?.length > 100 ? '...' : ''}
+Seed: ${metadata.seed}
+Size: ${metadata.width}x${metadata.height}
+Steps: ${metadata.steps}, CFG: ${metadata.cfg}
+Model: ${metadata.nai_model || metadata.model || 'N/A'}
+            `.trim();
+
+            if (confirm(`이 이미지의 설정을 불러오시겠습니까?\n\n${details}`)) {
+                applyMetadataSettings(metadata);
+            }
+        }
+
+        // 메타데이터 설정 적용
+        function applyMetadataSettings(metadata) {
+            // 프롬프트
+            if (metadata.prompt) document.getElementById('basePrompt').value = metadata.prompt;
+            if (metadata.negative_prompt) document.getElementById('negativePrompt').value = metadata.negative_prompt;
+
+            // 크기
+            if (metadata.width) document.getElementById('width').value = metadata.width;
+            if (metadata.height) document.getElementById('height').value = metadata.height;
+            // 사이즈 프리셋 체크
+            const sizeValue = `${metadata.width}x${metadata.height}`;
+            const sizePreset = document.getElementById('sizePreset');
+            const matchingOption = [...sizePreset.options].find(o => o.value === sizeValue);
+            sizePreset.value = matchingOption ? sizeValue : 'custom';
+
+            // 생성 설정
+            if (metadata.steps) document.getElementById('steps').value = metadata.steps;
+            if (metadata.cfg) document.getElementById('cfg').value = metadata.cfg;
+            if (metadata.seed) document.getElementById('seed').value = metadata.seed;
+            if (metadata.sampler) document.getElementById('sampler').value = metadata.sampler;
+            if (metadata.scheduler) document.getElementById('scheduler').value = metadata.scheduler;
+
+            // NAI 설정
+            if (metadata.nai_model) document.getElementById('naiModel').value = metadata.nai_model;
+            if (metadata.smea) document.getElementById('smea').value = metadata.smea;
+            if (metadata.uc_preset) document.getElementById('ucPreset').value = metadata.uc_preset;
+            if (metadata.quality_tags !== undefined) document.getElementById('qualityTags').checked = metadata.quality_tags;
+
+            // Local 설정
+            if (metadata.model) document.getElementById('localModel').value = metadata.model;
+
+            // Provider 설정
+            if (metadata.provider && metadata.provider !== currentProvider) {
+                // Provider 변경은 복잡하므로 알림만
+                showToast(`원본 Provider: ${metadata.provider}`, 'warning');
+            }
+
+            autoSaveSettings();
+            showToast('설정을 불러왔습니다', 'success');
+        }
+
         // Event listeners
         generateBtn.onclick = addToQueue;
         cancelCurrentBtn.onclick = cancelCurrent;

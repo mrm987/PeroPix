@@ -1626,14 +1626,18 @@ async def open_folder(request: dict):
 
     try:
         system = platform.system()
+        abs_path = str(folder_path.resolve())  # 절대 경로로 변환
+        print(f"[OpenFolder] Opening: {abs_path}")  # 디버그 로그
+
         if system == "Windows":
-            subprocess.Popen(["explorer", str(folder_path)])
+            os.startfile(abs_path)
         elif system == "Darwin":
-            subprocess.Popen(["open", str(folder_path)])
+            subprocess.Popen(["open", abs_path])
         else:
-            subprocess.Popen(["xdg-open", str(folder_path)])
-        return {"success": True, "path": str(folder_path)}
+            subprocess.Popen(["xdg-open", abs_path])
+        return {"success": True, "path": abs_path}
     except Exception as e:
+        print(f"[OpenFolder] Error: {e}")
         return {"error": str(e)}
 
 

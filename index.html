@@ -316,14 +316,15 @@
         
         .characters-header {
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            gap: 4px;
             margin-bottom: 8px;
         }
-        
+
         .characters-header label {
             color: var(--text-dim);
             font-size: 0.85rem;
+            flex: 1;
         }
         
         .add-char-btn {
@@ -394,7 +395,6 @@
         .character-item textarea {
             width: 100%;
             min-height: 40px;
-            max-height: 150px;
             background: var(--bg-light);
             border: 1px solid var(--border);
             border-radius: 4px;
@@ -458,6 +458,33 @@
         .mode-toggle.furry {
             background: var(--bg);
             border-color: var(--accent);
+        }
+
+        /* Collapsible prompts */
+        .collapse-toggle {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            padding: 2px 4px;
+            font-size: 0.8rem;
+            transition: transform 0.2s;
+        }
+        .collapse-toggle:hover {
+            color: var(--text);
+        }
+        .collapse-toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+        .collapsible-content {
+            overflow: hidden;
+            transition: max-height 0.2s ease-out, opacity 0.2s ease-out;
+        }
+        .collapsible-content.collapsed {
+            max-height: 0 !important;
+            opacity: 0;
+            margin: 0;
+            padding: 0;
         }
 
         .prompt-preset-dropdown {
@@ -1824,6 +1851,7 @@
                 <div class="section">
                     <div class="prompt-label-row">
                         <div class="prompt-label-left">
+                            <button type="button" class="collapse-toggle" data-target="basePromptContent" title="접기/펼치기">▼</button>
                             <button type="button" id="modeToggle" class="mode-toggle" title="Anime Mode">🌸</button>
                             <label for="basePrompt">Base Prompt</label>
                         </div>
@@ -1837,21 +1865,29 @@
                             </div>
                         </div>
                     </div>
-                    <textarea id="basePrompt" placeholder="1girl, solo, masterpiece..."></textarea>
-                    
+                    <div id="basePromptContent" class="collapsible-content">
+                        <textarea id="basePrompt" placeholder="1girl, solo, masterpiece..."></textarea>
+                    </div>
+
                     <!-- Characters -->
                     <div class="characters-section">
                         <div class="characters-header">
+                            <button type="button" class="collapse-toggle" data-target="charactersContent" title="접기/펼치기">▼</button>
                             <label>Characters</label>
                             <button type="button" class="add-char-btn" id="addCharBtn" title="Add character">+</button>
                         </div>
-                        <div class="characters-list" id="charactersList">
-                            <!-- 캐릭터들이 여기에 추가됨 -->
+                        <div id="charactersContent" class="collapsible-content">
+                            <div class="characters-list" id="charactersList">
+                                <!-- 캐릭터들이 여기에 추가됨 -->
+                            </div>
                         </div>
                     </div>
-                    
+
                     <div class="prompt-label-row">
-                        <label for="negativePrompt">Negative Prompt</label>
+                        <div class="prompt-label-left">
+                            <button type="button" class="collapse-toggle" data-target="negativePromptContent" title="접기/펼치기">▼</button>
+                            <label for="negativePrompt">Negative Prompt</label>
+                        </div>
                         <div class="prompt-preset-dropdown" data-category="negative">
                             <button type="button" class="prompt-preset-btn" title="Prompt presets">📁 ▼</button>
                             <div class="prompt-preset-menu">
@@ -1862,7 +1898,9 @@
                             </div>
                         </div>
                     </div>
-                    <textarea id="negativePrompt" rows="2" placeholder="lowres, bad quality..."></textarea>
+                    <div id="negativePromptContent" class="collapsible-content">
+                        <textarea id="negativePrompt" rows="2" placeholder="lowres, bad quality..."></textarea>
+                    </div>
                 </div>
                 
                 <!-- NAI Settings -->
@@ -4356,6 +4394,18 @@
         modeToggle.onclick = () => {
             setFurryMode(!furryModeEnabled);
         };
+
+        // Collapse toggle for prompts
+        document.querySelectorAll('.collapse-toggle').forEach(btn => {
+            btn.onclick = () => {
+                const targetId = btn.dataset.target;
+                const target = document.getElementById(targetId);
+                if (target) {
+                    btn.classList.toggle('collapsed');
+                    target.classList.toggle('collapsed');
+                }
+            };
+        });
 
         // 폴더 열기 버튼 핸들러
         async function openFolder(folderType, subfolder = '') {

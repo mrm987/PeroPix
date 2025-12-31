@@ -552,21 +552,110 @@ def get_vibe_cache_key(image_base64: str, model: str, info_extracted: float) -> 
     return f"{image_hash}_{model_short}_{info_str}"
 
 
+def get_next_vibe_number() -> int:
+    """다음 vibe 파일 번호 반환"""
+    existing = list(VIBE_CACHE_DIR.glob("*.png"))
+    if not existing:
+        return 1
+    max_num = 0
+    for f in existing:
+        try:
+            # 파일명: 0.6_0.7_0000001.png -> 마지막 숫자 추출
+            parts = f.stem.split('_')
+            if len(parts) >= 3:
+                num = int(parts[-1])
+                max_num = max(max_num, num)
+        except:
+            pass
+    return max_num + 1
+
+
 def get_cached_vibe(cache_key: str) -> Optional[str]:
-    """캐시된 vibe 데이터 반환"""
-    cache_file = VIBE_CACHE_DIR / f"{cache_key}.vibe"
-    if cache_file.exists():
-        return cache_file.read_text(encoding='utf-8')
+    """캐시된 vibe 데이터 반환 (PNG 메타데이터에서 읽기)"""
+    from PIL import Image as PILImage
+    from PIL.PngImagePlugin import PngInfo
+
+    # 먼저 키 매핑 파일 확인
+    key_map_file = VIBE_CACHE_DIR / "key_map.json"
+    if key_map_file.exists():
+        try:
+            key_map = json.loads(key_map_file.read_text(encoding='utf-8'))
+            if cache_key in key_map:
+                png_file = VIBE_CACHE_DIR / key_map[cache_key]
+                if png_file.exists():
+                    img = PILImage.open(png_file)
+                    if 'vibe_data' in img.info:
+                        return img.info['vibe_data']
+        except:
+            pass
+
+    # 레거시 .vibe 파일 확인
+    legacy_file = VIBE_CACHE_DIR / f"{cache_key}.vibe"
+    if legacy_file.exists():
+        return legacy_file.read_text(encoding='utf-8')
+
     return None
 
 
-def save_vibe_cache(cache_key: str, encoded_vibe: str):
-    """vibe 데이터를 캐시에 저장"""
-    cache_file = VIBE_CACHE_DIR / f"{cache_key}.vibe"
-    cache_file.write_text(encoded_vibe, encoding='utf-8')
+def save_vibe_cache(cache_key: str, encoded_vibe: str, original_image_base64: str,
+                    strength: float, info_extracted: float, model: str):
+    """vibe 데이터를 PNG 이미지로 저장 (썸네일 + 메타데이터)"""
+    from PIL import Image as PILImage
+    from PIL.PngImagePlugin import PngInfo
+
+    # 원본 이미지 디코딩
+    image_data = base64.b64decode(original_image_base64)
+    pil_img = PILImage.open(io.BytesIO(image_data))
+
+    # RGB로 변환
+    if pil_img.mode == 'RGBA':
+        background = PILImage.new('RGB', pil_img.size, (255, 255, 255))
+        background.paste(pil_img, mask=pil_img.split()[3])
+        pil_img = background
+    elif pil_img.mode != 'RGB':
+        pil_img = pil_img.convert('RGB')
+
+    # 썸네일 크기로 리사이즈 (긴 변 512px)
+    max_size = 512
+    w, h = pil_img.size
+    if w > max_size or h > max_size:
+        scale = min(max_size / w, max_size / h)
+        new_size = (int(w * scale), int(h * scale))
+        pil_img = pil_img.resize(new_size, PILImage.LANCZOS)
+
+    # 메타데이터에 vibe 정보 저장
+    metadata = PngInfo()
+    metadata.add_text("vibe_data", encoded_vibe)
+    metadata.add_text("cache_key", cache_key)
+    metadata.add_text("model", model)
+    metadata.add_text("info_extracted", str(info_extracted))
+    metadata.add_text("strength", str(strength))
+
+    # 파일명 생성: {strength}_{info_extracted}_{number}.png
+    number = get_next_vibe_number()
+    filename = f"{strength:.1f}_{info_extracted:.1f}_{number:07d}.png"
+    filepath = VIBE_CACHE_DIR / filename
+
+    # PNG 저장
+    pil_img.save(filepath, format='PNG', pnginfo=metadata)
+
+    # 캐시 키 매핑 저장
+    key_map_file = VIBE_CACHE_DIR / "key_map.json"
+    try:
+        if key_map_file.exists():
+            key_map = json.loads(key_map_file.read_text(encoding='utf-8'))
+        else:
+            key_map = {}
+        key_map[cache_key] = filename
+        key_map_file.write_text(json.dumps(key_map, indent=2), encoding='utf-8')
+    except:
+        pass
+
+    print(f"[NAI] Vibe saved: {filename}")
 
 
-async def encode_vibe_v4(image_base64: str, model: str, info_extracted: float, token: str) -> str:
+async def encode_vibe_v4(image_base64: str, model: str, info_extracted: float,
+                        strength: float, token: str) -> str:
     """V4+ 모델용 vibe 사전 인코딩 - /ai/encode-vibe 엔드포인트 사용 (캐시 지원)"""
     import httpx
 
@@ -610,9 +699,8 @@ async def encode_vibe_v4(image_base64: str, model: str, info_extracted: float, t
         encoded_vibe = base64.b64encode(response.content).decode('utf-8')
         print(f"[NAI] Vibe encoded successfully, length: {len(encoded_vibe)}")
 
-        # 캐시에 저장
-        save_vibe_cache(cache_key, encoded_vibe)
-        print(f"[NAI] Vibe cached: {cache_key}")
+        # 캐시에 PNG로 저장 (썸네일 이미지 + 메타데이터)
+        save_vibe_cache(cache_key, encoded_vibe, image_base64, strength, info_extracted, model)
 
         return encoded_vibe
 
@@ -707,7 +795,7 @@ async def call_nai_api(req: GenerateRequest):
                     png_image = ensure_png_base64(v["image"])
                     print(f"[NAI] Vibe {i+1}: {orig_size[0]}x{orig_size[1]}, encoding for V4+...")
 
-                    encoded_vibe = await encode_vibe_v4(png_image, req.nai_model, info_extracted, token)
+                    encoded_vibe = await encode_vibe_v4(png_image, req.nai_model, info_extracted, strength, token)
                     vibe_images.append(encoded_vibe)
                     print(f"[NAI] Vibe {i+1}: encoded successfully")
                 else:

@@ -1668,6 +1668,27 @@ async def serve_index():
     return {"error": "index.html not found"}
 
 
+@app.get("/assets/{filepath:path}")
+async def serve_assets(filepath: str):
+    """Serve static assets"""
+    file_path = APP_DIR / "assets" / filepath
+    if not file_path.exists() or not file_path.is_file():
+        return {"error": "File not found"}
+
+    # Determine media type
+    suffix = file_path.suffix.lower()
+    media_types = {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".gif": "image/gif",
+        ".svg": "image/svg+xml",
+        ".ico": "image/x-icon",
+    }
+    media_type = media_types.get(suffix, "application/octet-stream")
+    return FileResponse(file_path, media_type=media_type)
+
+
 @app.get("/api/config")
 async def get_config():
     return {

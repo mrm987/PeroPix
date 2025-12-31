@@ -1011,8 +1011,9 @@
         }
         
         .slot {
-            width: 280px;
-            min-width: 280px;
+            width: var(--slot-width, 280px);
+            min-width: 150px;
+            max-width: 600px;
             background: var(--bg-light);
             border: 1px solid var(--border);
             border-radius: 10px;
@@ -1021,6 +1022,44 @@
             overflow: hidden;
             flex-shrink: 0;
             transition: box-shadow 0.2s;
+            position: relative;
+        }
+
+        /* 슬롯 리사이즈 핸들 */
+        .slot-resize-handle {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 6px;
+            cursor: ew-resize;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.2s, background 0.2s;
+        }
+
+        .slot-resize-handle:hover,
+        .slot-resize-handle.active {
+            opacity: 1;
+            background: rgba(157, 106, 232, 0.5);
+        }
+
+        .slot-resize-handle.left {
+            left: 0;
+            border-radius: 10px 0 0 10px;
+        }
+
+        .slot-resize-handle.right {
+            right: 0;
+            border-radius: 0 10px 10px 0;
+        }
+
+        body.resizing-slot {
+            cursor: ew-resize !important;
+            user-select: none !important;
+        }
+
+        body.resizing-slot * {
+            cursor: ew-resize !important;
         }
         
         /* input, textarea는 선택 가능 */
@@ -2253,12 +2292,60 @@
             });
         }
         
+        // 슬롯 너비 관리
+        let currentSlotWidth = 280;
+        const MIN_SLOT_WIDTH = 150;
+        const MAX_SLOT_WIDTH = 600;
+
+        function setSlotWidth(width) {
+            currentSlotWidth = Math.max(MIN_SLOT_WIDTH, Math.min(MAX_SLOT_WIDTH, width));
+            document.documentElement.style.setProperty('--slot-width', currentSlotWidth + 'px');
+            autoSaveSettings();
+        }
+
+        function setupSlotResize(slot) {
+            const leftHandle = slot.querySelector('.slot-resize-handle.left');
+            const rightHandle = slot.querySelector('.slot-resize-handle.right');
+
+            function startResize(e, isLeft) {
+                e.preventDefault();
+                const startX = e.clientX;
+                const startWidth = currentSlotWidth;
+
+                document.body.classList.add('resizing-slot');
+                leftHandle.classList.add('active');
+                rightHandle.classList.add('active');
+
+                function onMouseMove(e) {
+                    const deltaX = e.clientX - startX;
+                    const newWidth = isLeft ? startWidth - deltaX : startWidth + deltaX;
+                    setSlotWidth(newWidth);
+                }
+
+                function onMouseUp() {
+                    document.body.classList.remove('resizing-slot');
+                    leftHandle.classList.remove('active');
+                    rightHandle.classList.remove('active');
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                }
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            }
+
+            leftHandle.addEventListener('mousedown', (e) => startResize(e, true));
+            rightHandle.addEventListener('mousedown', (e) => startResize(e, false));
+        }
+
         function createSlot(name = '', content = '') {
             const slotId = slotCounter++;
             const slot = document.createElement('div');
             slot.className = 'slot';
             slot.dataset.slotIndex = slotId;
             slot.innerHTML = `
+                <div class="slot-resize-handle left"></div>
+                <div class="slot-resize-handle right"></div>
                 <div class="slot-prompt">
                     <div class="slot-prompt-header">
                         <span class="slot-number">001</span>
@@ -2272,6 +2359,9 @@
                     <div class="slot-empty">Images will appear here</div>
                 </div>
             `;
+
+            // 리사이즈 핸들 설정
+            setupSlotResize(slot);
             
             slot.querySelector('.slot-delete').onclick = () => {
                 if (slotsContainer.querySelectorAll('.slot').length > 1) {
@@ -4435,7 +4525,8 @@
                 
                 // Slots
                 slots: getSlotList(),
-                
+                slotWidth: currentSlotWidth,
+
                 // Character prompts
                 characterPrompts: getCharacterPrompts(),
             };
@@ -4547,7 +4638,12 @@
                         addSlot(slot.name || '', slot.content || '');
                     });
                 }
-                
+
+                // Slot width
+                if (settings.slotWidth) {
+                    setSlotWidth(settings.slotWidth);
+                }
+
                 // Character prompts
                 if (settings.characterPrompts && settings.characterPrompts.length > 0) {
                     window._pendingCharacterPrompts = settings.characterPrompts;

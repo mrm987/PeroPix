@@ -1013,7 +1013,7 @@
         .slot {
             width: var(--slot-width, 280px);
             min-width: 150px;
-            max-width: 600px;
+            max-width: 1200px;
             background: var(--bg-light);
             border: 1px solid var(--border);
             border-radius: 10px;
@@ -2295,7 +2295,7 @@
         // 슬롯 너비 관리
         let currentSlotWidth = 280;
         const MIN_SLOT_WIDTH = 150;
-        const MAX_SLOT_WIDTH = 600;
+        const MAX_SLOT_WIDTH = 1200;
 
         function setSlotWidth(width) {
             currentSlotWidth = Math.max(MIN_SLOT_WIDTH, Math.min(MAX_SLOT_WIDTH, width));

@@ -4799,11 +4799,18 @@
             const settings = {
                 // Provider
                 provider: currentProvider,
-                
+
                 // Prompts
                 basePrompt: document.getElementById('basePrompt').value,
                 negativePrompt: document.getElementById('negativePrompt').value,
-                
+
+                // Prompt layout (heights and collapse states)
+                basePromptHeight: document.getElementById('basePrompt').style.height || null,
+                negativePromptHeight: document.getElementById('negativePrompt').style.height || null,
+                basePromptCollapsed: document.getElementById('basePromptContent').classList.contains('collapsed'),
+                charactersCollapsed: document.getElementById('charactersContent').classList.contains('collapsed'),
+                negativePromptCollapsed: document.getElementById('negativePromptContent').classList.contains('collapsed'),
+
                 // Size
                 sizePreset: document.getElementById('sizePreset').value,
                 width: document.getElementById('width').value,
@@ -4885,7 +4892,23 @@
                 // Prompts
                 if (settings.basePrompt !== undefined) document.getElementById('basePrompt').value = settings.basePrompt;
                 if (settings.negativePrompt !== undefined) document.getElementById('negativePrompt').value = settings.negativePrompt;
-                
+
+                // Prompt layout (heights and collapse states)
+                if (settings.basePromptHeight) document.getElementById('basePrompt').style.height = settings.basePromptHeight;
+                if (settings.negativePromptHeight) document.getElementById('negativePrompt').style.height = settings.negativePromptHeight;
+                if (settings.basePromptCollapsed) {
+                    document.getElementById('basePromptContent').classList.add('collapsed');
+                    document.querySelector('[data-target="basePromptContent"]').classList.add('collapsed');
+                }
+                if (settings.charactersCollapsed) {
+                    document.getElementById('charactersContent').classList.add('collapsed');
+                    document.querySelector('[data-target="charactersContent"]').classList.add('collapsed');
+                }
+                if (settings.negativePromptCollapsed) {
+                    document.getElementById('negativePromptContent').classList.add('collapsed');
+                    document.querySelector('[data-target="negativePromptContent"]').classList.add('collapsed');
+                }
+
                 // Size
                 if (settings.sizePreset) document.getElementById('sizePreset').value = settings.sizePreset;
                 if (settings.width) document.getElementById('width').value = settings.width;
@@ -5026,6 +5049,11 @@
             // 캐릭터 프롬프트 변경 감지
             charactersList.addEventListener('input', autoSaveSettings);
             charactersList.addEventListener('change', autoSaveSettings);
+
+            // 프롬프트 창 리사이즈 감지
+            const resizeObserver = new ResizeObserver(() => autoSaveSettings());
+            resizeObserver.observe(document.getElementById('basePrompt'));
+            resizeObserver.observe(document.getElementById('negativePrompt'));
         }
         
         // Init

@@ -1378,8 +1378,9 @@ async def get_config():
 
 @app.post("/api/open-folder")
 async def open_folder(request: dict):
-    """폴더를 Windows 탐색기로 열기"""
+    """폴더를 파일 탐색기로 열기 (Windows/macOS/Linux)"""
     import subprocess
+    import platform
 
     folder_type = request.get("folder", "")
 
@@ -1397,7 +1398,13 @@ async def open_folder(request: dict):
     folder_path.mkdir(parents=True, exist_ok=True)
 
     try:
-        subprocess.Popen(["explorer", str(folder_path)])
+        system = platform.system()
+        if system == "Windows":
+            subprocess.Popen(["explorer", str(folder_path)])
+        elif system == "Darwin":
+            subprocess.Popen(["open", str(folder_path)])
+        else:
+            subprocess.Popen(["xdg-open", str(folder_path)])
         return {"success": True, "path": str(folder_path)}
     except Exception as e:
         return {"error": str(e)}

@@ -1520,22 +1520,38 @@
         .mode-toggle {
             display: flex;
             background: var(--bg);
-            border-radius: 8px;
+            border-radius: 10px;
             padding: 4px;
             gap: 4px;
+            border: 1px solid var(--border);
         }
         .mode-btn {
-            padding: 8px 16px;
+            padding: 10px 20px;
             border: none;
             background: transparent;
             color: var(--text-dim);
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
             font-size: 0.9rem;
+            font-weight: 500;
             transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
-        .mode-btn:hover { color: var(--text); }
+        .mode-btn:hover {
+            color: var(--text);
+            background: var(--bg-light);
+        }
         .mode-btn.active {
+            color: white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+        #slotModeBtn.active {
+            background: var(--accent-gold);
+            color: #000;
+        }
+        #galleryModeBtn.active {
             background: var(--primary);
             color: white;
         }
@@ -2284,8 +2300,8 @@
         <main class="main">
             <div class="slots-header">
                 <div class="mode-toggle">
-                    <button type="button" class="mode-btn active" id="slotModeBtn">슬롯 모드</button>
-                    <button type="button" class="mode-btn" id="galleryModeBtn">갤러리</button>
+                    <button type="button" class="mode-btn active" id="slotModeBtn">🎰 슬롯 모드</button>
+                    <button type="button" class="mode-btn" id="galleryModeBtn">🖼️ 갤러리</button>
                 </div>
                 <div style="display: flex; gap: 8px; align-items: center;">
                     <div class="preset-dropdown" id="presetDropdown">

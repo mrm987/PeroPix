@@ -1542,11 +1542,13 @@
             overflow-y: auto;
             overflow-x: hidden;
             padding: 16px;
+            width: 100%;
         }
         .gallery-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
             gap: 16px;
+            width: 100%;
         }
         .gallery-item {
             background: var(--bg-light);
@@ -1554,7 +1556,6 @@
             overflow: hidden;
             transition: transform 0.2s;
             cursor: pointer;
-            min-width: 0;
         }
         .gallery-item:hover { transform: translateY(-4px); }
         .gallery-item img {
@@ -1629,7 +1630,7 @@
             font-size: 14px;
         }
         .slot-image-card:hover .save-gallery-btn { opacity: 1; }
-        .slot-image-card .save-gallery-btn:hover { background: var(--primary); opacity: 1; }
+        .slot-image-card .save-gallery-btn:hover { background: rgba(0,0,0,0.9); opacity: 1; }
         .slot-image-card .save-gallery-btn.saved { color: gold; opacity: 1; }
 
         /* Info row layout */
@@ -2807,12 +2808,38 @@
                 metadata: data.metadata || null  // 전체 설정 메타데이터
             };
 
-            // 갤러리 저장 버튼
+            // 갤러리 저장/제거 토글 버튼
             const saveBtn = card.querySelector('.save-gallery-btn');
             saveBtn.onclick = async (e) => {
                 e.stopPropagation();
-                if (saveBtn.classList.contains('saved')) return;
 
+                // 이미 저장된 경우 갤러리에서 제거
+                if (saveBtn.classList.contains('saved')) {
+                    try {
+                        const galleryFilename = card._imageData.galleryFilename || card._imageData.filename;
+                        const response = await fetch(`${API_BASE}/api/gallery/${encodeURIComponent(galleryFilename)}`, {
+                            method: 'DELETE'
+                        });
+                        const result = await response.json();
+                        if (result.success) {
+                            saveBtn.classList.remove('saved');
+                            saveBtn.textContent = '☆';
+                            card._imageData.galleryFilename = null;
+                            showToast('갤러리에서 제거됨', 'success');
+                            // 갤러리 뷰 새로고침
+                            if (currentMode === 'gallery') {
+                                loadGallery();
+                            }
+                        } else {
+                            showToast('제거 실패: ' + result.error, 'error');
+                        }
+                    } catch (err) {
+                        showToast('제거 오류: ' + err.message, 'error');
+                    }
+                    return;
+                }
+
+                // 저장되지 않은 경우 갤러리에 저장
                 try {
                     const response = await fetch(`${API_BASE}/api/gallery/save`, {
                         method: 'POST',
@@ -2838,6 +2865,7 @@
                     if (result.success) {
                         saveBtn.classList.add('saved');
                         saveBtn.textContent = '★';
+                        card._imageData.galleryFilename = result.filename || card._imageData.filename;
                         showToast('갤러리에 저장됨', 'success');
                     } else {
                         showToast('저장 실패: ' + result.error, 'error');

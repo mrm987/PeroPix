@@ -3707,6 +3707,7 @@
                 request.smea = document.getElementById('smea').value;
                 request.uc_preset = document.getElementById('ucPreset').value;
                 request.quality_tags = document.getElementById('qualityTags').checked;
+                request.furry_mode = currentMode === 'furry';
 
                 // Vibe Transfer
                 if (document.getElementById('enableVibeTransfer').checked && vibeList.length > 0) {

@@ -437,6 +437,7 @@ class GenerateRequest(BaseModel):
     smea: str = "none"
     uc_preset: str = "Heavy"
     quality_tags: bool = True
+    furry_mode: bool = False
 
     # NAI Vibe Transfer (최대 16개)
     vibe_transfer: List[dict] = []  # [{"image": base64, "info_extracted": 1.0, "strength": 0.6}, ...]
@@ -760,7 +761,10 @@ async def call_nai_api(req: GenerateRequest):
     # NAI 값이면 그대로, KSampler 값이면 변환
     nai_sampler = NAI_SAMPLER_MAP.get(req.sampler, req.sampler)
     nai_scheduler = NAI_SCHEDULER_MAP.get(req.scheduler, req.scheduler)
-    
+
+    # Furry Mode: 프롬프트 앞에 "fur dataset, " 추가
+    prompt_for_nai = f"fur dataset, {req.prompt}" if req.furry_mode else req.prompt
+
     params = {
         "params_version": 3,
         "width": req.width,
@@ -783,7 +787,7 @@ async def call_nai_api(req: GenerateRequest):
         "legacy_v3_extend": False,
         "uncond_scale": 1.0,
         "negative_prompt": req.negative_prompt,
-        "prompt": req.prompt,
+        "prompt": prompt_for_nai,
         "extra_noise_seed": int(seed),
         "use_coords": False,
         "characterPrompts": [{"prompt": cp, "uc": "", "center": {"x": 0.5, "y": 0.5}, "enabled": True} for cp in req.character_prompts] if req.character_prompts else [],
@@ -791,7 +795,7 @@ async def call_nai_api(req: GenerateRequest):
             "use_coords": False,
             "use_order": True,
             "caption": {
-                "base_caption": req.prompt, 
+                "base_caption": prompt_for_nai,
                 "char_captions": [{"char_caption": cp, "centers": [{"x": 0.5, "y": 0.5}]} for cp in req.character_prompts] if req.character_prompts else []
             }
         },

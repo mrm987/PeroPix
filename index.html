@@ -146,15 +146,15 @@
         }
         
         .section-title {
+            display: flex;
+            align-items: center;
+            gap: 6px;
             font-size: 0.75rem;
             font-weight: 600;
             color: var(--text-dim);
             text-transform: uppercase;
             letter-spacing: 0.05em;
             margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
         }
         
         .section-title .section-toggle {
@@ -238,11 +238,11 @@
             display: flex;
             align-items: center;
             gap: 6px;
-            flex: 1;
         }
 
         .size-inputs input {
             flex: 1;
+            min-width: 0;
             text-align: center;
             padding: 10px 8px;
         }
@@ -1918,39 +1918,43 @@
                 <!-- NAI Settings -->
                 <div class="provider-section active" data-provider="nai">
                     <div class="section">
-                        <div class="section-title">NAI Settings</div>
-                        
-                        <label>Model</label>
-                        <select id="naiModel">
-                            <option value="nai-diffusion-4-5-full">V4.5 Full</option>
-                            <option value="nai-diffusion-4-curated-preview">V4 Curated</option>
-                            <option value="nai-diffusion-3">V3</option>
-                        </select>
-                        
-                        <div class="row">
-                            <div>
-                                <label>UC Preset</label>
-                                <select id="ucPreset">
-                                    <option value="Heavy">Heavy</option>
-                                    <option value="Light">Light</option>
-                                    <option value="Human Focus">Human Focus</option>
-                                    <option value="Furry Focus">Furry Focus</option>
-                                    <option value="None">None</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label>SMEA</label>
-                                <select id="smea">
-                                    <option value="none">None</option>
-                                    <option value="SMEA">SMEA</option>
-                                    <option value="SMEA+DYN">SMEA+DYN</option>
-                                </select>
-                            </div>
+                        <div class="section-title">
+                            <button type="button" class="collapse-toggle" data-target="naiSettingsContent" title="접기/펼치기">▼</button>
+                            <span>NAI Settings</span>
                         </div>
-                        
-                        <div class="checkbox-row">
-                            <input type="checkbox" id="qualityTags" checked>
-                            <label for="qualityTags">Add Quality Tags</label>
+                        <div id="naiSettingsContent" class="collapsible-content">
+                            <label>Model</label>
+                            <select id="naiModel">
+                                <option value="nai-diffusion-4-5-full">V4.5 Full</option>
+                                <option value="nai-diffusion-4-curated-preview">V4 Curated</option>
+                                <option value="nai-diffusion-3">V3</option>
+                            </select>
+
+                            <div class="row">
+                                <div>
+                                    <label>UC Preset</label>
+                                    <select id="ucPreset">
+                                        <option value="Heavy">Heavy</option>
+                                        <option value="Light">Light</option>
+                                        <option value="Human Focus">Human Focus</option>
+                                        <option value="Furry Focus">Furry Focus</option>
+                                        <option value="None">None</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label>SMEA</label>
+                                    <select id="smea">
+                                        <option value="none">None</option>
+                                        <option value="SMEA">SMEA</option>
+                                        <option value="SMEA+DYN">SMEA+DYN</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="checkbox-row">
+                                <input type="checkbox" id="qualityTags" checked>
+                                <label for="qualityTags">Add Quality Tags</label>
+                            </div>
                         </div>
                     </div>
 
@@ -2113,80 +2117,87 @@
                 
                 <!-- Generation Settings -->
                 <div class="section">
-                    <div class="section-title">Generation</div>
-                    
-                    <div class="input-group">
-                        <label>Size</label>
-                        <div class="size-row">
-                            <select id="sizePreset" class="size-preset">
-                                <optgroup label="Landscape">
-                                    <option value="1536x640">1536 × 640</option>
-                                    <option value="1344x768">1344 × 768</option>
-                                    <option value="1216x832">1216 × 832</option>
-                                    <option value="1152x896">1152 × 896</option>
-                                </optgroup>
-                                <optgroup label="Square">
-                                    <option value="1024x1024">1024 × 1024</option>
-                                </optgroup>
-                                <optgroup label="Portrait">
-                                    <option value="896x1152">896 × 1152</option>
-                                    <option value="832x1216" selected>832 × 1216</option>
-                                    <option value="768x1344">768 × 1344</option>
-                                    <option value="640x1536">640 × 1536</option>
-                                </optgroup>
-                                <option value="custom">Custom</option>
-                            </select>
-                            <div class="size-inputs">
-                                <input type="number" id="width" value="832" step="64">
-                                <span class="size-x">×</span>
-                                <input type="number" id="height" value="1216" step="64">
+                    <div class="section-title">
+                        <button type="button" class="collapse-toggle" data-target="generationContent" title="접기/펼치기">▼</button>
+                        <span>Generation</span>
+                    </div>
+                    <div id="generationContent" class="collapsible-content">
+                        <div class="row">
+                            <div>
+                                <label>Size</label>
+                                <select id="sizePreset">
+                                    <optgroup label="Landscape">
+                                        <option value="1536x640">1536 × 640</option>
+                                        <option value="1344x768">1344 × 768</option>
+                                        <option value="1216x832">1216 × 832</option>
+                                        <option value="1152x896">1152 × 896</option>
+                                    </optgroup>
+                                    <optgroup label="Square">
+                                        <option value="1024x1024">1024 × 1024</option>
+                                    </optgroup>
+                                    <optgroup label="Portrait">
+                                        <option value="896x1152">896 × 1152</option>
+                                        <option value="832x1216" selected>832 × 1216</option>
+                                        <option value="768x1344">768 × 1344</option>
+                                        <option value="640x1536">640 × 1536</option>
+                                    </optgroup>
+                                    <option value="custom">Custom</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label>W × H</label>
+                                <div class="size-inputs">
+                                    <input type="number" id="width" value="832" step="64">
+                                    <span class="size-x">×</span>
+                                    <input type="number" id="height" value="1216" step="64">
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div>
-                            <label>Steps</label>
-                            <input type="number" id="steps" value="28">
+
+                        <div class="row">
+                            <div>
+                                <label>Steps</label>
+                                <input type="number" id="steps" value="28">
+                            </div>
+                            <div>
+                                <label>CFG</label>
+                                <input type="number" id="cfg" value="5.0" step="0.1">
+                            </div>
                         </div>
-                        <div>
-                            <label>CFG</label>
-                            <input type="number" id="cfg" value="5.0" step="0.1">
+
+                        <div class="row">
+                            <div>
+                                <label>Sampler</label>
+                                <select id="sampler">
+                                    <option value="k_euler_ancestral">Euler Ancestral</option>
+                                    <option value="k_euler">Euler</option>
+                                    <option value="k_dpmpp_2s_ancestral">DPM++ 2S Ancestral</option>
+                                    <option value="k_dpmpp_2m_sde">DPM++ 2M SDE</option>
+                                    <option value="k_dpmpp_2m">DPM++ 2M</option>
+                                    <option value="k_dpmpp_sde">DPM++ SDE</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label>Scheduler</label>
+                                <select id="scheduler">
+                                    <option value="karras">Karras</option>
+                                    <option value="exponential">Exponential</option>
+                                    <option value="polyexponential">Polyexponential</option>
+                                </select>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div>
-                            <label>Sampler</label>
-                            <select id="sampler">
-                                <option value="k_euler_ancestral">Euler Ancestral</option>
-                                <option value="k_euler">Euler</option>
-                                <option value="k_dpmpp_2s_ancestral">DPM++ 2S Ancestral</option>
-                                <option value="k_dpmpp_2m_sde">DPM++ 2M SDE</option>
-                                <option value="k_dpmpp_2m">DPM++ 2M</option>
-                                <option value="k_dpmpp_sde">DPM++ SDE</option>
-                            </select>
+
+                        <div class="row">
+                            <div>
+                                <label>Seed</label>
+                                <input type="number" id="seed" value="-1">
+                            </div>
                         </div>
-                        <div>
-                            <label>Scheduler</label>
-                            <select id="scheduler">
-                                <option value="karras">Karras</option>
-                                <option value="exponential">Exponential</option>
-                                <option value="polyexponential">Polyexponential</option>
-                            </select>
+
+                        <div class="checkbox-row">
+                            <input type="checkbox" id="randomSeed">
+                            <label for="randomSeed">Random seed every image</label>
                         </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div>
-                            <label>Seed</label>
-                            <input type="number" id="seed" value="-1">
-                        </div>
-                    </div>
-                    
-                    <div class="checkbox-row">
-                        <input type="checkbox" id="randomSeed">
-                        <label for="randomSeed">Random seed every image</label>
                     </div>
                 </div>
             </div>
@@ -4435,14 +4446,24 @@
             setFurryMode(!furryModeEnabled);
         };
 
-        // Collapse toggle for prompts
+        // Collapse toggle for prompts and sections
         document.querySelectorAll('.collapse-toggle').forEach(btn => {
+            const targetId = btn.dataset.target;
+            const target = document.getElementById(targetId);
+
+            // Restore collapse state from localStorage
+            const savedState = localStorage.getItem(`collapse_${targetId}`);
+            if (savedState === 'collapsed' && target) {
+                btn.classList.add('collapsed');
+                target.classList.add('collapsed');
+            }
+
             btn.onclick = () => {
-                const targetId = btn.dataset.target;
-                const target = document.getElementById(targetId);
                 if (target) {
                     btn.classList.toggle('collapsed');
                     target.classList.toggle('collapsed');
+                    // Save state to localStorage
+                    localStorage.setItem(`collapse_${targetId}`, btn.classList.contains('collapsed') ? 'collapsed' : 'expanded');
                 }
             };
         });

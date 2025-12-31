@@ -1603,6 +1603,7 @@ async def open_folder(request: dict):
     import platform
 
     folder_type = request.get("folder", "")
+    subfolder = request.get("subfolder", "")  # outputs 서브폴더 지원
 
     folder_map = {
         "outputs": OUTPUT_DIR,
@@ -1616,16 +1617,18 @@ async def open_folder(request: dict):
     if not folder_path:
         return {"error": "Unknown folder type"}
 
+    # 서브폴더가 지정된 경우 (outputs 전용)
+    if folder_type == "outputs" and subfolder:
+        folder_path = folder_path / subfolder
+
     folder_path.mkdir(parents=True, exist_ok=True)
 
     try:
         system = platform.system()
         if system == "Windows":
-            # /select로 열면 폴더 창이 포커스를 받음
-            subprocess.Popen(["explorer", "/select,", str(folder_path)])
+            subprocess.Popen(["explorer", str(folder_path)])
         elif system == "Darwin":
-            # -R 옵션으로 Finder에서 선택된 상태로 열림
-            subprocess.Popen(["open", "-R", str(folder_path)])
+            subprocess.Popen(["open", str(folder_path)])
         else:
             subprocess.Popen(["xdg-open", str(folder_path)])
         return {"success": True, "path": str(folder_path)}

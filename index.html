@@ -3968,12 +3968,12 @@
         document.getElementById('clearImagesBtn').onclick = clearResults;
 
         // 폴더 열기 버튼 핸들러
-        async function openFolder(folderType) {
+        async function openFolder(folderType, subfolder = '') {
             try {
                 const response = await fetch(`${API_BASE}/api/open-folder`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ folder: folderType })
+                    body: JSON.stringify({ folder: folderType, subfolder: subfolder })
                 });
                 const data = await response.json();
                 if (data.error) {
@@ -3984,7 +3984,10 @@
             }
         }
 
-        document.getElementById('openOutputFolderBtn').onclick = () => openFolder('outputs');
+        document.getElementById('openOutputFolderBtn').onclick = () => {
+            const subfolder = document.getElementById('outputFolder').value.trim();
+            openFolder('outputs', subfolder);
+        };
         document.getElementById('openVibeFolderBtn').onclick = () => openFolder('vibe_cache');
         document.getElementById('openCheckpointsFolderBtn').onclick = () => openFolder('checkpoints');
         document.getElementById('openLorasFolderBtn').onclick = () => openFolder('loras');

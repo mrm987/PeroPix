@@ -3255,14 +3255,19 @@
             }
         }
         
+        let lastSSETime = Date.now();
+        let sseHealthCheckInterval = null;
+
         function connectSSE() {
             if (eventSource) {
                 eventSource.close();
             }
-            
+
             eventSource = new EventSource(`${API_BASE}/api/stream`);
-            
+            lastSSETime = Date.now();
+
             eventSource.onmessage = (event) => {
+                lastSSETime = Date.now();
                 try {
                     const data = JSON.parse(event.data);
                     handleSSEMessage(data);
@@ -3270,35 +3275,86 @@
                     console.error('SSE parse error:', e);
                 }
             };
-            
+
             eventSource.onerror = () => {
+                console.warn('SSE connection error, reconnecting...');
                 setTimeout(connectSSE, 2000);
             };
+
+            // SSE 헬스체크 - 30초간 메시지 없으면 재연결
+            if (sseHealthCheckInterval) clearInterval(sseHealthCheckInterval);
+            sseHealthCheckInterval = setInterval(() => {
+                const timeSinceLastMessage = Date.now() - lastSSETime;
+                if (timeSinceLastMessage > 30000) {
+                    console.warn('SSE stale, reconnecting...');
+                    connectSSE();
+                }
+            }, 10000);
         }
         
+        // 서버 진행 상황 동기화 함수
+        function syncProgressFromServer(data) {
+            if (data.global_completed !== undefined && data.global_total !== undefined) {
+                // 서버에서 보낸 전역 진행률로 동기화
+                const serverCompleted = data.global_completed;
+                const serverTotal = data.global_total;
+
+                // 로컬 값이 서버보다 뒤처졌으면 동기화
+                if (currentIndex < serverCompleted || totalImages < serverTotal) {
+                    currentIndex = serverCompleted;
+                    totalImages = serverTotal;
+                    updateProgress();
+                }
+            }
+        }
+
         function handleSSEMessage(data) {
             switch (data.type) {
                 case 'status':
+                case 'heartbeat':
+                    // 하트비트/상태로 프로그레스 동기화
+                    syncProgressFromServer(data);
                     break;
-                    
+
                 case 'job_start':
+                    // 작업 시작 시 전역 total 동기화
+                    if (data.global_total !== undefined) {
+                        totalImages = data.global_total;
+                        updateProgress();
+                    }
                     break;
-                    
+
                 case 'image':
-                    currentIndex++;
+                    // 서버 전역 진행률 사용 (SSE 누락 방지)
+                    if (data.global_completed !== undefined) {
+                        currentIndex = data.global_completed;
+                    } else {
+                        currentIndex++;
+                    }
+                    if (data.global_total !== undefined) {
+                        totalImages = data.global_total;
+                    }
                     updateProgress();
                     addImageToSlot(data.prompt_idx, data);
                     break;
-                    
+
                 case 'job_done':
                     // Anlas 잔액 및 비용 갱신 (생성 완료 시)
                     if (currentProvider === 'nai') {
                         fetchAnlasBalance();
                         updateAnlasCost();  // Vibe 캐시 상태 갱신
                     }
+                    // 서버 진행률로 동기화
+                    if (data.global_completed !== undefined) {
+                        currentIndex = data.global_completed;
+                    }
+                    if (data.global_total !== undefined) {
+                        totalImages = data.global_total;
+                    }
+                    updateProgress();
+
                     if (data.queue_length === 0) {
-                        // SSE 누락 보정: 완료 시 강제 동기화
-                        currentIndex = totalImages;
+                        // 완료 처리
                         statusText.textContent = 'Complete!';
                         progressFill.style.width = '100%';
                         showToast('All done', 'success');
@@ -3306,7 +3362,7 @@
                         if (resetTimer) clearTimeout(resetTimer);
                         resetTimer = setTimeout(() => {
                             // 새 작업이 추가되지 않았을 때만 리셋
-                            if (totalImages === currentIndex) {
+                            if (totalImages === currentIndex || totalImages === 0) {
                                 currentIndex = 0;
                                 totalImages = 0;
                                 updateProgress();
@@ -3314,22 +3370,32 @@
                         }, 2000);
                     }
                     break;
-                    
+
                 case 'job_cancelled':
+                    syncProgressFromServer(data);
                     totalImages -= data.cancelled_images;
                     if (totalImages < currentIndex) totalImages = currentIndex;
                     updateProgress();
                     showToast('Job cancelled', 'warning');
                     break;
-                    
+
                 case 'queue_cleared':
+                    syncProgressFromServer(data);
                     totalImages -= data.cleared_images;
                     if (totalImages < currentIndex) totalImages = currentIndex;
                     updateProgress();
                     break;
-                    
+
                 case 'error':
-                    currentIndex++;
+                    // 서버 전역 진행률 사용
+                    if (data.global_completed !== undefined) {
+                        currentIndex = data.global_completed;
+                    } else {
+                        currentIndex++;
+                    }
+                    if (data.global_total !== undefined) {
+                        totalImages = data.global_total;
+                    }
                     updateProgress();
                     showToast(`Error: ${data.error || 'Generation failed'}`, 'error');
                     console.error('Generation error:', data.error);

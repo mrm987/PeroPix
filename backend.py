@@ -1130,6 +1130,10 @@ class GenerationQueue:
         self.cancel_current = False  # 현재 작업 취소 플래그
         self.is_processing = False
         self.clients = []  # SSE 클라이언트들
+        # 진행 상황 추적 (SSE 누락 시 동기화용)
+        self.completed_images = 0
+        self.total_images = 0
+        self.current_job_progress = 0  # 현재 작업 내 진행률
     
     def add_job(self, request):
         job_id = str(uuid.uuid4())[:8]
@@ -1162,7 +1166,11 @@ class GenerationQueue:
             "queue_length": len(self.queue),
             "current_job_id": self.current_job_id,
             "is_processing": self.is_processing,
-            "queued_jobs": [{"id": j["id"], "prompts": len(j["request"].prompt_list or [''])} for j in self.queue]
+            "queued_jobs": [{"id": j["id"], "prompts": len(j["request"].prompt_list or [''])} for j in self.queue],
+            # 진행 상황 동기화용
+            "completed_images": self.completed_images,
+            "total_images": self.total_images,
+            "current_job_progress": self.current_job_progress
         }
     
     async def broadcast(self, data):
@@ -1214,12 +1222,18 @@ async def process_job(job):
     # 시드 설정
     current_seed = req.seed if req.seed >= 0 else np.random.randint(0, 2**31 - 1)
     
+    # 진행 상황 초기화
+    gen_queue.total_images += total_images
+    gen_queue.current_job_progress = 0
+
     # 시작 알림
     await gen_queue.broadcast({
         "type": "job_start",
         "job_id": job_id,
         "total": total_images,
-        "queue_length": len(gen_queue.queue)
+        "queue_length": len(gen_queue.queue),
+        "global_completed": gen_queue.completed_images,
+        "global_total": gen_queue.total_images
     })
     
     for prompt_idx, prompt_item in enumerate(prompts):
@@ -1312,7 +1326,11 @@ async def process_job(job):
             file_num = get_next_image_number(category, save_dir)
             filename = f"{category}_{file_num:07d}.png"
             image.save(save_dir / filename)
-            
+
+            # 진행 상황 업데이트
+            gen_queue.completed_images += 1
+            gen_queue.current_job_progress += 1
+
             await gen_queue.broadcast({
                 "type": "image",
                 "job_id": job_id,
@@ -1323,7 +1341,9 @@ async def process_job(job):
                 "seed": actual_seed,
                 "image": image_to_base64(image),
                 "filename": filename,
-                "queue_length": len(gen_queue.queue)
+                "queue_length": len(gen_queue.queue),
+                "global_completed": gen_queue.completed_images,
+                "global_total": gen_queue.total_images
             })
             
         except Exception as e:
@@ -1331,19 +1351,33 @@ async def process_job(job):
             print(f"[Error] Generation failed: {e}")
             traceback.print_exc()
             image_idx += 1
+            # 에러도 완료로 카운트 (프로그레스바 진행용)
+            gen_queue.completed_images += 1
+            gen_queue.current_job_progress += 1
             await gen_queue.broadcast({
                 "type": "error",
                 "job_id": job_id,
                 "index": image_idx - 1,
                 "total": total_images,
-                "error": str(e)
+                "error": str(e),
+                "global_completed": gen_queue.completed_images,
+                "global_total": gen_queue.total_images
             })
-    
+
+    # 큐가 비면 카운터 리셋
+    queue_empty = len(gen_queue.queue) == 0
     await gen_queue.broadcast({
         "type": "job_done",
         "job_id": job_id,
-        "queue_length": len(gen_queue.queue)
+        "queue_length": len(gen_queue.queue),
+        "global_completed": gen_queue.completed_images,
+        "global_total": gen_queue.total_images
     })
+
+    if queue_empty:
+        gen_queue.completed_images = 0
+        gen_queue.total_images = 0
+        gen_queue.current_job_progress = 0
 
 
 
@@ -1629,18 +1663,24 @@ async def generate_multi(req: MultiGenerateRequest):
 
 @app.get("/api/stream")
 async def stream():
-    """SSE 스트림 - 모든 이벤트 수신"""
+    """SSE 스트림 - 모든 이벤트 수신 (하트비트 포함)"""
     async def event_stream():
         queue = asyncio.Queue()
         gen_queue.clients.append(queue)
-        
+        heartbeat_interval = 15  # 15초마다 하트비트
+
         try:
             # 초기 상태 전송
             yield f"data: {json.dumps({'type': 'status', **gen_queue.get_status()})}\n\n"
-            
+
             while True:
-                data = await queue.get()
-                yield f"data: {json.dumps(data)}\n\n"
+                try:
+                    # 타임아웃 내에 데이터가 오면 전송
+                    data = await asyncio.wait_for(queue.get(), timeout=heartbeat_interval)
+                    yield f"data: {json.dumps(data)}\n\n"
+                except asyncio.TimeoutError:
+                    # 타임아웃 시 하트비트 전송 (현재 상태 포함)
+                    yield f"data: {json.dumps({'type': 'heartbeat', **gen_queue.get_status()})}\n\n"
         except asyncio.CancelledError:
             pass
         finally:

@@ -1726,15 +1726,15 @@
         .gallery-subfolders {
             display: flex;
             gap: 8px;
-            padding: 8px 16px;
-            border-bottom: 1px solid var(--border);
-            background: var(--bg);
-            flex-shrink: 0;
-            overflow-x: auto;
-            min-height: 40px;
+            flex-wrap: wrap;
         }
-        .gallery-subfolders:empty {
-            display: none;
+
+        .folder-separator {
+            width: 1px;
+            height: 24px;
+            background: var(--border);
+            margin: 0 4px;
+            align-self: center;
         }
 
         .folder-tab {
@@ -2640,13 +2640,14 @@
                     <div class="toolbar-left">
                         <button type="button" class="add-folder-btn" id="addFolderBtn" title="새 폴더 추가">+📁</button>
                         <button type="button" class="folder-tab root-folder active" id="galleryRootBtn" data-folder="">📂 gallery</button>
+                        <span class="folder-separator"></span>
+                        <div class="gallery-subfolders" id="gallerySubfolders">
+                            <!-- 하위 폴더 탭들이 여기에 추가됨 -->
+                        </div>
                     </div>
                     <div class="toolbar-right">
                         <button type="button" class="header-btn icon-only" id="openGalleryFolderBtn" title="갤러리 폴더 열기">📂</button>
                     </div>
-                </div>
-                <div class="gallery-subfolders" id="gallerySubfolders">
-                    <!-- 하위 폴더 탭들이 여기에 추가됨 -->
                 </div>
                 <div class="gallery-content">
                     <div class="gallery-grid" id="galleryGrid">
@@ -5627,6 +5628,9 @@
                 slotWidth: currentSlotWidth,
                 sidebarWidth: currentSidebarWidth,
 
+                // Preset
+                currentPreset: currentPreset,
+
                 // Character prompts (with layout)
                 characterPromptsLayout: getCharacterPromptsWithLayout(),
             };
@@ -5770,6 +5774,12 @@
                 // Sidebar width
                 if (settings.sidebarWidth) {
                     setSidebarWidth(settings.sidebarWidth);
+                }
+
+                // Preset 복원
+                if (settings.currentPreset) {
+                    currentPreset = settings.currentPreset;
+                    presetNameSpan.textContent = currentPreset.name || 'Slot Set';
                 }
 
                 // Character prompts (new format with layout)

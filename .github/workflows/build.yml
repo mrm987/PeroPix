@@ -63,16 +63,12 @@ jobs:
           # README 복사
           Copy-Item "README.md" -Destination "dist/PeroPix/" -ErrorAction SilentlyContinue
 
-      - name: Create Launcher Scripts
+      - name: Create Launcher Script
         shell: pwsh
         run: |
           # PeroPix.bat 생성
-          $bat1 = "@echo off`r`ntitle PeroPix`r`ncd /d `"%~dp0`"`r`necho Starting PeroPix...`r`nstart `"`" `"http://127.0.0.1:8765`"`r`npython\python.exe backend.py"
-          [System.IO.File]::WriteAllText("dist/PeroPix/PeroPix.bat", $bat1)
-
-          # PeroPix-App.bat 생성
-          $bat2 = "@echo off`r`ntitle PeroPix Server`r`ncd /d `"%~dp0`"`r`necho Starting PeroPix...`r`nstart /B python\python.exe backend.py`r`ntimeout /t 2 /nobreak >nul`r`nstart `"`" chrome --app=http://127.0.0.1:8765 2>nul || start `"`" msedge --app=http://127.0.0.1:8765 2>nul || start `"`" `"http://127.0.0.1:8765`"`r`necho Press any key to stop server...`r`npause >nul`r`ntaskkill /F /IM python.exe >nul 2>&1"
-          [System.IO.File]::WriteAllText("dist/PeroPix/PeroPix-App.bat", $bat2)
+          $bat = "@echo off`r`ntitle PeroPix`r`ncd /d `"%~dp0`"`r`necho Starting PeroPix...`r`nstart `"`" `"http://127.0.0.1:8765`"`r`npython\python.exe backend.py"
+          [System.IO.File]::WriteAllText("dist/PeroPix/PeroPix.bat", $bat)
 
       - name: Create ZIP Archive
         shell: pwsh

@@ -1897,10 +1897,18 @@ async def open_gallery_folder(request: dict = None):
 
 @app.get("/")
 async def serve_index():
-    """Serve index.html"""
+    """Serve index.html (캐시 비활성화)"""
     index_path = APP_DIR / "index.html"
     if index_path.exists():
-        return FileResponse(index_path, media_type="text/html")
+        return FileResponse(
+            index_path,
+            media_type="text/html",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+        )
     return {"error": "index.html not found"}
 
 

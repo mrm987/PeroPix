@@ -1288,6 +1288,9 @@ async def process_queue():
 
 async def process_job(job):
     """단일 작업 처리"""
+    import time
+    job_start_time = time.time()
+
     req = job["request"]
     job_id = job["id"]
 
@@ -1298,6 +1301,8 @@ async def process_job(job):
 
     # 시드 설정
     current_seed = req.seed if req.seed >= 0 else random.randint(0, 2**31 - 1)
+
+    print(f"[Generate] Job {job_id} started - {total_images} image(s), {req.width}x{req.height}, {req.steps} steps")
 
     # 시작 알림 (total은 job_queued에서 이미 증가됨)
     await gen_queue.broadcast({
@@ -1375,10 +1380,12 @@ async def process_job(job):
         )
         
         try:
+            image_start_time = time.time()
             if req.provider == "nai":
                 image, actual_seed = await call_nai_api(single_req)
             else:
                 image, actual_seed = call_local_diffusers(single_req)
+            image_time = time.time() - image_start_time
             
             # 파일명용 태그 결정: name > 첫 태그 (sanitize_filename 사용)
             file_tag = ""
@@ -1500,7 +1507,7 @@ async def process_job(job):
                 "queue_length": len(gen_queue.queue)
             }
 
-            print(f"[Backend] Broadcasting image: {image_path}, slot_idx={slot_index}, seq={gen_queue.image_sequence}, clients={len(gen_queue.clients)}")
+            print(f"[Generate] Image {image_idx}/{total_images} completed - {image_time:.1f}s - {filename}")
             await gen_queue.broadcast(image_data)
             
         except Exception as e:
@@ -1524,6 +1531,9 @@ async def process_job(job):
 
     # 큐가 비면 카운터 리셋
     queue_empty = len(gen_queue.queue) == 0
+    job_total_time = time.time() - job_start_time
+    print(f"[Generate] Job {job_id} finished - {image_idx} image(s) in {job_total_time:.1f}s")
+
     await gen_queue.broadcast({
         "type": "job_done",
         "job_id": job_id,

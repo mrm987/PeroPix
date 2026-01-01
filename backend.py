@@ -12,6 +12,7 @@ import json
 import asyncio
 import datetime
 import math
+import random
 from pathlib import Path
 from typing import Optional, List
 from contextlib import asynccontextmanager
@@ -76,21 +77,21 @@ def save_config(config):
 CONFIG = load_config()
 
 # ============================================================
-# Imports (lazy loading for faster startup)
+# Imports (lazy loading for local generation only)
 # ============================================================
+from PIL import Image  # PIL은 NAI에서도 필요하므로 바로 import
+
 torch = None
 np = None
-Image = None
 
 def lazy_imports():
-    global torch, np, Image
+    """Local generation 전용 - torch, numpy 로드"""
+    global torch, np
     if torch is None:
         import torch as _torch
         import numpy as _np
-        from PIL import Image as _Image
         torch = _torch
         np = _np
-        Image = _Image
 
 # ============================================================
 # Character Reference Helper Functions
@@ -744,20 +745,19 @@ async def encode_vibe_v4(image_base64: str, model: str, info_extracted: float,
 
 
 async def call_nai_api(req: GenerateRequest):
-    lazy_imports()
     import httpx
 
     token = CONFIG.get("nai_token", "")
     if not token:
         raise HTTPException(status_code=500, detail="NAI token not set. Go to Settings.")
-    
+
     uc_preset_map = {"Heavy": 0, "Light": 1, "Human Focus": 2, "None": 3}
     uc_preset_value = uc_preset_map.get(req.uc_preset, 0)
-    
+
     sm = req.smea in ["SMEA", "SMEA+DYN"]
     sm_dyn = req.smea == "SMEA+DYN"
-    
-    seed = req.seed if req.seed >= 0 else np.random.randint(0, 2**31 - 1)
+
+    seed = req.seed if req.seed >= 0 else random.randint(0, 2**31 - 1)
     
     # NAI 값이면 그대로, KSampler 값이면 변환
     nai_sampler = NAI_SAMPLER_MAP.get(req.sampler, req.sampler)
@@ -1241,17 +1241,16 @@ async def process_queue():
 
 async def process_job(job):
     """단일 작업 처리"""
-    lazy_imports()
     req = job["request"]
     job_id = job["id"]
-    
+
     # PromptItem 리스트 처리
     prompts = req.prompt_list if req.prompt_list else [PromptItem(name="", content="")]
     total_images = len(prompts)
     image_idx = 0
-    
+
     # 시드 설정
-    current_seed = req.seed if req.seed >= 0 else np.random.randint(0, 2**31 - 1)
+    current_seed = req.seed if req.seed >= 0 else random.randint(0, 2**31 - 1)
     
     # 진행 상황 초기화
     gen_queue.total_images += total_images
@@ -1292,7 +1291,7 @@ async def process_job(job):
             full_prompt = f"{full_prompt}, {char_prompts_str}".strip(", ")
         
         if req.random_seed_per_image and prompt_idx > 0:
-            current_seed = np.random.randint(0, 2**31 - 1)
+            current_seed = random.randint(0, 2**31 - 1)
         
         single_req = GenerateRequest(
             provider=req.provider,
@@ -1475,8 +1474,6 @@ async def health():
 @app.post("/api/extract-metadata")
 async def extract_metadata(request: dict):
     """PNG 이미지에서 메타데이터 추출"""
-    lazy_imports()
-
     image_base64 = request.get("image")
     if not image_base64:
         return {"success": False, "error": "No image provided"}
@@ -1596,7 +1593,6 @@ async def delete_gallery_folder(folder_name: str):
 @app.get("/api/gallery")
 async def get_gallery(folder: str = ""):
     """갤러리 이미지 목록 조회 (폴더별)"""
-    lazy_imports()
     images = []
 
     try:
@@ -1648,7 +1644,6 @@ async def get_gallery(folder: str = ""):
 @app.post("/api/gallery/save")
 async def save_to_gallery(request: dict):
     """이미지를 갤러리에 저장 (원본 메타데이터 보존)"""
-    lazy_imports()
     from PIL.PngImagePlugin import PngInfo
 
     image_base64 = request.get("image")
@@ -1701,8 +1696,6 @@ async def save_to_gallery(request: dict):
 @app.get("/api/gallery/{filename}")
 async def get_gallery_image(filename: str, folder: str = ""):
     """갤러리 이미지 조회 (전체 크기 + 메타데이터)"""
-    lazy_imports()
-
     try:
         gallery_path = get_gallery_folder_path(folder)
     except ValueError as e:

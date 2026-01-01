@@ -5815,10 +5815,10 @@
                     if (ghost) ghost.remove();
                 };
 
-                // 이미지 자체의 기본 드래그 동작 방지
+                // 이미지 자체의 기본 드래그 동작 방지 (부모 item의 드래그로 대체)
                 const imgEl = item.querySelector('img');
                 if (imgEl) {
-                    imgEl.ondragstart = (e) => e.preventDefault();
+                    imgEl.draggable = false;
                 }
 
                 // 라이트박스 표시 함수

@@ -881,7 +881,7 @@
             color: var(--text-dim);
             font-size: 0.9rem;
             flex-shrink: 0;
-            overflow-x: auto;
+            overflow: visible;
             gap: 12px;
         }
         .slots-header::-webkit-scrollbar {
@@ -997,16 +997,13 @@
         
         .preset-menu {
             display: none;
-            position: absolute;
-            top: 100%;
-            left: 0;
-            margin-top: 4px;
+            position: fixed;
             min-width: 220px;
             background: var(--bg-light);
             border: 1px solid var(--border);
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            z-index: 100;
+            z-index: 1000;
             overflow: hidden;
         }
         
@@ -3156,6 +3153,10 @@
             e.stopPropagation();
             presetMenu.classList.toggle('show');
             if (presetMenu.classList.contains('show')) {
+                // position: fixed 메뉴 위치 계산
+                const btnRect = presetBtn.getBoundingClientRect();
+                presetMenu.style.top = (btnRect.bottom + 4) + 'px';
+                presetMenu.style.left = btnRect.left + 'px';
                 loadPresetList();
             }
         };

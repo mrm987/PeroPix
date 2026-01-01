@@ -3042,9 +3042,13 @@
                 }
             });
 
-            // 최신 이미지를 위에 추가
-            imagesContainer.insertBefore(card, imagesContainer.firstChild);
-            console.log(`[addImageToSlot] Card inserted for ${data.filename}`);
+            // 이미지 로드 완료 후 카드 추가 (이미지와 info가 동시에 표시되도록)
+            const insertCard = () => {
+                imagesContainer.insertBefore(card, imagesContainer.firstChild);
+                console.log(`[addImageToSlot] Card inserted for ${data.filename}`);
+            };
+            img.onload = insertCard;
+            img.onerror = insertCard;  // 로드 실패 시에도 카드 표시
         }
 
         function clearSlotImages() {

@@ -2286,7 +2286,6 @@ async def calculate_cost(request: dict):
     vibe_count = request.get("vibe_count", 0)
     has_char_ref = request.get("has_char_ref", False)
     count = request.get("count", 1)  # 생성 횟수
-    print(f"[Cost Request] is_opus={is_opus}, has_char_ref={has_char_ref}, count={count}")
 
     # Vibe 캐시 체크 (vibes 배열이 제공된 경우)
     vibes = request.get("vibes", [])
@@ -2315,7 +2314,6 @@ async def calculate_cost(request: dict):
 
     cost_per_image = calculate_anlas_cost(width, height, steps, is_opus, uncached_vibe_count, has_char_ref)
     total_cost = cost_per_image * count
-    print(f"[Cost] cost_per_image={cost_per_image}, total_cost={total_cost} (count={count})")
 
     # Vibe 인코딩 비용 (캐시되지 않은 것만, 첫 이미지에서만 발생)
     vibe_encoding_cost = uncached_vibe_count * 2 if uncached_vibe_count > 0 else 0
@@ -3063,4 +3061,4 @@ async def uninstall_local():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8765)
+    uvicorn.run(app, host="127.0.0.1", port=8765, log_level="warning")

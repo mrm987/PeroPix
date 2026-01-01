@@ -489,7 +489,7 @@
             transform: rotate(-90deg);
         }
         .collapsible-content {
-            overflow: visible;
+            overflow: hidden;
             transition: max-height 0.2s ease-out, opacity 0.2s ease-out;
         }
         .collapsible-content.collapsed {
@@ -497,7 +497,10 @@
             opacity: 0;
             margin: 0;
             padding: 0;
-            overflow: hidden;
+        }
+        /* Characters 섹션만 드롭다운이 밖으로 나올 수 있도록 */
+        #charactersContent:not(.collapsed) {
+            overflow: visible;
         }
 
         .prompt-preset-dropdown {

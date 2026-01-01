@@ -5113,12 +5113,14 @@
 
                 currentAnlas = data.anlas;
                 isOpusTier = data.tier >= 3; // Tier 3 = Opus
+                console.log('[Anlas] Subscription loaded:', { tier: data.tier, isOpusTier, anlas: currentAnlas });
 
                 document.getElementById('anlasBalance').textContent =
                     currentAnlas !== null ? currentAnlas.toLocaleString() : '--';
 
                 updateAnlasCost();
             } catch (e) {
+                console.error('[Anlas] Failed to fetch subscription:', e);
                 document.getElementById('anlasBalance').textContent = '--';
             }
         }

@@ -2499,35 +2499,6 @@
                     </div>
                 </div>
 
-                <!-- Save Options -->
-                <div class="section">
-                    <div class="section-title">
-                        <button type="button" class="collapse-toggle" data-target="saveOptionsContent" title="접기/펼치기">▼</button>
-                        <span>Save Options</span>
-                    </div>
-                    <div id="saveOptionsContent" class="collapsible-content">
-                        <div class="row">
-                            <div>
-                                <label>Format</label>
-                                <select id="saveFormat">
-                                    <option value="png" selected>PNG</option>
-                                    <option value="jpg">JPG</option>
-                                    <option value="webp">WebP</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label>JPG Quality</label>
-                                <input type="number" id="jpgQuality" value="95" min="1" max="100" step="1">
-                            </div>
-                        </div>
-                        <label style="display: flex; align-items: center; gap: 6px; margin-top: 8px; cursor: pointer;">
-                            <input type="checkbox" id="stripMetadata">
-                            <span>메타데이터 제거</span>
-                        </label>
-                        <small style="color: var(--text-dim);">체크 시 이미지에서 생성 정보가 제거됩니다</small>
-                    </div>
-                </div>
-
                 <!-- Generation Settings -->
                 <div class="section">
                     <div class="section-title">
@@ -2615,6 +2586,35 @@
                             <input type="checkbox" id="lockSeed">
                             <label for="lockSeed">시드 고정</label>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Save Options -->
+                <div class="section">
+                    <div class="section-title">
+                        <button type="button" class="collapse-toggle" data-target="saveOptionsContent" title="접기/펼치기">▼</button>
+                        <span>Save Options</span>
+                    </div>
+                    <div id="saveOptionsContent" class="collapsible-content">
+                        <div class="row">
+                            <div>
+                                <label>Format</label>
+                                <select id="saveFormat">
+                                    <option value="png" selected>PNG</option>
+                                    <option value="jpg">JPG</option>
+                                    <option value="webp">WebP</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label>JPG Quality</label>
+                                <input type="number" id="jpgQuality" value="95" min="1" max="100" step="1">
+                            </div>
+                        </div>
+                        <div class="checkbox-row">
+                            <input type="checkbox" id="stripMetadata">
+                            <label for="stripMetadata">메타데이터 제거</label>
+                        </div>
+                        <small style="color: var(--text-dim);">체크 시 이미지에서 생성 정보가 제거됩니다</small>
                     </div>
                 </div>
             </div>
@@ -6306,7 +6306,7 @@
                     <div class="gallery-item-actions">
                         <button class="copy-prompt-btn" title="프롬프트 복사">📋 Prompt</button>
                         <button class="copy-seed-btn" title="시드 복사">🎲 Seed</button>
-                        <button class="apply-all-btn" title="전체 설정 적용">📥 Apply</button>
+                        <button class="apply-all-btn" title="전체 설정 적용">📋 Apply</button>
                         <button class="delete-btn" title="삭제">🗑️</button>
                     </div>
                 `;

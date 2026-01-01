@@ -2983,20 +2983,14 @@
 
                 // 저장되지 않은 경우 갤러리에 저장
                 try {
-                    // 원본 메타데이터가 있으면 사용, 없으면 기본값
-                    const originalMeta = card._imageData.metadata || {};
+                    // 백엔드에서 원본 파일의 메타데이터를 직접 읽음
                     const response = await fetch(`${API_BASE}/api/gallery/save`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             image: card._imageData.image,  // base64 (하위 호환)
                             image_path: card._imageData.image_path,  // 파일 경로
-                            filename: card._imageData.filename,
-                            metadata: {
-                                ...originalMeta,  // 원본 메타데이터 전체 (character_prompts 포함)
-                                seed: card._imageData.seed,
-                                prompt: card._imageData.prompt
-                            }
+                            filename: card._imageData.filename
                         })
                     });
                     const result = await response.json();

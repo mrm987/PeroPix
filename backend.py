@@ -1567,14 +1567,13 @@ async def get_gallery():
 
 @app.post("/api/gallery/save")
 async def save_to_gallery(request: dict):
-    """이미지를 갤러리에 저장"""
+    """이미지를 갤러리에 저장 (원본 메타데이터 보존)"""
     lazy_imports()
     from PIL.PngImagePlugin import PngInfo
 
     image_base64 = request.get("image")
     image_path = request.get("image_path")  # 파일 경로 (우선)
     filename = request.get("filename", "gallery_image.png")
-    metadata = request.get("metadata", {})
 
     try:
         # image_path가 있으면 파일에서 읽기, 없으면 base64 디코딩
@@ -1595,10 +1594,12 @@ async def save_to_gallery(request: dict):
         new_filename = f"{base_name}_{timestamp}.png"
         filepath = GALLERY_DIR / new_filename
 
-        # 메타데이터 보존
+        # 원본 PNG 메타데이터 보존
         pnginfo = PngInfo()
-        if metadata:
-            pnginfo.add_text("Comment", json.dumps(metadata))
+        if hasattr(image, 'info') and image.info:
+            for key, value in image.info.items():
+                if isinstance(value, str):
+                    pnginfo.add_text(key, value)
 
         image.save(filepath, format="PNG", pnginfo=pnginfo)
 

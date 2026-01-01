@@ -456,15 +456,13 @@
         }
         
         .character-item .char-label {
-            flex: 1;
             color: var(--text-dim);
             font-size: 0.75rem;
             background: transparent;
             border: none;
             outline: none;
             padding: 2px 4px;
-            min-width: 60px;
-            max-width: 120px;
+            width: 80px;
         }
 
         .character-item .char-label:hover,
@@ -472,12 +470,20 @@
             background: var(--bg-light);
             border-radius: 3px;
         }
-        
-        .character-item .prompt-preset-btn {
-            padding: 1px 4px;
-            font-size: 0.65rem;
+
+        .character-item .char-header-spacer {
+            flex: 1;
         }
-        
+
+        .character-item .prompt-preset-dropdown {
+            margin-left: auto;
+        }
+
+        .character-item .prompt-preset-btn {
+            padding: 2px 6px;
+            font-size: 0.7rem;
+        }
+
         .character-item textarea {
             width: 100%;
             min-height: 40px;
@@ -501,8 +507,8 @@
             border: none;
             color: var(--text-dim);
             cursor: pointer;
-            padding: 2px 4px;
-            font-size: 0.9rem;
+            padding: 2px 6px;
+            font-size: 1rem;
             opacity: 0.5;
         }
         

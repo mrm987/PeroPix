@@ -2436,7 +2436,7 @@
                     <div class="preset-dropdown" id="presetDropdown">
                         <button type="button" class="header-btn preset-btn" id="presetBtn">
                             <span>🔖</span>
-                            <span class="preset-name" id="presetName">Presets</span>
+                            <span class="preset-name" id="presetName">Slot Set</span>
                             <span class="dropdown-arrow">▼</span>
                         </button>
                         <div class="preset-menu" id="presetMenu">
@@ -2444,14 +2444,14 @@
                                 <!-- 프리셋 목록 -->
                             </div>
                             <div class="preset-actions">
-                                <button type="button" class="preset-action-btn" id="newPresetBtn">+ New Preset</button>
+                                <button type="button" class="preset-action-btn" id="newPresetBtn">+ New Set</button>
                                 <button type="button" class="preset-action-btn" id="savePresetBtn">💾 Save</button>
                             </div>
                         </div>
                     </div>
                     <div class="prefix-input-wrapper">
-                        <span class="prefix-label">📁 Sub Folder:</span>
-                        <input type="text" id="outputFolder" value="" placeholder="선택사항" class="prefix-input">
+                        <span class="prefix-label">📁 Save:</span>
+                        <input type="text" id="outputFolder" value="" placeholder="폴더명(선택)" class="prefix-input">
                     </div>
                     <button type="button" class="header-btn" id="openOutputFolderBtn" title="출력 폴더 열기">
                         <span>📁</span>
@@ -3353,7 +3353,7 @@
 
                         if (currentPreset?.filename === filename) {
                             currentPreset = null;
-                            presetNameSpan.textContent = 'Presets';
+                            presetNameSpan.textContent = 'Slot Set';
                         }
 
                         loadPresetList();

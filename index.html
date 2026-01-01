@@ -4329,6 +4329,12 @@
                     }
                     break;
 
+                case 'job_queued':
+                    // 작업이 큐에 추가될 때 즉시 진행률 반영
+                    console.log(`[WS] Job queued: ${data.job_id}, images: ${data.job_images}`);
+                    updateProgressFromServer(data.progress);
+                    break;
+
                 case 'job_start':
                     console.log(`[WS] Job started: ${data.job_id}, total: ${data.job_total}`);
                     updateProgressFromServer(data.progress);

@@ -1287,11 +1287,8 @@ async def process_job(job):
 
     # 시드 설정
     current_seed = req.seed if req.seed >= 0 else random.randint(0, 2**31 - 1)
-    
-    # 진행 상황 초기화
-    gen_queue.total_images += total_images
 
-    # 시작 알림
+    # 시작 알림 (total은 job_queued에서 이미 증가됨)
     await gen_queue.broadcast({
         "type": "job_start",
         "job_id": job_id,
@@ -2239,6 +2236,25 @@ async def generate(req: GenerateRequest):
 async def generate_multi(req: MultiGenerateRequest):
     """큐에 작업 추가"""
     job_id = gen_queue.add_job(req)
+
+    # 이 job의 이미지 수 계산
+    prompt_count = len(req.prompt_list) if req.prompt_list else 1
+
+    # 즉시 total에 반영 (job 시작 전에도 프로그레스바에 표시)
+    gen_queue.total_images += prompt_count
+
+    # 모든 클라이언트에게 큐 추가 알림
+    await gen_queue.broadcast({
+        "type": "job_queued",
+        "job_id": job_id,
+        "job_images": prompt_count,
+        "progress": {
+            "completed": gen_queue.completed_images,
+            "total": gen_queue.total_images,
+            "queue_length": len(gen_queue.queue)
+        }
+    })
+
     return {
         "success": True,
         "job_id": job_id,

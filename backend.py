@@ -754,8 +754,10 @@ async def call_nai_api(req: GenerateRequest):
     uc_preset_map = {"Heavy": 0, "Light": 1, "Human Focus": 2, "None": 3}
     uc_preset_value = uc_preset_map.get(req.uc_preset, 0)
 
-    sm = req.smea in ["SMEA", "SMEA+DYN"]
-    sm_dyn = req.smea == "SMEA+DYN"
+    # SMEA는 V3 모델에서만 지원, V4+에서는 비활성화
+    is_v4_model = "diffusion-4" in req.nai_model
+    sm = req.smea in ["SMEA", "SMEA+DYN"] and not is_v4_model
+    sm_dyn = req.smea == "SMEA+DYN" and not is_v4_model
 
     seed = req.seed if req.seed >= 0 else random.randint(0, 2**31 - 1)
     

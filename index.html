@@ -445,8 +445,17 @@
             display: flex;
             align-items: center;
             gap: 6px;
+            padding: 4px 6px;
+            margin: 0 -6px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.15s;
         }
-        
+
+        .character-item-header:hover {
+            background: var(--bg-lighter);
+        }
+
         .character-item .char-num {
             color: var(--accent-gold);
             font-size: 0.75rem;
@@ -4156,12 +4165,14 @@
 
             contentDiv.appendChild(textarea);
 
-            // 접기 버튼 이벤트
-            collapseBtn.onclick = () => {
+            // 헤더 바 전체 클릭으로 접기/펴기
+            header.addEventListener('click', (e) => {
+                // 체크박스, 프리셋, 삭제 버튼 클릭은 무시
+                if (e.target.closest('.char-enable-toggle, .prompt-preset-dropdown, .delete-char-btn')) return;
                 collapseBtn.classList.toggle('collapsed');
                 contentDiv.classList.toggle('collapsed');
                 autoSaveSettings();
-            };
+            });
 
             item.appendChild(header);
             item.appendChild(contentDiv);

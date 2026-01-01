@@ -87,8 +87,14 @@ PeroPix/
 
 ## 시스템 요구사항
 
+### NAI 생성
 - Windows 10/11
-- NVIDIA GPU (CUDA, Local 생성 시)
+- 인터넷 연결
+- NAI 구독 및 API 토큰
+
+### Local 생성
+- Windows 10/11
+- NVIDIA GPU (CUDA)
 - 8GB+ VRAM 권장
 
 ## License

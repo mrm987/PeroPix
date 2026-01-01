@@ -3150,23 +3150,32 @@
         let currentPreset = null; // { filename, name }
         let presets = [];
         
-        // 드롭다운 토글
+        // 드롭다운 토글 (body에 붙여서 overflow 문제 해결)
         presetBtn.onclick = (e) => {
             e.stopPropagation();
-            presetMenu.classList.toggle('show');
-            if (presetMenu.classList.contains('show')) {
-                // position: fixed 메뉴 위치 계산
+            const isShowing = presetMenu.classList.contains('show');
+
+            if (isShowing) {
+                presetMenu.classList.remove('show');
+                presetDropdown.appendChild(presetMenu); // 원래 위치로
+            } else {
+                // body에 붙이고 위치 계산
+                document.body.appendChild(presetMenu);
                 const btnRect = presetBtn.getBoundingClientRect();
                 presetMenu.style.top = (btnRect.bottom + 4) + 'px';
                 presetMenu.style.left = btnRect.left + 'px';
+                presetMenu.classList.add('show');
                 loadPresetList();
             }
         };
-        
+
         // 외부 클릭 시 닫기
         document.addEventListener('click', (e) => {
-            if (!presetDropdown.contains(e.target)) {
+            if (!presetDropdown.contains(e.target) && !presetMenu.contains(e.target)) {
                 presetMenu.classList.remove('show');
+                if (presetMenu.parentElement === document.body) {
+                    presetDropdown.appendChild(presetMenu);
+                }
             }
         });
         

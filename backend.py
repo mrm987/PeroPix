@@ -1972,6 +1972,111 @@ async def open_gallery_folder(request: dict = None):
         return {"success": False, "error": str(e)}
 
 
+# === Vibe Cache API ===
+
+@app.get("/api/vibe-cache")
+async def get_vibe_cache():
+    """바이브 캐시 목록 조회"""
+    vibes = []
+
+    if not VIBE_CACHE_DIR.exists():
+        return {"vibes": []}
+
+    for filepath in sorted(VIBE_CACHE_DIR.glob("*.png"), key=lambda x: x.stat().st_mtime, reverse=True):
+        try:
+            image = Image.open(filepath)
+            metadata = {}
+
+            if hasattr(image, 'info'):
+                for key, value in image.info.items():
+                    if isinstance(value, str):
+                        metadata[key] = value
+
+            # 썸네일 생성
+            thumb = image.copy()
+            thumb.thumbnail((260, 260), Image.LANCZOS)
+            buffer = io.BytesIO()
+            thumb.save(buffer, format="PNG")
+            thumb_base64 = base64.b64encode(buffer.getvalue()).decode()
+
+            vibes.append({
+                "filename": filepath.name,
+                "thumbnail": thumb_base64,
+                "model": metadata.get("model", "unknown"),
+                "strength": metadata.get("strength", "0.6"),
+                "info_extracted": metadata.get("info_extracted", "1.0"),
+                "has_vibe_data": "vibe_data" in metadata
+            })
+        except Exception as e:
+            print(f"[VibeCache] Error loading {filepath}: {e}")
+            continue
+
+    return {"vibes": vibes}
+
+
+@app.get("/api/vibe-cache/{filename}")
+async def get_vibe_cache_file(filename: str):
+    """바이브 캐시 파일 상세 정보 (vibe_data 포함)"""
+    filepath = VIBE_CACHE_DIR / filename
+
+    if not filepath.exists():
+        return {"success": False, "error": "File not found"}
+
+    try:
+        image = Image.open(filepath)
+        metadata = {}
+
+        if hasattr(image, 'info'):
+            for key, value in image.info.items():
+                if isinstance(value, str):
+                    metadata[key] = value
+
+        # 원본 이미지 base64
+        buffer = io.BytesIO()
+        image.save(buffer, format="PNG")
+        image_base64 = base64.b64encode(buffer.getvalue()).decode()
+
+        return {
+            "success": True,
+            "filename": filename,
+            "image": image_base64,
+            "vibe_data": metadata.get("vibe_data"),
+            "model": metadata.get("model", "unknown"),
+            "strength": float(metadata.get("strength", 0.6)),
+            "info_extracted": float(metadata.get("info_extracted", 1.0))
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.delete("/api/vibe-cache/{filename}")
+async def delete_vibe_cache_file(filename: str):
+    """바이브 캐시 파일 삭제"""
+    filepath = VIBE_CACHE_DIR / filename
+
+    if not filepath.exists():
+        return {"success": False, "error": "File not found"}
+
+    try:
+        # key_map.json에서도 제거
+        key_map_file = VIBE_CACHE_DIR / "key_map.json"
+        if key_map_file.exists():
+            try:
+                key_map = json.loads(key_map_file.read_text(encoding='utf-8'))
+                # filename과 일치하는 캐시 키 찾아서 제거
+                keys_to_remove = [k for k, v in key_map.items() if v == filename]
+                for k in keys_to_remove:
+                    del key_map[k]
+                key_map_file.write_text(json.dumps(key_map, indent=2), encoding='utf-8')
+            except:
+                pass
+
+        filepath.unlink()
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 @app.get("/")
 async def serve_index():
     """Serve index.html (캐시 비활성화)"""

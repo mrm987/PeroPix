@@ -1785,6 +1785,23 @@
             margin: 0 4px;
             align-self: center;
         }
+        .folder-separator.double {
+            width: 4px;
+            background: linear-gradient(90deg, var(--border) 0%, var(--border) 40%, transparent 40%, transparent 60%, var(--border) 60%, var(--border) 100%);
+            margin: 0 8px;
+        }
+        .folder-tab.vibe-folder {
+            background: var(--bg-light);
+            border-color: var(--accent-gold);
+        }
+        .folder-tab.vibe-folder:hover {
+            background: var(--bg-lighter);
+        }
+        .folder-tab.vibe-folder.active {
+            background: var(--accent-gold);
+            border-color: var(--accent-gold);
+            color: black;
+        }
 
         .folder-tab {
             padding: 6px 12px;
@@ -2722,6 +2739,8 @@
             <div class="gallery-container" id="galleryContainer" style="display: none;">
                 <div class="gallery-toolbar">
                     <div class="toolbar-left">
+                        <button type="button" class="folder-tab vibe-folder" id="vibeCacheBtn" data-folder="vibe">🎨 vibe</button>
+                        <span class="folder-separator double"></span>
                         <button type="button" class="folder-tab root-folder active" id="galleryRootBtn" data-folder="">📂 gallery</button>
                         <span class="folder-separator"></span>
                         <button type="button" class="add-folder-btn" id="addFolderBtn" title="새 폴더 추가">+📁</button>
@@ -6155,6 +6174,7 @@
 
         let currentMode = 'slot'; // 'slot' or 'gallery'
         let currentGalleryFolder = ''; // 현재 선택된 폴더 (빈 문자열 = gallery 루트)
+        let isVibeMode = false; // vibe cache mode
 
         slotModeBtn.onclick = () => {
             if (currentMode === 'slot') return;
@@ -6219,14 +6239,19 @@
 
         // 폴더 아이콘 업데이트 (📂 선택됨 / 📁 미선택)
         function updateFolderIcons() {
+            const vibeCacheBtn = document.getElementById('vibeCacheBtn');
+
+            // vibe 폴더
+            vibeCacheBtn.classList.toggle('active', isVibeMode);
+
             // 루트 폴더
-            const isRootActive = currentGalleryFolder === '';
+            const isRootActive = !isVibeMode && currentGalleryFolder === '';
             galleryRootBtn.textContent = `${isRootActive ? '📂' : '📁'} gallery`;
             galleryRootBtn.classList.toggle('active', isRootActive);
 
             // 하위 폴더들
             gallerySubfolders.querySelectorAll('.folder-tab').forEach(tab => {
-                const isActive = tab.dataset.folder === currentGalleryFolder;
+                const isActive = !isVibeMode && tab.dataset.folder === currentGalleryFolder;
                 const folderName = tab.dataset.folder;
                 const count = tab.dataset.count || '';
                 tab.textContent = `${isActive ? '📂' : '📁'} ${folderName}${count ? ` (${count})` : ''}`;
@@ -6266,10 +6291,19 @@
             }
         }
 
+        // Vibe 캐시 버튼 클릭
+        document.getElementById('vibeCacheBtn').onclick = () => {
+            if (isVibeMode) return;
+            isVibeMode = true;
+            updateFolderIcons();
+            loadVibeCache();
+        };
+
         // 폴더 탭 이벤트 설정
         function setupFolderTab(tab) {
             tab.onclick = () => {
-                if (tab.dataset.folder === currentGalleryFolder) return;
+                if (!isVibeMode && tab.dataset.folder === currentGalleryFolder) return;
+                isVibeMode = false;  // Exit vibe mode when clicking gallery folders
                 currentGalleryFolder = tab.dataset.folder;
                 updateFolderIcons();
                 loadGallery(currentGalleryFolder);
@@ -6574,6 +6608,157 @@
                                             <div class="icon">🖼️</div>
                                             <p>갤러리가 비어있습니다</p>
                                             <small>이미지에서 ⭐ 버튼을 눌러 갤러리에 저장하세요</small>
+                                        `;
+                                        galleryEmpty.style.display = 'flex';
+                                        galleryGrid.style.display = 'none';
+                                    }
+                                } else {
+                                    showToast('삭제 실패', 'error');
+                                }
+                            } catch (err) {
+                                showToast('삭제 오류: ' + err.message, 'error');
+                            }
+                        },
+                        '삭제',
+                        true
+                    );
+                };
+
+                galleryGrid.appendChild(item);
+            });
+        }
+
+        // ============================================================
+        // Vibe Cache Loading
+        // ============================================================
+        async function loadVibeCache() {
+            // 로딩 중 표시
+            galleryGrid.style.display = 'none';
+            galleryEmpty.innerHTML = `
+                <div class="icon">⏳</div>
+                <p>바이브 캐시 로딩 중...</p>
+            `;
+            galleryEmpty.style.display = 'flex';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/vibe-cache`);
+                const result = await response.json();
+
+                if (result.vibes && result.vibes.length > 0) {
+                    galleryEmpty.style.display = 'none';
+                    galleryGrid.style.display = 'grid';
+                    renderVibeCache(result.vibes);
+                } else {
+                    galleryEmpty.innerHTML = `
+                        <div class="icon">🎨</div>
+                        <p>바이브 캐시가 비어있습니다</p>
+                        <small>이미지 생성 시 바이브가 자동으로 캐시됩니다</small>
+                    `;
+                    galleryEmpty.style.display = 'flex';
+                    galleryGrid.style.display = 'none';
+                    galleryGrid.innerHTML = '';
+                }
+            } catch (err) {
+                galleryEmpty.innerHTML = `
+                    <div class="icon">❌</div>
+                    <p>바이브 캐시 로드 실패</p>
+                    <small>${err.message}</small>
+                `;
+                showToast('바이브 캐시 로드 실패: ' + err.message, 'error');
+            }
+        }
+
+        function renderVibeCache(vibes) {
+            galleryGrid.innerHTML = '';
+
+            vibes.forEach(vibe => {
+                const item = document.createElement('div');
+                item.className = 'gallery-item';
+                item._filename = vibe.filename;
+                item.draggable = false;  // Vibe items are not draggable
+
+                // 파일명에서 이름 추출 (예: name_0.6_1.0_0000001.png → name)
+                const displayName = vibe.filename.replace(/\.png$/i, '').replace(/_[\d.]+_[\d.]+_\d+$/, '');
+
+                item.innerHTML = `
+                    <img src="data:image/png;base64,${vibe.thumbnail}" alt="">
+                    <div class="gallery-item-info">
+                        <div class="filename-row">
+                            <span class="filename" title="${vibe.filename}">${displayName}</span>
+                        </div>
+                        <div class="seed">S:${vibe.strength} IE:${vibe.info_extracted}</div>
+                    </div>
+                    <div class="gallery-item-actions">
+                        <button class="apply-vibe-btn" title="바이브 적용">🎨 Vibe</button>
+                        <button class="delete-btn" title="삭제">🗑️</button>
+                    </div>
+                `;
+
+                // 이미지 클릭 시 라이트박스
+                const imgEl = item.querySelector('img');
+                imgEl.onclick = () => {
+                    lightboxImg.src = `data:image/png;base64,${vibe.thumbnail}`;
+                    lightbox.classList.add('active');
+                };
+
+                // 바이브 적용 버튼
+                item.querySelector('.apply-vibe-btn').onclick = async (e) => {
+                    e.stopPropagation();
+                    try {
+                        const response = await fetch(`${API_BASE}/api/vibe-cache/${vibe.filename}`);
+                        const result = await response.json();
+                        if (result.success && result.vibe_data) {
+                            // vibeList에 추가
+                            if (vibeList.length >= 16) {
+                                showToast('바이브는 최대 16개까지만 추가할 수 있습니다', 'error');
+                                return;
+                            }
+
+                            vibeList.push({
+                                image: result.image,
+                                strength: result.strength,
+                                info_extracted: result.info_extracted,
+                                name: displayName,
+                                encoded: result.vibe_data  // Pre-encoded vibe data
+                            });
+                            renderVibeList();
+                            saveAppSettings();
+                            updateAnlasCost();
+
+                            // Vibe Transfer 활성화
+                            document.getElementById('enableVibeTransfer').checked = true;
+                            document.getElementById('vibeTransferSettings').style.display = 'block';
+
+                            showToast('바이브가 추가되었습니다', 'success');
+                        } else {
+                            showToast('바이브 데이터 없음', 'warning');
+                        }
+                    } catch (err) {
+                        showToast('바이브 적용 실패: ' + err.message, 'error');
+                    }
+                };
+
+                // 삭제 버튼
+                item.querySelector('.delete-btn').onclick = async (e) => {
+                    e.stopPropagation();
+                    showConfirmModal(
+                        '🗑️ 바이브 삭제',
+                        '<p>이 바이브 캐시를 삭제하시겠습니까?</p>',
+                        async () => {
+                            try {
+                                const response = await fetch(`${API_BASE}/api/vibe-cache/${vibe.filename}`, {
+                                    method: 'DELETE'
+                                });
+                                const result = await response.json();
+                                if (result.success) {
+                                    item.remove();
+                                    showToast('삭제됨', 'success');
+                                    // 캐시가 비었는지 확인
+                                    if (galleryGrid.children.length === 0) {
+                                        galleryEmpty.innerHTML = `
+                                            <div class="icon">🎨</div>
+                                            <p>바이브 캐시가 비어있습니다</p>
+                                            <small>이미지 생성 시 바이브가 자동으로 캐시됩니다</small>
                                         `;
                                         galleryEmpty.style.display = 'flex';
                                         galleryGrid.style.display = 'none';

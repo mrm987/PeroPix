@@ -2770,6 +2770,7 @@
             <div id="dropModalMetadata" class="metadata"></div>
             <div class="buttons">
                 <button type="button" class="btn btn-secondary" id="dropModalCancel">취소</button>
+                <button type="button" class="btn" id="dropModalPromptOnly" style="display: none;">프롬프트만</button>
                 <button type="button" class="btn btn-primary" id="dropModalConfirm">적용</button>
             </div>
         </div>
@@ -5143,12 +5144,37 @@
                 <div><strong>Model:</strong> ${metadata.nai_model || metadata.model || 'N/A'}</div>
             `;
 
-            document.getElementById('dropModalConfirm').textContent = '설정 적용';
+            document.getElementById('dropModalConfirm').textContent = '전체 적용';
+            document.getElementById('dropModalPromptOnly').style.display = 'inline-block';
 
             // 임시 데이터 저장
             window._pendingLoadMetadata = metadata;
 
             dropModal.classList.add('active');
+        }
+
+        // 프롬프트만 적용 (시드 포함)
+        function applyPromptOnly(metadata) {
+            // 프롬프트
+            if (metadata.prompt) document.getElementById('basePrompt').value = metadata.prompt;
+            if (metadata.negative_prompt) document.getElementById('negativePrompt').value = metadata.negative_prompt;
+
+            // 캐릭터 프롬프트 적용
+            if (metadata.character_prompts && metadata.character_prompts.length > 0) {
+                const charactersList = document.getElementById('charactersList');
+                charactersList.innerHTML = '';
+                metadata.character_prompts.forEach(cp => {
+                    if (cp && cp.trim()) {
+                        addCharacter(cp);
+                    }
+                });
+                updateCharacterNumbers();
+            }
+
+            // 시드
+            if (metadata.seed) document.getElementById('seed').value = metadata.seed;
+
+            showToast('프롬프트와 시드가 적용되었습니다', 'success');
         }
 
         // 메타데이터 설정 적용
@@ -6304,7 +6330,6 @@
                         <div class="seed">${img.seed ? 'Seed: ' + img.seed : '메타데이터 없음'}</div>
                     </div>
                     <div class="gallery-item-actions">
-                        <button class="copy-prompt-btn" title="프롬프트 복사">📋 Prompt</button>
                         <button class="copy-seed-btn" title="시드 복사">🎲 Seed</button>
                         <button class="apply-all-btn" title="전체 설정 적용">📋 Apply</button>
                         <button class="delete-btn" title="삭제">🗑️</button>
@@ -6424,61 +6449,6 @@
                             input.blur();
                         }
                     };
-                };
-
-                // 프롬프트 적용 (확인 팝업)
-                item.querySelector('.copy-prompt-btn').onclick = async (e) => {
-                    e.stopPropagation();
-                    try {
-                        const response = await fetch(`${API_BASE}/api/gallery/${item._filename}${folderQuery}`);
-                        const result = await response.json();
-                        if (result.success && result.metadata && result.metadata.prompt) {
-                            const meta = result.metadata;
-                            const prompt = meta.prompt;
-
-                            // 캐릭터 프롬프트 추출
-                            let charPrompts = meta.character_prompts || [];
-                            if (charPrompts.length === 0 && meta.v4_prompt?.caption?.char_captions) {
-                                charPrompts = meta.v4_prompt.caption.char_captions.map(c => c.char_caption).filter(c => c);
-                            }
-                            if (charPrompts.length === 0 && meta.characterPrompts) {
-                                charPrompts = meta.characterPrompts.map(c => c.prompt).filter(c => c);
-                            }
-
-                            const charPromptsInfo = charPrompts.length > 0
-                                ? `<div style="margin-top: 8px;"><strong>캐릭터 (${charPrompts.length}):</strong> ${charPrompts.map((c, i) => `[${i+1}]`).join(' ')}</div>`
-                                : '';
-
-                            showConfirmModal(
-                                '📋 프롬프트 적용',
-                                `<p>이 프롬프트를 적용하시겠습니까?</p><div style="white-space: pre-wrap; word-break: break-word; margin-top: 8px;">${prompt}</div>${charPromptsInfo}`,
-                                async () => {
-                                    document.getElementById('basePrompt').value = prompt;
-
-                                    // 캐릭터 프롬프트 적용
-                                    if (charPrompts.length > 0) {
-                                        const charactersList = document.getElementById('charactersList');
-                                        charactersList.innerHTML = '';
-                                        charPrompts.forEach(cp => {
-                                            if (cp && cp.trim()) {
-                                                addCharacter(cp);
-                                            }
-                                        });
-                                        updateCharacterNumbers();
-                                    }
-
-                                    await navigator.clipboard.writeText(prompt);
-                                    showToast('프롬프트 적용 및 복사됨', 'success');
-                                    autoSaveSettings();
-                                },
-                                '적용'
-                            );
-                        } else {
-                            showToast('프롬프트 없음', 'warning');
-                        }
-                    } catch (err) {
-                        showToast('복사 실패', 'error');
-                    }
                 };
 
                 // 시드 적용 (확인 팝업)
@@ -6706,6 +6676,20 @@
             pendingDropData = null;
             window._pendingLoadMetadata = null;
             document.getElementById('dropModalPreview').style.display = '';
+            document.getElementById('dropModalPromptOnly').style.display = 'none';
+            document.getElementById('dropModalConfirm').textContent = '확인';
+        };
+
+        // 프롬프트만 적용 버튼
+        document.getElementById('dropModalPromptOnly').onclick = () => {
+            if (window._pendingLoadMetadata) {
+                applyPromptOnly(window._pendingLoadMetadata);
+                window._pendingLoadMetadata = null;
+                dropModal.classList.remove('active');
+                document.getElementById('dropModalPreview').style.display = '';
+                document.getElementById('dropModalPromptOnly').style.display = 'none';
+                document.getElementById('dropModalConfirm').textContent = '확인';
+            }
         };
 
         document.getElementById('dropModalConfirm').onclick = () => {
@@ -6715,6 +6699,8 @@
                 window._pendingLoadMetadata = null;
                 dropModal.classList.remove('active');
                 document.getElementById('dropModalPreview').style.display = '';
+                document.getElementById('dropModalPromptOnly').style.display = 'none';
+                document.getElementById('dropModalConfirm').textContent = '확인';
                 return;
             }
 

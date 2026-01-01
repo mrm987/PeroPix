@@ -50,6 +50,9 @@ jobs:
           # prompts 폴더 복사
           Copy-Item -Recurse "prompts" -Destination "dist/PeroPix/"
 
+          # assets 폴더 복사
+          Copy-Item -Recurse "assets" -Destination "dist/PeroPix/"
+
           # 빈 폴더 생성
           New-Item -ItemType Directory -Force -Path "dist/PeroPix/models/checkpoints"
           New-Item -ItemType Directory -Force -Path "dist/PeroPix/models/loras"

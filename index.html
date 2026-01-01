@@ -489,7 +489,7 @@
             transform: rotate(-90deg);
         }
         .collapsible-content {
-            overflow: hidden;
+            overflow: visible;
             transition: max-height 0.2s ease-out, opacity 0.2s ease-out;
         }
         .collapsible-content.collapsed {
@@ -497,6 +497,7 @@
             opacity: 0;
             margin: 0;
             padding: 0;
+            overflow: hidden;
         }
 
         .prompt-preset-dropdown {

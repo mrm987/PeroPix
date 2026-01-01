@@ -2729,7 +2729,7 @@
                         <button type="button" class="slot-drag" title="드래그하여 순서 변경" tabindex="-1">☰</button>
                         <button type="button" class="slot-delete" tabindex="-1">×</button>
                     </div>
-                    <textarea placeholder="태그..." class="slot-tags">${content}</textarea>
+                    <textarea placeholder="이 슬롯에만 적용할 태그" class="slot-tags">${content}</textarea>
                 </div>
                 <div class="slot-images">
                     <div class="slot-empty">이미지가 여기에 표시됩니다</div>
@@ -2924,6 +2924,8 @@
 
             const card = document.createElement('div');
             card.className = 'slot-image-card';
+            card.style.opacity = '0';
+            card.style.transition = 'opacity 0.15s';
             // image_path가 있으면 URL로, 없으면 base64로 (하위 호환)
             const imgSrc = data.image_path
                 ? `${API_BASE}/api/outputs/${data.image_path}`
@@ -2939,6 +2941,10 @@
                     <div class="seed">Seed: ${data.seed}</div>
                 </div>
             `;
+
+            // 이미지 로드 완료 시 카드 표시
+            const img = card.querySelector('img');
+            img.onload = () => { card.style.opacity = '1'; };
 
             // 이미지 데이터 저장 (갤러리 저장용 + 설정 불러오기용)
             card._imageData = {

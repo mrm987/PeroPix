@@ -5584,15 +5584,44 @@
                         const response = await fetch(`${API_BASE}/api/gallery/${item._filename}`);
                         const result = await response.json();
                         if (result.success && result.metadata && result.metadata.prompt) {
-                            const prompt = result.metadata.prompt;
+                            const meta = result.metadata;
+                            const prompt = meta.prompt;
                             const previewPrompt = prompt.length > 100 ? prompt.substring(0, 100) + '...' : prompt;
+
+                            // 캐릭터 프롬프트 추출
+                            let charPrompts = meta.character_prompts || [];
+                            if (charPrompts.length === 0 && meta.v4_prompt?.caption?.char_captions) {
+                                charPrompts = meta.v4_prompt.caption.char_captions.map(c => c.char_caption).filter(c => c);
+                            }
+                            if (charPrompts.length === 0 && meta.characterPrompts) {
+                                charPrompts = meta.characterPrompts.map(c => c.prompt).filter(c => c);
+                            }
+
+                            const charPromptsInfo = charPrompts.length > 0
+                                ? `<div style="margin-top: 8px;"><strong>캐릭터 (${charPrompts.length}):</strong> ${charPrompts.map((c, i) => `[${i+1}]`).join(' ')}</div>`
+                                : '';
+
                             showConfirmModal(
                                 '📋 프롬프트 적용',
-                                `<p>이 프롬프트를 적용하시겠습니까?</p><div class="metadata" style="max-height: 150px; overflow-y: auto; font-size: 0.8rem; color: var(--text-dim); margin-top: 8px;">${previewPrompt}</div>`,
+                                `<p>이 프롬프트를 적용하시겠습니까?</p><div class="metadata" style="max-height: 150px; overflow-y: auto; font-size: 0.8rem; color: var(--text-dim); margin-top: 8px;">${previewPrompt}</div>${charPromptsInfo}`,
                                 async () => {
-                                    document.getElementById('prompt').value = prompt;
+                                    document.getElementById('basePrompt').value = prompt;
+
+                                    // 캐릭터 프롬프트 적용
+                                    if (charPrompts.length > 0) {
+                                        const charactersList = document.getElementById('charactersList');
+                                        charactersList.innerHTML = '';
+                                        charPrompts.forEach(cp => {
+                                            if (cp && cp.trim()) {
+                                                addCharacter(cp);
+                                            }
+                                        });
+                                        updateCharacterNumbers();
+                                    }
+
                                     await navigator.clipboard.writeText(prompt);
                                     showToast('프롬프트 적용 및 복사됨', 'success');
+                                    autoSaveSettings();
                                 },
                                 '적용'
                             );

@@ -1,12 +1,13 @@
 # Backend dependencies
 fastapi>=0.100.0
-uvicorn>=0.22.0
+uvicorn[standard]>=0.22.0
 python-dotenv>=1.0.0
 pydantic>=2.0.0
 httpx>=0.25.0
 Pillow>=10.0.0
 numpy>=1.24.0
 aiofiles>=23.0.0
+websockets>=11.0.0
 
 # Local generation (optional - only needed for Local mode)
 torch>=2.0.0

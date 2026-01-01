@@ -2009,7 +2009,8 @@
         }
 
         /* Load settings button */
-        .slot-image-card .load-settings-btn {
+        .slot-image-card .load-settings-btn,
+        .slot-image-card .apply-seed-btn {
             background: var(--bg-lighter);
             border: 1px solid var(--border);
             color: var(--text-dim);
@@ -2024,6 +2025,11 @@
             background: var(--primary);
             color: white;
             border-color: var(--primary);
+        }
+        .slot-image-card .apply-seed-btn:hover {
+            background: var(--accent-gold);
+            color: black;
+            border-color: var(--accent-gold);
         }
 
         /* Settings Modal */
@@ -2492,7 +2498,36 @@
                         </div>
                     </div>
                 </div>
-                
+
+                <!-- Save Options -->
+                <div class="section">
+                    <div class="section-title">
+                        <button type="button" class="collapse-toggle" data-target="saveOptionsContent" title="접기/펼치기">▼</button>
+                        <span>Save Options</span>
+                    </div>
+                    <div id="saveOptionsContent" class="collapsible-content">
+                        <div class="row">
+                            <div>
+                                <label>Format</label>
+                                <select id="saveFormat">
+                                    <option value="png" selected>PNG</option>
+                                    <option value="jpg">JPG</option>
+                                    <option value="webp">WebP</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label>JPG Quality</label>
+                                <input type="number" id="jpgQuality" value="95" min="1" max="100" step="1">
+                            </div>
+                        </div>
+                        <label style="display: flex; align-items: center; gap: 6px; margin-top: 8px; cursor: pointer;">
+                            <input type="checkbox" id="stripMetadata">
+                            <span>메타데이터 제거</span>
+                        </label>
+                        <small style="color: var(--text-dim);">체크 시 이미지에서 생성 정보가 제거됩니다</small>
+                    </div>
+                </div>
+
                 <!-- Generation Settings -->
                 <div class="section">
                     <div class="section-title">
@@ -3229,7 +3264,8 @@
                 <div class="info">
                     <div class="info-row">
                         <div class="filename" title="${data.filename}">${data.filename}</div>
-                        <button type="button" class="load-settings-btn" title="이 이미지의 설정 불러오기">📋</button>
+                        <button type="button" class="apply-seed-btn" title="이 시드 적용">🎲</button>
+                        <button type="button" class="load-settings-btn" title="전체 설정 불러오기">📋</button>
                     </div>
                     <div class="seed">Seed: ${data.seed}</div>
                 </div>
@@ -3301,6 +3337,19 @@
                     }
                 } catch (err) {
                     showToast('저장 오류: ' + err.message, 'error');
+                }
+            };
+
+            // 시드 적용 버튼
+            const applySeedBtn = card.querySelector('.apply-seed-btn');
+            applySeedBtn.onclick = (e) => {
+                e.stopPropagation();
+                const seed = card._imageData.seed;
+                if (seed !== undefined && seed !== null) {
+                    document.getElementById('seed').value = seed;
+                    showToast(`시드 ${seed} 적용됨`, 'success');
+                } else {
+                    showToast('시드 정보가 없습니다', 'error');
                 }
             };
 
@@ -4481,7 +4530,12 @@
                     }
                 }
             }
-            
+
+            // Save options
+            request.save_format = document.getElementById('saveFormat').value;
+            request.jpg_quality = parseInt(document.getElementById('jpgQuality').value);
+            request.strip_metadata = document.getElementById('stripMetadata').checked;
+
             // 시드 고정이 아닐 경우, 다음 큐를 위해 즉시 새 시드로 UI 갱신
             // (빠르게 여러 번 클릭해도 중복 시드 방지)
             if (!document.getElementById('lockSeed').checked) {
@@ -5714,7 +5768,12 @@
                 upscaleSteps: document.getElementById('upscaleSteps').value,
                 upscaleCfg: document.getElementById('upscaleCfg').value,
                 upscaleDenoise: document.getElementById('upscaleDenoise').value,
-                
+
+                // Save Options
+                saveFormat: document.getElementById('saveFormat').value,
+                jpgQuality: document.getElementById('jpgQuality').value,
+                stripMetadata: document.getElementById('stripMetadata').checked,
+
                 // Output
                 outputFolder: getOutputFolder(),
                 repeatCount: document.getElementById('repeatCount').value,
@@ -5849,7 +5908,12 @@
                     document.getElementById('upscaleDenoise').value = settings.upscaleDenoise;
                     document.getElementById('upscaleDenoiseValue').textContent = settings.upscaleDenoise;
                 }
-                
+
+                // Save Options
+                if (settings.saveFormat) document.getElementById('saveFormat').value = settings.saveFormat;
+                if (settings.jpgQuality) document.getElementById('jpgQuality').value = settings.jpgQuality;
+                if (settings.stripMetadata !== undefined) document.getElementById('stripMetadata').checked = settings.stripMetadata;
+
                 // Output
                 if (settings.outputFolder !== undefined) setOutputFolder(settings.outputFolder);
                 if (settings.repeatCount) document.getElementById('repeatCount').value = settings.repeatCount;

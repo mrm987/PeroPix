@@ -35,18 +35,19 @@ CONFIG_FILE = APP_DIR / "config.json"
 PYTHON_ENV_DIR = APP_DIR / "python_env"  # 로컬 생성용 Python 환경
 
 # 카테고리별 이미지 순번 - 매번 실제 폴더 스캔
-def get_next_image_number(category: str, save_dir: Path = None) -> int:
-    """해당 카테고리의 다음 순번 반환 - 실제 폴더에서 스캔"""
+def get_next_image_number(category: str, save_dir: Path = None, ext: str = 'png') -> int:
+    """해당 카테고리의 다음 순번 반환 - 실제 폴더에서 스캔 (모든 확장자 검색)"""
     if save_dir is None:
         save_dir = OUTPUT_DIR
 
     max_num = 0
-    pattern = re.compile(rf'^{re.escape(category)}_(\d{{7}})\.png$')
+    # 모든 지원 포맷에서 순번 검색 (포맷 변경 시에도 연속 번호 유지)
+    pattern = re.compile(rf'^{re.escape(category)}_(\d{{7}})\.(png|jpg|webp)$')
 
     if save_dir.exists():
         for f in save_dir.iterdir():
             try:
-                if f.suffix == '.png':
+                if f.suffix.lower() in ['.png', '.jpg', '.webp']:
                     match = pattern.match(f.name)
                     if match:
                         num = int(match.group(1))
@@ -503,6 +504,11 @@ class MultiGenerateRequest(BaseModel):
     upscale_cfg: float = 5.0
     upscale_denoise: float = 0.5
     size_alignment: str = "none"
+
+    # Save Options
+    save_format: str = "png"  # png, jpg, webp
+    jpg_quality: int = 95
+    strip_metadata: bool = False
 
 
 class ConfigUpdate(BaseModel):
@@ -1392,15 +1398,25 @@ async def process_job(job):
             else:
                 category = f"{slot_index+1:03d}"
 
-            file_num = get_next_image_number(category, save_dir)
-            filename = f"{category}_{file_num:07d}.png"
+            # 저장 포맷 결정
+            save_format = getattr(req, 'save_format', 'png').lower()
+            if save_format not in ['png', 'jpg', 'webp']:
+                save_format = 'png'
+            ext = 'jpg' if save_format == 'jpg' else save_format
 
-            # 메타데이터 보존 및 추가
+            file_num = get_next_image_number(category, save_dir, ext)
+            filename = f"{category}_{file_num:07d}.{ext}"
+
+            # 메타데이터 옵션
+            strip_metadata = getattr(req, 'strip_metadata', False)
+            jpg_quality = getattr(req, 'jpg_quality', 95)
+
+            # 메타데이터 보존 및 추가 (PNG only, strip_metadata가 False일 때만)
             from PIL.PngImagePlugin import PngInfo
-            pnginfo = PngInfo()
+            pnginfo = PngInfo() if save_format == 'png' and not strip_metadata else None
 
             # 기존 메타데이터 복사 (NAI 메타데이터 포함)
-            if hasattr(image, 'info') and image.info:
+            if pnginfo and hasattr(image, 'info') and image.info:
                 for key, value in image.info.items():
                     if isinstance(value, str):
                         pnginfo.add_text(key, value)
@@ -1431,14 +1447,25 @@ async def process_job(job):
                 # Local 설정
                 "model": req.model,
             }
-            pnginfo.add_text("peropix", json.dumps(peropix_metadata))
 
-            # 기존 호환성용 개별 필드
-            pnginfo.add_text("prompt", full_prompt)
-            pnginfo.add_text("seed", str(actual_seed))
-            pnginfo.add_text("negative_prompt", req.negative_prompt or "")
+            if pnginfo:
+                pnginfo.add_text("peropix", json.dumps(peropix_metadata))
+                # 기존 호환성용 개별 필드
+                pnginfo.add_text("prompt", full_prompt)
+                pnginfo.add_text("seed", str(actual_seed))
+                pnginfo.add_text("negative_prompt", req.negative_prompt or "")
 
-            image.save(save_dir / filename, pnginfo=pnginfo)
+            # 포맷별 저장
+            save_path = save_dir / filename
+            if save_format == 'png':
+                image.save(save_path, format='PNG', pnginfo=pnginfo)
+            elif save_format == 'jpg':
+                # JPEG는 RGB만 지원
+                if image.mode in ('RGBA', 'P'):
+                    image = image.convert('RGB')
+                image.save(save_path, format='JPEG', quality=jpg_quality)
+            elif save_format == 'webp':
+                image.save(save_path, format='WEBP', quality=jpg_quality)
 
             # 진행 상황 업데이트
             gen_queue.completed_images += 1

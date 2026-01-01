@@ -5606,14 +5606,12 @@
         // 초기 그라데이션 업데이트
         setTimeout(updateScrollGradients, 100);
         
-        // 페이지 떠날 때 저장 및 경고 (생성 중일 때만)
+        // 페이지 떠날 때 저장 및 경고
         window.addEventListener('beforeunload', (e) => {
             saveAppSettings();
-            // 생성 중일 때만 브라우저 확인 팝업 표시
-            if (isGenerating) {
-                e.preventDefault();
-                e.returnValue = '';
-            }
+            // 브라우저 기본 확인 팝업 표시
+            e.preventDefault();
+            e.returnValue = '';
         });
 
         // ============================================================

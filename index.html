@@ -459,6 +459,18 @@
             flex: 1;
             color: var(--text-dim);
             font-size: 0.75rem;
+            background: transparent;
+            border: none;
+            outline: none;
+            padding: 2px 4px;
+            min-width: 60px;
+            max-width: 120px;
+        }
+
+        .character-item .char-label:hover,
+        .character-item .char-label:focus {
+            background: var(--bg-light);
+            border-radius: 3px;
         }
         
         .character-item .prompt-preset-btn {
@@ -502,9 +514,10 @@
         .char-enable-toggle {
             width: 14px;
             height: 14px;
-            margin-right: 6px;
+            margin: 0 4px 0 0;
             cursor: pointer;
             accent-color: var(--accent);
+            vertical-align: middle;
         }
 
         .character-item.disabled {
@@ -4086,7 +4099,7 @@
         const charactersList = document.getElementById('charactersList');
         const addCharBtn = document.getElementById('addCharBtn');
         
-        function createCharacterItem(content = '', collapsed = false, enabled = true) {
+        function createCharacterItem(content = '', collapsed = false, enabled = true, label = 'Character') {
             const item = document.createElement('div');
             item.className = 'character-item' + (enabled ? '' : ' disabled');
 
@@ -4116,9 +4129,12 @@
             const charNum = document.createElement('span');
             charNum.className = 'char-num';
 
-            const charLabel = document.createElement('span');
+            const charLabel = document.createElement('input');
+            charLabel.type = 'text';
             charLabel.className = 'char-label';
-            charLabel.textContent = 'Character';
+            charLabel.value = label;
+            charLabel.placeholder = 'Character';
+            charLabel.onchange = () => autoSaveSettings();
 
             // 프리셋 드롭다운
             const presetDropdown = document.createElement('div');
@@ -4230,7 +4246,8 @@
                 content: item.querySelector('textarea').value,
                 collapsed: item.querySelector('.collapsible-content').classList.contains('collapsed'),
                 height: item.querySelector('textarea').style.height || null,
-                enabled: item.querySelector('.char-enable-toggle').checked
+                enabled: item.querySelector('.char-enable-toggle').checked,
+                label: item.querySelector('.char-label').value || 'Character'
             }));
         }
         
@@ -5964,8 +5981,9 @@
                     const collapsed = charData.collapsed || false;
                     const height = charData.height || null;
                     const enabled = charData.enabled !== false;  // 기본값 true (하위 호환)
+                    const label = charData.label || 'Character';
                     if (content.trim() || collapsed) {
-                        const item = createCharacterItem(content, collapsed, enabled);
+                        const item = createCharacterItem(content, collapsed, enabled, label);
                         if (height) {
                             item.querySelector('textarea').style.height = height;
                         }

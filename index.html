@@ -4895,6 +4895,7 @@
                 widthInput.value = w;
                 heightInput.value = h;
             }
+            updateAnlasCost();
         };
         
         // Width/Height 직접 수정 시 Custom으로 변경
@@ -5234,9 +5235,10 @@
             }
         });
 
-        // Vibe/CharRef 변경시 비용 재계산
+        // Vibe/CharRef/모델 변경시 비용 재계산
         document.getElementById('enableVibeTransfer').addEventListener('change', updateAnlasCost);
         document.getElementById('enableCharRef').addEventListener('change', updateAnlasCost);
+        document.getElementById('naiModel').addEventListener('change', updateAnlasCost);
 
         // ============================================================
         // Settings Persistence (localStorage)

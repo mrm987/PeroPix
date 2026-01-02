@@ -451,7 +451,14 @@ class GenerateRequest(BaseModel):
 
     # NAI Character Reference (V4.5 only)
     character_reference: Optional[dict] = None  # {"image": base64, "fidelity": 0.5, "style_aware": True}
-    
+
+    # Base Image (img2img / inpaint)
+    base_image: Optional[str] = None  # base64 encoded image
+    base_mask: Optional[str] = None   # base64 encoded mask (white = inpaint area)
+    base_mode: str = "inpaint"        # "img2img" | "inpaint"
+    base_strength: float = 0.7        # 변형 강도
+    base_noise: float = 0.0           # 노이즈
+
     # Local
     model: str = ""
     loras: List[dict] = []
@@ -504,6 +511,13 @@ class MultiGenerateRequest(BaseModel):
 
     # NAI Character Reference (V4.5 only)
     character_reference: Optional[dict] = None
+
+    # Base Image (img2img / inpaint)
+    base_image: Optional[str] = None
+    base_mask: Optional[str] = None
+    base_mode: str = "inpaint"
+    base_strength: float = 0.7
+    base_noise: float = 0.0
 
     # Upscale (Local only)
     enable_upscale: bool = False
@@ -909,10 +923,28 @@ async def call_nai_api(req: GenerateRequest):
         params["director_reference_secondary_strength_values"] = [1.0 - fidelity]
         params["director_reference_information_extracted"] = [1.0]
 
+    # Base Image (img2img / inpaint) 처리
+    action = "generate"
+    if req.base_image:
+        # 이미지를 PNG로 변환
+        base_png = ensure_png_base64(req.base_image)
+        params["image"] = base_png
+        params["strength"] = req.base_strength
+        params["noise"] = req.base_noise
+
+        if req.base_mode == "inpaint" and req.base_mask:
+            action = "infill"
+            mask_png = ensure_png_base64(req.base_mask)
+            params["mask"] = mask_png
+            print(f"[NAI] Mode: Inpaint, strength={req.base_strength}, noise={req.base_noise}")
+        else:
+            action = "img2img"
+            print(f"[NAI] Mode: Img2Img, strength={req.base_strength}, noise={req.base_noise}")
+
     payload = {
         "input": req.prompt,
         "model": req.nai_model,
-        "action": "generate",
+        "action": action,
         "parameters": params
     }
     
@@ -922,7 +954,11 @@ async def call_nai_api(req: GenerateRequest):
         debug_params["reference_image_multiple"] = [f"<base64 len={len(img)}>" for img in debug_params["reference_image_multiple"]]
     if "director_reference_images" in debug_params:
         debug_params["director_reference_images"] = [f"<base64 len={len(img)}>" for img in debug_params["director_reference_images"]]
-    debug_payload = {"input": req.prompt[:100], "model": req.nai_model, "action": "generate", "parameters": debug_params}
+    if "image" in debug_params:
+        debug_params["image"] = f"<base64 len={len(debug_params['image'])}>"
+    if "mask" in debug_params:
+        debug_params["mask"] = f"<base64 len={len(debug_params['mask'])}>"
+    debug_payload = {"input": req.prompt[:100], "model": req.nai_model, "action": action, "parameters": debug_params}
     with open("nai_debug_payload.json", "w", encoding="utf-8") as f:
         json.dump(debug_payload, f, indent=2, ensure_ascii=False)
     print(f"[NAI] Debug payload saved to nai_debug_payload.json")

@@ -1718,6 +1718,95 @@
             padding: 10px 16px;
         }
 
+        /* Mask Editor Modal */
+        .mask-editor-modal {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        .mask-editor-modal.active { display: flex; }
+        .mask-editor-container {
+            background: var(--bg-light);
+            border-radius: 12px;
+            padding: 20px;
+            max-width: 95vw;
+            max-height: 95vh;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .mask-editor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .mask-editor-header h3 { margin: 0; }
+        .mask-editor-canvas-wrapper {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #1a1a1a;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .mask-editor-canvas-wrapper canvas {
+            max-width: 100%;
+            max-height: 70vh;
+        }
+        #maskEditorMaskCanvas {
+            position: absolute;
+            top: 0; left: 0;
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        .mask-editor-toolbar {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .mask-editor-toolbar .tool-group {
+            display: flex;
+            gap: 4px;
+            background: var(--bg);
+            padding: 4px;
+            border-radius: 8px;
+        }
+        .mask-editor-toolbar .tool-btn {
+            padding: 8px 12px;
+            border: none;
+            background: transparent;
+            color: var(--text);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        .mask-editor-toolbar .tool-btn:hover { background: var(--border); }
+        .mask-editor-toolbar .tool-btn.active { background: var(--primary); color: white; }
+        .mask-editor-toolbar .slider-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .mask-editor-toolbar .slider-group label {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+        }
+        .mask-editor-toolbar .slider-group input[type="range"] {
+            width: 100px;
+        }
+        .mask-editor-footer {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        .mask-editor-footer .btn { padding: 10px 20px; }
+
         /* Mode Toggle */
         .mode-toggle {
             display: flex;
@@ -2027,7 +2116,8 @@
 
         /* Load settings button */
         .slot-image-card .load-settings-btn,
-        .slot-image-card .apply-seed-btn {
+        .slot-image-card .apply-seed-btn,
+        .slot-image-card .inpaint-btn {
             background: var(--bg-lighter);
             border: 1px solid var(--border);
             color: var(--text-dim);
@@ -2047,6 +2137,11 @@
             background: var(--accent-gold);
             color: black;
             border-color: var(--accent-gold);
+        }
+        .slot-image-card .inpaint-btn:hover {
+            background: #9b59b6;
+            color: white;
+            border-color: #9b59b6;
         }
 
         /* Settings Modal */
@@ -2516,6 +2611,43 @@
                     </div>
                 </div>
 
+                <!-- Base Image (Inpaint/Img2Img) -->
+                <div class="section" id="baseImageSection" style="display: none;">
+                    <div class="section-title">
+                        <button type="button" class="collapse-toggle" data-target="baseImageContent" title="접기/펼치기">▼</button>
+                        <span>Base Image</span>
+                        <button type="button" class="btn btn-secondary" id="clearBaseImage" style="margin-left: auto; padding: 4px 8px; font-size: 0.8rem;">✕ Clear</button>
+                    </div>
+                    <div id="baseImageContent" class="collapsible-content">
+                        <div style="display: flex; gap: 12px; align-items: flex-start;">
+                            <div id="baseImagePreview" style="flex: 0 0 120px; height: 120px; background: var(--bg); border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;">
+                                <img id="baseImageImg" src="" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                                <div id="baseImageMaskOverlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0.5; pointer-events: none;"></div>
+                            </div>
+                            <div style="flex: 1;">
+                                <div class="row" style="margin-bottom: 8px;">
+                                    <div style="flex: 1;">
+                                        <label>Mode</label>
+                                        <select id="baseImageMode">
+                                            <option value="inpaint">Inpaint</option>
+                                            <option value="img2img">Img2Img</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div style="margin-bottom: 8px;">
+                                    <label>Strength: <span id="baseImageStrengthValue">0.7</span></label>
+                                    <input type="range" id="baseImageStrength" min="0" max="1" step="0.05" value="0.7" style="width: 100%;">
+                                </div>
+                                <div>
+                                    <label>Noise: <span id="baseImageNoiseValue">0</span></label>
+                                    <input type="range" id="baseImageNoise" min="0" max="1" step="0.05" value="0" style="width: 100%;">
+                                </div>
+                                <button type="button" class="btn" id="editMaskBtn" style="margin-top: 8px; width: 100%;">🎨 Edit Mask</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Generation Settings -->
                 <div class="section">
                     <div class="section-title">
@@ -2841,6 +2973,59 @@
             <div class="buttons">
                 <button type="button" class="btn btn-secondary" id="inputModalCancel">취소</button>
                 <button type="button" class="btn" id="inputModalOk">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mask Editor Modal -->
+    <div class="mask-editor-modal" id="maskEditorModal">
+        <div class="mask-editor-container">
+            <div class="mask-editor-header">
+                <h3>🎨 Inpaint Mask Editor</h3>
+                <button class="btn btn-secondary" id="maskEditorClose" style="padding: 6px 12px;">✕</button>
+            </div>
+            <div class="mask-editor-toolbar">
+                <div class="tool-group">
+                    <button class="tool-btn active" id="maskToolBrush" title="브러시 (마스크 그리기)">🖌️</button>
+                    <button class="tool-btn" id="maskToolEraser" title="지우개">🧹</button>
+                </div>
+                <div class="slider-group">
+                    <label>Size:</label>
+                    <input type="range" id="maskBrushSize" min="5" max="100" value="30">
+                    <span id="maskBrushSizeValue">30</span>
+                </div>
+                <div class="tool-group">
+                    <button class="tool-btn" id="maskToolClear" title="전체 지우기">🗑️ Clear</button>
+                    <button class="tool-btn" id="maskToolInvert" title="마스크 반전">🔄 Invert</button>
+                </div>
+                <div class="slider-group" style="margin-left: auto;">
+                    <label>Mode:</label>
+                    <select id="maskEditorMode" style="padding: 6px; border-radius: 6px; background: var(--bg); color: var(--text); border: 1px solid var(--border);">
+                        <option value="inpaint">Inpaint</option>
+                        <option value="img2img">Img2Img</option>
+                    </select>
+                </div>
+            </div>
+            <div class="mask-editor-canvas-wrapper">
+                <canvas id="maskEditorImageCanvas"></canvas>
+                <canvas id="maskEditorMaskCanvas"></canvas>
+                <canvas id="maskEditorDrawCanvas" style="position: absolute; top: 0; left: 0; cursor: crosshair;"></canvas>
+            </div>
+            <div class="mask-editor-toolbar">
+                <div class="slider-group">
+                    <label>Strength:</label>
+                    <input type="range" id="maskEditorStrength" min="0" max="1" step="0.05" value="0.7">
+                    <span id="maskEditorStrengthValue">0.7</span>
+                </div>
+                <div class="slider-group">
+                    <label>Noise:</label>
+                    <input type="range" id="maskEditorNoise" min="0" max="1" step="0.05" value="0">
+                    <span id="maskEditorNoiseValue">0</span>
+                </div>
+            </div>
+            <div class="mask-editor-footer">
+                <button class="btn btn-secondary" id="maskEditorCancel">취소</button>
+                <button class="btn btn-primary" id="maskEditorApply">✓ 설정에 적용</button>
             </div>
         </div>
     </div>
@@ -3314,6 +3499,7 @@
                 <div class="info">
                     <div class="info-row">
                         <div class="filename" title="${data.filename}">${data.filename}</div>
+                        <button type="button" class="inpaint-btn" title="Inpaint">🎨</button>
                         <button type="button" class="apply-seed-btn" title="이 시드 적용">🎲</button>
                         <button type="button" class="load-settings-btn" title="전체 설정 불러오기">📋</button>
                     </div>
@@ -3413,6 +3599,34 @@
                     return;
                 }
                 showLoadSettingsConfirm(metadata);
+            };
+
+            // Inpaint 버튼
+            const inpaintBtn = card.querySelector('.inpaint-btn');
+            inpaintBtn.onclick = async (e) => {
+                e.stopPropagation();
+                // 이미지 base64 가져오기
+                let imageBase64 = card._imageData.image;
+                if (!imageBase64 && card._imageData.image_path) {
+                    // 파일 경로에서 이미지 로드
+                    try {
+                        const response = await fetch(`${API_BASE}/api/image?path=${encodeURIComponent(card._imageData.image_path)}`);
+                        const blob = await response.blob();
+                        imageBase64 = await new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onload = () => resolve(reader.result.split(',')[1]);
+                            reader.readAsDataURL(blob);
+                        });
+                    } catch (err) {
+                        showToast('이미지 로드 실패', 'error');
+                        return;
+                    }
+                }
+                if (imageBase64) {
+                    setBaseImageForInpaint('data:image/png;base64,' + imageBase64);
+                } else {
+                    showToast('이미지 데이터가 없습니다', 'error');
+                }
             };
 
             // 드래그와 클릭 구분
@@ -4591,6 +4805,17 @@
             request.save_format = document.getElementById('saveFormat').value;
             request.jpg_quality = parseInt(document.getElementById('jpgQuality').value);
             request.strip_metadata = document.getElementById('stripMetadata').checked;
+
+            // Base Image (img2img / inpaint)
+            if (baseImageData.enabled && baseImageData.image) {
+                request.base_image = baseImageData.image;
+                request.base_mode = baseImageData.mode;
+                request.base_strength = baseImageData.strength;
+                request.base_noise = baseImageData.noise;
+                if (baseImageData.mode === 'inpaint' && baseImageData.mask) {
+                    request.base_mask = baseImageData.mask;
+                }
+            }
 
             // 시드 고정이 아닐 경우, 다음 큐를 위해 즉시 새 시드로 UI 갱신
             // (빠르게 여러 번 클릭해도 중복 시드 방지)
@@ -6505,6 +6730,7 @@
                     <div class="gallery-item-actions">
                         <button class="copy-seed-btn" title="시드 복사">🎲 Seed</button>
                         <button class="apply-all-btn" title="전체 설정 적용">📋 Apply</button>
+                        <button class="inpaint-btn" title="인페인트">🎨 Inpaint</button>
                         <button class="delete-btn" title="삭제">🗑️</button>
                     </div>
                 `;
@@ -6683,6 +6909,23 @@
                         }
                     } catch (err) {
                         showToast('적용 실패: ' + err.message, 'error');
+                    }
+                };
+
+                // 인페인트
+                item.querySelector('.inpaint-btn').onclick = async (e) => {
+                    e.stopPropagation();
+                    try {
+                        const response = await fetch(`${API_BASE}/api/gallery/${item._filename}${folderQuery}`);
+                        const result = await response.json();
+                        if (result.success && result.image) {
+                            setBaseImageForInpaint(result.image);
+                            showToast('인페인트 모드로 전환', 'success');
+                        } else {
+                            showToast('이미지 로드 실패', 'error');
+                        }
+                    } catch (err) {
+                        showToast('인페인트 오류: ' + err.message, 'error');
                     }
                 };
 
@@ -7210,6 +7453,334 @@
 
             closeDropModal();
         };
+
+        // ============================================================
+        // Mask Editor & Base Image (Inpaint/Img2Img)
+        // ============================================================
+
+        // Base Image 데이터
+        let baseImageData = {
+            enabled: false,
+            image: null,        // base64
+            mask: null,         // base64 (white = inpaint area)
+            mode: 'inpaint',    // 'inpaint' | 'img2img'
+            strength: 0.7,
+            noise: 0,
+            width: 0,
+            height: 0
+        };
+
+        // Mask Editor 상태
+        const maskEditor = {
+            isDrawing: false,
+            tool: 'brush',  // 'brush' | 'eraser'
+            brushSize: 30,
+            imageCanvas: null,
+            maskCanvas: null,
+            drawCanvas: null,
+            imageCtx: null,
+            maskCtx: null,
+            drawCtx: null,
+            originalImage: null,
+            scale: 1
+        };
+
+        // Mask Editor 열기
+        function openMaskEditor(imageBase64, existingMask = null) {
+            const modal = document.getElementById('maskEditorModal');
+            const img = new Image();
+
+            img.onload = () => {
+                maskEditor.originalImage = img;
+
+                // 캔버스 크기 계산 (최대 70vh, 95vw 내에서)
+                const maxWidth = window.innerWidth * 0.9;
+                const maxHeight = window.innerHeight * 0.65;
+                let scale = Math.min(maxWidth / img.width, maxHeight / img.height, 1);
+                maskEditor.scale = scale;
+
+                const canvasWidth = Math.round(img.width * scale);
+                const canvasHeight = Math.round(img.height * scale);
+
+                // 캔버스 초기화
+                maskEditor.imageCanvas = document.getElementById('maskEditorImageCanvas');
+                maskEditor.maskCanvas = document.getElementById('maskEditorMaskCanvas');
+                maskEditor.drawCanvas = document.getElementById('maskEditorDrawCanvas');
+
+                [maskEditor.imageCanvas, maskEditor.maskCanvas, maskEditor.drawCanvas].forEach(c => {
+                    c.width = canvasWidth;
+                    c.height = canvasHeight;
+                    c.style.width = canvasWidth + 'px';
+                    c.style.height = canvasHeight + 'px';
+                });
+
+                maskEditor.imageCtx = maskEditor.imageCanvas.getContext('2d');
+                maskEditor.maskCtx = maskEditor.maskCanvas.getContext('2d');
+                maskEditor.drawCtx = maskEditor.drawCanvas.getContext('2d');
+
+                // 이미지 그리기
+                maskEditor.imageCtx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
+
+                // 기존 마스크 로드 또는 클리어
+                if (existingMask) {
+                    const maskImg = new Image();
+                    maskImg.onload = () => {
+                        maskEditor.maskCtx.drawImage(maskImg, 0, 0, canvasWidth, canvasHeight);
+                    };
+                    maskImg.src = existingMask;
+                } else {
+                    maskEditor.maskCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+                }
+
+                // 설정 복원
+                document.getElementById('maskEditorMode').value = baseImageData.mode;
+                document.getElementById('maskEditorStrength').value = baseImageData.strength;
+                document.getElementById('maskEditorStrengthValue').textContent = baseImageData.strength;
+                document.getElementById('maskEditorNoise').value = baseImageData.noise;
+                document.getElementById('maskEditorNoiseValue').textContent = baseImageData.noise;
+
+                modal.classList.add('active');
+            };
+
+            img.src = imageBase64.startsWith('data:') ? imageBase64 : 'data:image/png;base64,' + imageBase64;
+        }
+
+        // Mask Editor 닫기
+        function closeMaskEditor() {
+            document.getElementById('maskEditorModal').classList.remove('active');
+        }
+
+        // 마스크 그리기 이벤트
+        function setupMaskEditorEvents() {
+            const drawCanvas = document.getElementById('maskEditorDrawCanvas');
+
+            function getPos(e) {
+                const rect = drawCanvas.getBoundingClientRect();
+                const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left;
+                const y = (e.clientY || e.touches?.[0]?.clientY) - rect.top;
+                return { x, y };
+            }
+
+            function draw(e) {
+                if (!maskEditor.isDrawing) return;
+                const pos = getPos(e);
+                const ctx = maskEditor.maskCtx;
+                const size = maskEditor.brushSize;
+
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, size / 2, 0, Math.PI * 2);
+
+                if (maskEditor.tool === 'brush') {
+                    ctx.fillStyle = 'white';
+                    ctx.fill();
+                } else {
+                    ctx.globalCompositeOperation = 'destination-out';
+                    ctx.fill();
+                    ctx.globalCompositeOperation = 'source-over';
+                }
+            }
+
+            drawCanvas.addEventListener('mousedown', (e) => {
+                maskEditor.isDrawing = true;
+                draw(e);
+            });
+            drawCanvas.addEventListener('mousemove', draw);
+            drawCanvas.addEventListener('mouseup', () => maskEditor.isDrawing = false);
+            drawCanvas.addEventListener('mouseleave', () => maskEditor.isDrawing = false);
+
+            // Touch support
+            drawCanvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                maskEditor.isDrawing = true;
+                draw(e);
+            });
+            drawCanvas.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                draw(e);
+            });
+            drawCanvas.addEventListener('touchend', () => maskEditor.isDrawing = false);
+
+            // 도구 버튼
+            document.getElementById('maskToolBrush').onclick = () => {
+                maskEditor.tool = 'brush';
+                document.getElementById('maskToolBrush').classList.add('active');
+                document.getElementById('maskToolEraser').classList.remove('active');
+            };
+            document.getElementById('maskToolEraser').onclick = () => {
+                maskEditor.tool = 'eraser';
+                document.getElementById('maskToolEraser').classList.add('active');
+                document.getElementById('maskToolBrush').classList.remove('active');
+            };
+
+            // 브러시 크기
+            document.getElementById('maskBrushSize').oninput = function() {
+                maskEditor.brushSize = parseInt(this.value);
+                document.getElementById('maskBrushSizeValue').textContent = this.value;
+            };
+
+            // Clear
+            document.getElementById('maskToolClear').onclick = () => {
+                maskEditor.maskCtx.clearRect(0, 0, maskEditor.maskCanvas.width, maskEditor.maskCanvas.height);
+            };
+
+            // Invert
+            document.getElementById('maskToolInvert').onclick = () => {
+                const ctx = maskEditor.maskCtx;
+                const imageData = ctx.getImageData(0, 0, maskEditor.maskCanvas.width, maskEditor.maskCanvas.height);
+                const data = imageData.data;
+                for (let i = 0; i < data.length; i += 4) {
+                    // Invert alpha (make transparent -> opaque, opaque -> transparent)
+                    if (data[i + 3] > 0) {
+                        data[i] = data[i + 1] = data[i + 2] = 0;
+                        data[i + 3] = 0;
+                    } else {
+                        data[i] = data[i + 1] = data[i + 2] = 255;
+                        data[i + 3] = 255;
+                    }
+                }
+                // Fill with white where there was nothing
+                ctx.putImageData(imageData, 0, 0);
+                // Actually do proper invert
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.fillStyle = 'white';
+                ctx.globalCompositeOperation = 'xor';
+                ctx.fillRect(0, 0, maskEditor.maskCanvas.width, maskEditor.maskCanvas.height);
+                ctx.globalCompositeOperation = 'source-over';
+            };
+
+            // Strength/Noise sliders
+            document.getElementById('maskEditorStrength').oninput = function() {
+                document.getElementById('maskEditorStrengthValue').textContent = this.value;
+            };
+            document.getElementById('maskEditorNoise').oninput = function() {
+                document.getElementById('maskEditorNoiseValue').textContent = this.value;
+            };
+
+            // Cancel
+            document.getElementById('maskEditorCancel').onclick = closeMaskEditor;
+            document.getElementById('maskEditorClose').onclick = closeMaskEditor;
+
+            // Apply
+            document.getElementById('maskEditorApply').onclick = () => {
+                // 원본 크기로 마스크 생성
+                const fullMaskCanvas = document.createElement('canvas');
+                fullMaskCanvas.width = maskEditor.originalImage.width;
+                fullMaskCanvas.height = maskEditor.originalImage.height;
+                const fullCtx = fullMaskCanvas.getContext('2d');
+
+                // 스케일 업
+                fullCtx.drawImage(maskEditor.maskCanvas, 0, 0, fullMaskCanvas.width, fullMaskCanvas.height);
+
+                // Base Image 데이터 설정
+                baseImageData.enabled = true;
+                baseImageData.image = maskEditor.imageCanvas.toDataURL('image/png').split(',')[1];
+
+                // 원본 크기 이미지
+                const fullImageCanvas = document.createElement('canvas');
+                fullImageCanvas.width = maskEditor.originalImage.width;
+                fullImageCanvas.height = maskEditor.originalImage.height;
+                fullImageCanvas.getContext('2d').drawImage(maskEditor.originalImage, 0, 0);
+                baseImageData.image = fullImageCanvas.toDataURL('image/png').split(',')[1];
+
+                baseImageData.mask = fullMaskCanvas.toDataURL('image/png').split(',')[1];
+                baseImageData.mode = document.getElementById('maskEditorMode').value;
+                baseImageData.strength = parseFloat(document.getElementById('maskEditorStrength').value);
+                baseImageData.noise = parseFloat(document.getElementById('maskEditorNoise').value);
+                baseImageData.width = maskEditor.originalImage.width;
+                baseImageData.height = maskEditor.originalImage.height;
+
+                // UI 업데이트
+                updateBaseImageUI();
+                closeMaskEditor();
+                showToast('Base Image 설정됨', 'success');
+            };
+        }
+
+        // Base Image UI 업데이트
+        function updateBaseImageUI() {
+            const section = document.getElementById('baseImageSection');
+            const preview = document.getElementById('baseImageImg');
+            const maskOverlay = document.getElementById('baseImageMaskOverlay');
+
+            if (baseImageData.enabled && baseImageData.image) {
+                section.style.display = 'block';
+                preview.src = 'data:image/png;base64,' + baseImageData.image;
+
+                if (baseImageData.mask) {
+                    maskOverlay.style.backgroundImage = `url(data:image/png;base64,${baseImageData.mask})`;
+                    maskOverlay.style.backgroundSize = 'contain';
+                    maskOverlay.style.backgroundPosition = 'center';
+                    maskOverlay.style.backgroundRepeat = 'no-repeat';
+                } else {
+                    maskOverlay.style.backgroundImage = 'none';
+                }
+
+                document.getElementById('baseImageMode').value = baseImageData.mode;
+                document.getElementById('baseImageStrength').value = baseImageData.strength;
+                document.getElementById('baseImageStrengthValue').textContent = baseImageData.strength;
+                document.getElementById('baseImageNoise').value = baseImageData.noise;
+                document.getElementById('baseImageNoiseValue').textContent = baseImageData.noise;
+
+                // 사이즈 동기화
+                document.getElementById('width').value = baseImageData.width;
+                document.getElementById('height').value = baseImageData.height;
+            } else {
+                section.style.display = 'none';
+            }
+        }
+
+        // Base Image 섹션 이벤트
+        function setupBaseImageEvents() {
+            // Clear 버튼
+            document.getElementById('clearBaseImage').onclick = () => {
+                baseImageData = {
+                    enabled: false,
+                    image: null,
+                    mask: null,
+                    mode: 'inpaint',
+                    strength: 0.7,
+                    noise: 0,
+                    width: 0,
+                    height: 0
+                };
+                updateBaseImageUI();
+                showToast('Base Image 제거됨', 'success');
+            };
+
+            // Edit Mask 버튼
+            document.getElementById('editMaskBtn').onclick = () => {
+                if (baseImageData.image) {
+                    openMaskEditor('data:image/png;base64,' + baseImageData.image,
+                        baseImageData.mask ? 'data:image/png;base64,' + baseImageData.mask : null);
+                }
+            };
+
+            // Sliders
+            document.getElementById('baseImageStrength').oninput = function() {
+                baseImageData.strength = parseFloat(this.value);
+                document.getElementById('baseImageStrengthValue').textContent = this.value;
+            };
+            document.getElementById('baseImageNoise').oninput = function() {
+                baseImageData.noise = parseFloat(this.value);
+                document.getElementById('baseImageNoiseValue').textContent = this.value;
+            };
+            document.getElementById('baseImageMode').onchange = function() {
+                baseImageData.mode = this.value;
+            };
+        }
+
+        // Inpaint용 이미지 설정 함수 (외부에서 호출)
+        function setBaseImageForInpaint(imageBase64) {
+            // 슬롯 모드로 전환 (생성은 슬롯 모드에서만 가능)
+            if (currentMode !== 'slot') {
+                document.getElementById('slotModeBtn').click();
+            }
+            openMaskEditor(imageBase64);
+        }
+
+        // 초기화
+        setupMaskEditorEvents();
+        setupBaseImageEvents();
     </script>
 </body>
 </html>

@@ -5990,9 +5990,9 @@
 
         // 프롬프트만 적용 (시드 포함)
         function applyPromptOnly(metadata) {
-            // 프롬프트
-            if (metadata.prompt) document.getElementById('basePrompt').value = metadata.prompt;
-            if (metadata.negative_prompt) document.getElementById('negativePrompt').value = metadata.negative_prompt;
+            // 프롬프트 (공란이어도 적용)
+            if (metadata.prompt !== undefined) document.getElementById('basePrompt').value = metadata.prompt;
+            if (metadata.negative_prompt !== undefined) document.getElementById('negativePrompt').value = metadata.negative_prompt;
 
             // 캐릭터 프롬프트 적용
             if (metadata.character_prompts && metadata.character_prompts.length > 0) {
@@ -6014,9 +6014,9 @@
 
         // 메타데이터 설정 적용
         function applyMetadataSettings(metadata) {
-            // 프롬프트
-            if (metadata.prompt) document.getElementById('basePrompt').value = metadata.prompt;
-            if (metadata.negative_prompt) document.getElementById('negativePrompt').value = metadata.negative_prompt;
+            // 프롬프트 (공란이어도 적용)
+            if (metadata.prompt !== undefined) document.getElementById('basePrompt').value = metadata.prompt;
+            if (metadata.negative_prompt !== undefined) document.getElementById('negativePrompt').value = metadata.negative_prompt;
 
             // 캐릭터 프롬프트 적용
             if (metadata.character_prompts && metadata.character_prompts.length > 0) {

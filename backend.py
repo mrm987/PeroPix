@@ -845,8 +845,11 @@ async def call_nai_api(req: GenerateRequest):
                 "char_captions": [{"char_caption": "", "centers": [{"x": 0.5, "y": 0.5}]} for _ in req.character_prompts] if req.character_prompts else []
             }
         },
-        "skip_cfg_above_sigma": 19 if req.variety_plus else None
     }
+
+    # Variety+ 옵션 (값이 있을 때만 추가)
+    if req.variety_plus:
+        params["skip_cfg_above_sigma"] = 19
     
     # k_euler_ancestral + non-native scheduler 조합에서 필수 파라미터
     if nai_sampler == "k_euler_ancestral" and nai_scheduler != "native":

@@ -1718,6 +1718,7 @@ async def extract_metadata(request: dict):
             "is_vibe": is_vibe,
             "is_nai": nai_metadata is not None,
             "vibe_data": metadata.get('vibe_data') if is_vibe else None,
+            "vibe_model": metadata.get('model') if is_vibe else None,
             "vibe_strength": float(metadata.get('strength', 0.6)) if is_vibe else None,
             "vibe_info_extracted": float(metadata.get('info_extracted', 1.0)) if is_vibe else None,
             "nai_metadata": nai_metadata,

@@ -190,7 +190,10 @@ NAI 웹과 100% 호환되는 형식. PeroPix 전용 설정은 `peropix` 확장 �
     "character_prompts": ["girl, ..."],  // 캐릭터별 프롬프트
     "variety_plus": false,
     "furry_mode": false,
-    "local_model": ""                    // local provider용 모델명
+    "local_model": "",                   // local provider용 모델명
+    "vibe_transfer": [                   // 바이브 설정 (이미지 제외)
+      {"strength": 0.6, "info_extracted": 1.0, "name": "vibe_name"}
+    ]
   }
 }
 ```
@@ -205,6 +208,15 @@ NAI 웹과 100% 호환되는 형식. PeroPix 전용 설정은 `peropix` 확장 �
 | `ucPreset` | `uc_preset` |
 | `qualityToggle` | `quality_tags` |
 | `sm` / `sm_dyn` | `smea` |
+
+#### normalizeMetadata() 함수
+NAI 형식 메타데이터를 앱 내부 형식으로 변환하는 중앙화된 함수.
+모든 메타데이터 표시/적용 시 이 함수를 통해 정규화해야 함.
+```javascript
+// 사용 예시
+const normalized = normalizeMetadata(naiMetadata);
+applyMetadataSettings(normalized);
+```
 
 ### 슬롯 이미지 데이터 (card._imageData)
 ```javascript

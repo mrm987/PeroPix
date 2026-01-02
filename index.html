@@ -5831,6 +5831,18 @@
             const ucPresetMap = { 0: 'Heavy', 1: 'Light', 2: 'Human Focus', 3: 'None' };
             const ucPreset = ucPresetMap[meta.ucPreset] || meta.ucPreset || 'Heavy';
 
+            // Variety+ 감지 (peropix 확장 또는 NAI skip_cfg_above_sigma)
+            let varietyPlus = ppx.variety_plus || false;
+            if (!varietyPlus && meta.skip_cfg_above_sigma !== undefined && meta.skip_cfg_above_sigma !== null) {
+                varietyPlus = true;
+            }
+
+            // Furry Mode 감지 (peropix 확장 또는 프롬프트 시작)
+            let furryMode = ppx.furry_mode || false;
+            if (!furryMode && meta.prompt && meta.prompt.startsWith('fur dataset,')) {
+                furryMode = true;
+            }
+
             // NAI 형식 → 앱 내부 형식 변환
             return {
                 prompt: meta.prompt || '',
@@ -5848,8 +5860,8 @@
                 uc_preset: ucPreset,
                 quality_tags: meta.qualityToggle,
                 cfg_rescale: meta.cfg_rescale,
-                variety_plus: ppx.variety_plus || false,
-                furry_mode: ppx.furry_mode || false,
+                variety_plus: varietyPlus,
+                furry_mode: furryMode,
                 provider: ppx.provider || 'nai',
                 model: ppx.local_model || '',
                 vibe_transfer: ppx.vibe_transfer || null
@@ -7640,11 +7652,13 @@
                 const metadataDiv = document.getElementById('dropModalMetadata');
 
                 if (result.is_vibe) {
-                    // 바이브 파일
-                    document.getElementById('dropModalTitle').textContent = '🎨 바이브 파일 감지됨';
+                    // 바이브 캐시 파일
+                    const hasCache = result.vibe_data && result.vibe_model;
+                    document.getElementById('dropModalTitle').textContent = hasCache ? '🎨 바이브 캐시 파일' : '🎨 바이브 파일';
                     metadataDiv.innerHTML = `
                         <div><strong>Strength:</strong> ${result.vibe_strength}</div>
                         <div><strong>Info Extracted:</strong> ${result.vibe_info_extracted}</div>
+                        ${hasCache ? `<div><strong>Model:</strong> ${result.vibe_model}</div><div style="color:#4ade80">✓ 인코딩 캐시 있음 (Anlas 무료)</div>` : ''}
                     `;
                     document.getElementById('dropModalConfirm').textContent = '바이브에 추가';
                     pendingDropData = {
@@ -7652,30 +7666,24 @@
                         image: base64,
                         strength: result.vibe_strength,
                         info_extracted: result.vibe_info_extracted,
-                        name: file.name
+                        name: file.name,
+                        encoded: result.vibe_data || null,
+                        encoded_model: result.vibe_model || null
                     };
                 } else if (result.is_nai && result.nai_metadata) {
-                    // NAI 생성 이미지
-                    const meta = result.nai_metadata;
+                    // NAI 생성 이미지 - 정규화된 메타데이터로 표시
+                    const meta = normalizeMetadata(result.nai_metadata);
                     document.getElementById('dropModalTitle').textContent = '🖼️ NAI 생성 이미지';
-
-                    // SMEA 표시
-                    let smeaStr = 'None';
-                    if (meta.sm_dyn) smeaStr = 'SMEA+DYN';
-                    else if (meta.sm) smeaStr = 'SMEA';
-
-                    // Variety+ 표시
-                    const varietyStr = (meta.skip_cfg_above_sigma !== undefined && meta.skip_cfg_above_sigma !== null) ? 'On' : 'Off';
 
                     metadataDiv.innerHTML = `
                         <div><strong>Prompt:</strong> ${(meta.prompt || '').substring(0, 100)}${(meta.prompt || '').length > 100 ? '...' : ''}</div>
-                        <div><strong>Negative:</strong> ${(meta.uc || '').substring(0, 50)}${(meta.uc || '').length > 50 ? '...' : ''}</div>
+                        <div><strong>Negative:</strong> ${(meta.negative_prompt || '').substring(0, 50)}${(meta.negative_prompt || '').length > 50 ? '...' : ''}</div>
                         <div><strong>Seed:</strong> ${meta.seed || 'N/A'}</div>
                         <div><strong>Size:</strong> ${meta.width}x${meta.height}</div>
-                        <div><strong>Steps:</strong> ${meta.steps}, <strong>CFG:</strong> ${meta.scale}, <strong>Rescale:</strong> ${meta.cfg_rescale || 0}</div>
-                        <div><strong>Sampler:</strong> ${meta.sampler}, <strong>Scheduler:</strong> ${meta.noise_schedule || 'native'}</div>
-                        <div><strong>SMEA:</strong> ${smeaStr}, <strong>Variety+:</strong> ${varietyStr}</div>
-                        <div><strong>Model:</strong> ${meta.request_type || 'N/A'}</div>
+                        <div><strong>Steps:</strong> ${meta.steps}, <strong>CFG:</strong> ${meta.cfg}, <strong>Rescale:</strong> ${meta.cfg_rescale || 0}</div>
+                        <div><strong>Sampler:</strong> ${meta.sampler}, <strong>Scheduler:</strong> ${meta.scheduler}</div>
+                        <div><strong>SMEA:</strong> ${meta.smea}, <strong>Variety+:</strong> ${meta.variety_plus ? 'On' : 'Off'}</div>
+                        <div><strong>Model:</strong> ${meta.nai_model || 'N/A'}</div>
                     `;
                     document.getElementById('dropModalConfirm').textContent = '전체 적용';
                     document.getElementById('dropModalPromptOnly').style.display = 'inline-block';
@@ -7683,7 +7691,7 @@
                     document.getElementById('dropModalAsVibe').style.display = 'inline-block';
                     pendingDropData = {
                         type: 'nai',
-                        metadata: meta,
+                        metadata: result.nai_metadata,  // 원본 저장 (적용 시 다시 정규화)
                         image: base64,
                         name: file.name
                     };
@@ -7785,123 +7793,35 @@
             if (!pendingDropData) return;
 
             if (pendingDropData.type === 'vibe') {
-                // 바이브 리스트에 추가
+                // 바이브 리스트에 추가 (캐시 데이터 포함)
                 if (vibeList.length >= 16) {
                     showToast('바이브는 최대 16개까지만 추가할 수 있습니다', 'error');
                 } else {
-                    vibeList.push({
+                    const vibeEntry = {
                         image: pendingDropData.image,
                         strength: pendingDropData.strength || 0.6,
                         info_extracted: pendingDropData.info_extracted || 1.0,
                         name: pendingDropData.name
-                    });
+                    };
+                    // 캐시된 인코딩 데이터가 있으면 포함
+                    if (pendingDropData.encoded) {
+                        vibeEntry.encoded = pendingDropData.encoded;
+                        vibeEntry.encoded_model = pendingDropData.encoded_model;
+                    }
+                    vibeList.push(vibeEntry);
                     renderVibeList();
                     saveAppSettings();
                     updateAnlasCost();
                     // Vibe Transfer 활성화
                     document.getElementById('enableVibeTransfer').checked = true;
                     document.getElementById('vibeTransferSettings').style.display = 'block';
-                    showToast('바이브에 추가됨', 'success');
+                    const msg = pendingDropData.encoded ? '바이브 추가됨 (캐시 사용)' : '바이브에 추가됨';
+                    showToast(msg, 'success');
                 }
             } else if (pendingDropData.type === 'nai') {
-                // NAI 메타데이터 적용
-                const meta = pendingDropData.metadata;
-
-                // 기본 설정
-                if (meta.prompt) document.getElementById('basePrompt').value = meta.prompt;
-                if (meta.uc) document.getElementById('negativePrompt').value = meta.uc;
-                if (meta.seed) document.getElementById('seed').value = meta.seed;
-                if (meta.width) document.getElementById('width').value = meta.width;
-                if (meta.height) document.getElementById('height').value = meta.height;
-                if (meta.steps) document.getElementById('steps').value = meta.steps;
-                if (meta.scale) document.getElementById('cfg').value = meta.scale;
-
-                // Sampler (NAI uses k_ prefix)
-                if (meta.sampler) {
-                    const samplerSelect = document.getElementById('sampler');
-                    if ([...samplerSelect.options].some(o => o.value === meta.sampler)) {
-                        samplerSelect.value = meta.sampler;
-                    }
-                }
-
-                // Scheduler (noise_schedule)
-                if (meta.noise_schedule) {
-                    const schedulerSelect = document.getElementById('scheduler');
-                    const schedMap = { 'karras': 'karras', 'exponential': 'exponential', 'polyexponential': 'polyexponential', 'native': 'native' };
-                    const mappedSched = schedMap[meta.noise_schedule] || meta.noise_schedule;
-                    if ([...schedulerSelect.options].some(o => o.value === mappedSched)) {
-                        schedulerSelect.value = mappedSched;
-                    }
-                }
-
-                // SMEA
-                if (meta.sm_dyn) {
-                    document.getElementById('smea').value = 'SMEA+DYN';
-                } else if (meta.sm) {
-                    document.getElementById('smea').value = 'SMEA';
-                } else {
-                    document.getElementById('smea').value = 'none';
-                }
-
-                // Model (request_type에서 추출)
-                if (meta.request_type) {
-                    const modelSelect = document.getElementById('naiModel');
-                    if ([...modelSelect.options].some(o => o.value === meta.request_type)) {
-                        modelSelect.value = meta.request_type;
-                    }
-                }
-
-                // Advanced NAI settings
-                if (meta.cfg_rescale !== undefined) {
-                    document.getElementById('cfgRescale').value = meta.cfg_rescale;
-                    document.getElementById('cfgRescaleValue').textContent = meta.cfg_rescale;
-                }
-
-                // UC Preset
-                if (meta.ucPreset !== undefined) {
-                    const ucMap = { 0: 'Heavy', 1: 'Light', 2: 'Human Focus', 3: 'None' };
-                    const ucValue = ucMap[meta.ucPreset] || 'Heavy';
-                    document.getElementById('ucPreset').value = ucValue;
-                }
-
-                // Quality Tags
-                if (meta.qualityToggle !== undefined) {
-                    document.getElementById('qualityTags').checked = meta.qualityToggle;
-                }
-
-                // PeroPix 확장 필드 처리
-                const ppx = meta.peropix || {};
-
-                // Variety Plus
-                if (ppx.variety_plus !== undefined) {
-                    document.getElementById('varietyPlus').checked = ppx.variety_plus;
-                } else if (meta.skip_cfg_above_sigma !== undefined && meta.skip_cfg_above_sigma !== null) {
-                    document.getElementById('varietyPlus').checked = true;
-                } else {
-                    document.getElementById('varietyPlus').checked = false;
-                }
-
-                // Furry Mode
-                if (ppx.furry_mode !== undefined) {
-                    setFurryMode(ppx.furry_mode);
-                } else if (meta.prompt && meta.prompt.startsWith('fur dataset,')) {
-                    setFurryMode(true);
-                }
-
-                // Character Prompts
-                if (ppx.character_prompts && ppx.character_prompts.length > 0) {
-                    const charactersList = document.getElementById('charactersList');
-                    charactersList.innerHTML = '';
-                    ppx.character_prompts.forEach(cp => {
-                        if (cp && cp.trim()) {
-                            addCharacter(cp);
-                        }
-                    });
-                    updateCharacterNumbers();
-                }
-
-                saveAppSettings();
-                showToast('NAI 설정이 적용됨', 'success');
+                // NAI 메타데이터 적용 - 정규화 후 applyMetadataSettings 사용
+                const normalized = normalizeMetadata(pendingDropData.metadata);
+                applyMetadataSettings(normalized);
             } else if (pendingDropData.type === 'plain') {
                 // 일반 이미지를 바이브로 추가
                 if (vibeList.length >= 16) {

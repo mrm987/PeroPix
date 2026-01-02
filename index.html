@@ -7808,6 +7808,7 @@
                         name: file.name
                     };
                     window._isPureNaiImage = isPureNai;
+                    console.log('[DEBUG] Drop NAI image, isPureNai:', isPureNai, 'peropix field:', result.nai_metadata.peropix);
                 } else {
                     // 일반 이미지 - 바이브로 추가 제안
                     document.getElementById('dropModalTitle').textContent = '📷 일반 이미지';
@@ -7904,6 +7905,8 @@
         };
 
         document.getElementById('dropModalConfirm').onclick = () => {
+            console.log('[DEBUG] dropModalConfirm clicked, _pendingLoadMetadata:', !!window._pendingLoadMetadata, '_isPureNaiImage:', window._isPureNaiImage);
+
             // 설정 불러오기 처리
             if (window._pendingLoadMetadata) {
                 const doApply = () => {

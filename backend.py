@@ -213,12 +213,16 @@ def resize_image_to_size_base64(base64_image: str, target_width: int, target_hei
     pil_resized.save(buffer, format='PNG')
     return base64.b64encode(buffer.getvalue()).decode('utf-8')
 
-def ensure_png_base64(base64_image: str) -> str:
-    """base64 이미지를 PNG 포맷으로 재인코딩 (리사이즈 없음)"""
+def ensure_png_base64(base64_image: str, force_reencode: bool = False) -> str:
+    """base64 이미지를 PNG 포맷으로 변환 (필요한 경우에만 재인코딩)"""
     from PIL import Image as PILImage
 
     image_data = base64.b64decode(base64_image)
     pil_img = PILImage.open(io.BytesIO(image_data))
+
+    # 이미 RGB PNG이고 강제 재인코딩이 아니면 원본 그대로 반환
+    if not force_reencode and pil_img.format == 'PNG' and pil_img.mode == 'RGB':
+        return base64_image
 
     # RGB로 변환 (NAI API 호환성)
     if pil_img.mode == 'RGBA':
@@ -722,6 +726,13 @@ async def encode_vibe_v4(image_base64: str, model: str, info_extracted: float,
                         strength: float, token: str, image_name: str = "vibe") -> str:
     """V4+ 모델용 vibe 사전 인코딩 - /ai/encode-vibe 엔드포인트 사용 (캐시 지원)"""
     import httpx
+    import hashlib
+
+    # 디버그: 입력 이미지 정보
+    img_hash = hashlib.sha256(image_base64.encode()).hexdigest()[:16]
+    print(f"[NAI-VIBE-DEBUG] Input image hash: {img_hash}, length: {len(image_base64)}")
+    print(f"[NAI-VIBE-DEBUG] info_extracted: {info_extracted} (type: {type(info_extracted).__name__})")
+    print(f"[NAI-VIBE-DEBUG] model: {model}")
 
     # 캐시 확인
     cache_key = get_vibe_cache_key(image_base64, model, info_extracted)

@@ -1807,6 +1807,250 @@
         }
         .mask-editor-footer .btn { padding: 10px 20px; }
 
+        /* Censor Mode Container */
+        .censor-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        .censor-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: var(--bg-light);
+            border-bottom: 1px solid var(--border);
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .censor-toolbar .toolbar-left,
+        .censor-toolbar .toolbar-center,
+        .censor-toolbar .toolbar-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .censor-folder-select {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .censor-folder-select label {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+        }
+        .censor-folder-select select {
+            padding: 6px 10px;
+            border-radius: 6px;
+            background: var(--bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+            min-width: 150px;
+        }
+        .censor-stats {
+            display: flex;
+            gap: 12px;
+            font-size: 0.9rem;
+        }
+        .censor-stats .stat {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .censor-stats .stat.ok { color: #4CAF50; }
+        .censor-stats .stat.warning { color: #FF9800; }
+        .censor-stats .stat.total { color: var(--text-dim); }
+        .censor-content {
+            flex: 1;
+            overflow: auto;
+            padding: 16px;
+        }
+        .censor-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 16px;
+        }
+        .censor-grid-item {
+            position: relative;
+            background: var(--bg);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid var(--border);
+            cursor: pointer;
+            transition: border-color 0.2s, transform 0.2s;
+        }
+        .censor-grid-item:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+        .censor-grid-item.status-ok { border-color: #4CAF50; }
+        .censor-grid-item.status-warning { border-color: #FF9800; }
+        .censor-grid-item img {
+            width: 100%;
+            aspect-ratio: 1;
+            object-fit: cover;
+        }
+        .censor-grid-item .status-badge {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+        .censor-grid-item .status-badge.ok {
+            background: #4CAF50;
+            color: white;
+        }
+        .censor-grid-item .status-badge.warning {
+            background: #FF9800;
+            color: white;
+        }
+        .censor-grid-item .filename {
+            padding: 8px;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .censor-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-dim);
+            text-align: center;
+        }
+        .censor-empty .icon { font-size: 4rem; margin-bottom: 16px; }
+        .censor-empty p { font-size: 1.2rem; margin-bottom: 8px; }
+        .censor-empty small { font-size: 0.9rem; opacity: 0.7; }
+
+        /* Censor Quick Editor Modal */
+        .censor-editor-modal {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        .censor-editor-modal.active { display: flex; }
+        .censor-editor-container {
+            background: var(--bg-light);
+            border-radius: 12px;
+            padding: 20px;
+            max-width: 95vw;
+            max-height: 95vh;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .censor-editor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .censor-editor-header .header-left,
+        .censor-editor-header .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .censor-editor-header h3 { margin: 0; }
+        .censor-editor-header .image-counter {
+            font-size: 0.9rem;
+            color: var(--text-dim);
+            padding: 4px 12px;
+            background: var(--bg);
+            border-radius: 4px;
+        }
+        .censor-editor-header .nav-btn {
+            padding: 8px 16px;
+            border: none;
+            background: var(--bg);
+            color: var(--text);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        .censor-editor-header .nav-btn:hover { background: var(--border); }
+        .censor-editor-toolbar {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .censor-editor-toolbar .tool-group {
+            display: flex;
+            gap: 4px;
+            background: var(--bg);
+            padding: 4px;
+            border-radius: 8px;
+        }
+        .censor-editor-toolbar .tool-btn {
+            padding: 8px 12px;
+            border: none;
+            background: transparent;
+            color: var(--text);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        .censor-editor-toolbar .tool-btn:hover { background: var(--border); }
+        .censor-editor-toolbar .tool-btn.active { background: var(--primary); color: white; }
+        .censor-editor-toolbar .tool-btn.fill-btn {
+            width: 36px;
+            padding: 8px;
+            text-align: center;
+        }
+        .censor-editor-toolbar .slider-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .censor-editor-toolbar .slider-group label {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+        }
+        .censor-editor-toolbar .slider-group input[type="range"] {
+            width: 100px;
+        }
+        .censor-editor-canvas-wrapper {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #1a1a1a;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .censor-editor-canvas-wrapper canvas {
+            max-width: 100%;
+            max-height: 70vh;
+        }
+        .censor-editor-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .censor-editor-footer .footer-left,
+        .censor-editor-footer .footer-right {
+            display: flex;
+            gap: 8px;
+        }
+        .censor-editor-footer .btn { padding: 10px 16px; }
+        .btn-warning {
+            background: #FF9800 !important;
+            color: white !important;
+        }
+        .btn-warning:hover {
+            background: #F57C00 !important;
+        }
+
         /* Mode Toggle */
         .mode-toggle {
             display: flex;
@@ -2832,6 +3076,7 @@
                 <div class="mode-toggle">
                     <button type="button" class="mode-btn active" id="slotModeBtn">🎰 슬롯 모드</button>
                     <button type="button" class="mode-btn" id="galleryModeBtn">🖼️ 갤러리</button>
+                    <button type="button" class="mode-btn" id="censorModeBtn">🔞 검열</button>
                 </div>
             </div>
 
@@ -2915,6 +3160,47 @@
                         <div class="icon">🖼️</div>
                         <p>갤러리가 비어있습니다</p>
                         <small>이미지에서 ⭐ 버튼을 눌러 갤러리에 저장하세요</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 검열 모드 -->
+            <div class="censor-container" id="censorContainer" style="display: none;">
+                <div class="censor-toolbar">
+                    <div class="toolbar-left">
+                        <div class="censor-folder-select">
+                            <label>Source:</label>
+                            <select id="censorSourceFolder">
+                                <option value="">📂 outputs</option>
+                            </select>
+                        </div>
+                        <div class="censor-folder-select">
+                            <label>Output:</label>
+                            <select id="censorOutputFolder">
+                                <option value="">📁 censored</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="toolbar-center">
+                        <button type="button" class="btn btn-primary" id="runAutoCensorBtn">🔍 자동 검열 실행</button>
+                        <button type="button" class="btn" id="exportApprovedBtn">📤 승인된 이미지 내보내기</button>
+                    </div>
+                    <div class="toolbar-right">
+                        <div class="censor-stats">
+                            <span class="stat ok">✓ <span id="censorOkCount">0</span></span>
+                            <span class="stat warning">⚠️ <span id="censorWarningCount">0</span></span>
+                            <span class="stat total">전체: <span id="censorTotalCount">0</span></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="censor-content">
+                    <div class="censor-grid" id="censorGrid">
+                        <!-- 검열 대상 이미지들 -->
+                    </div>
+                    <div class="censor-empty" id="censorEmpty">
+                        <div class="icon">🔞</div>
+                        <p>검열할 이미지가 없습니다</p>
+                        <small>Source 폴더를 선택하고 [자동 검열 실행]을 클릭하세요</small>
                     </div>
                 </div>
             </div>
@@ -3026,6 +3312,58 @@
             <div class="mask-editor-footer">
                 <button class="btn btn-secondary" id="maskEditorCancel">취소</button>
                 <button class="btn btn-primary" id="maskEditorApply">✓ 설정에 적용</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Censor Quick Editor Modal -->
+    <div class="censor-editor-modal" id="censorEditorModal">
+        <div class="censor-editor-container">
+            <div class="censor-editor-header">
+                <div class="header-left">
+                    <h3>🔞 Quick Editor</h3>
+                    <span class="image-counter" id="censorImageCounter">1 / 10</span>
+                </div>
+                <div class="header-right">
+                    <button class="nav-btn" id="censorPrevBtn" title="이전 이미지">◀</button>
+                    <button class="nav-btn" id="censorNextBtn" title="다음 이미지">▶</button>
+                    <button class="btn btn-secondary" id="censorEditorClose" style="padding: 6px 12px;">✕</button>
+                </div>
+            </div>
+            <div class="censor-editor-toolbar">
+                <div class="tool-group">
+                    <button class="tool-btn active" id="censorToolRect" title="사각형 도구">▢ Rect</button>
+                    <button class="tool-btn" id="censorToolBrush" title="브러시">🖌️ Brush</button>
+                    <button class="tool-btn" id="censorToolMove" title="이동/선택">↔ Move</button>
+                </div>
+                <div class="tool-group">
+                    <button class="tool-btn fill-btn active" id="censorFillBlack" title="검정 채우기" style="background: #333;">■</button>
+                    <button class="tool-btn fill-btn" id="censorFillWhite" title="흰색 채우기" style="background: #fff; color: #333;">□</button>
+                    <button class="tool-btn fill-btn" id="censorFillMosaic" title="모자이크">▦</button>
+                </div>
+                <div class="slider-group">
+                    <label>Size:</label>
+                    <input type="range" id="censorBrushSize" min="5" max="100" value="30">
+                    <span id="censorBrushSizeValue">30</span>
+                </div>
+                <div class="tool-group" style="margin-left: auto;">
+                    <button class="tool-btn" id="censorToolUndo" title="실행 취소">↩ Undo</button>
+                    <button class="tool-btn" id="censorToolClear" title="전체 지우기">🗑️ Clear</button>
+                </div>
+            </div>
+            <div class="censor-editor-canvas-wrapper">
+                <canvas id="censorEditorCanvas"></canvas>
+                <canvas id="censorEditorOverlay" style="position: absolute; top: 0; left: 0; cursor: crosshair;"></canvas>
+            </div>
+            <div class="censor-editor-footer">
+                <div class="footer-left">
+                    <button class="btn btn-secondary" id="censorMarkOk" title="이 이미지는 수정 불필요">✓ OK로 표시</button>
+                    <button class="btn btn-warning" id="censorMarkNeed" title="추가 수정 필요">⚠️ 확인필요</button>
+                </div>
+                <div class="footer-right">
+                    <button class="btn" id="censorSkipBtn">건너뛰기</button>
+                    <button class="btn btn-primary" id="censorSaveNextBtn">💾 저장 & 다음</button>
+                </div>
             </div>
         </div>
     </div>
@@ -6482,14 +6820,16 @@
         // ============================================================
         const slotModeBtn = document.getElementById('slotModeBtn');
         const galleryModeBtn = document.getElementById('galleryModeBtn');
+        const censorModeBtn = document.getElementById('censorModeBtn');
         const slotsToolbar = document.getElementById('slotsToolbar');
         const galleryContainer = document.getElementById('galleryContainer');
+        const censorContainer = document.getElementById('censorContainer');
         const galleryGrid = document.getElementById('galleryGrid');
         const galleryEmpty = document.getElementById('galleryEmpty');
         const gallerySubfolders = document.getElementById('gallerySubfolders');
         const galleryRootBtn = document.getElementById('galleryRootBtn');
 
-        let currentMode = 'slot'; // 'slot' or 'gallery'
+        let currentMode = 'slot'; // 'slot' | 'gallery' | 'censor'
         let currentGalleryFolder = ''; // 현재 선택된 폴더 (빈 문자열 = gallery 루트)
         let isVibeMode = false; // vibe cache mode
 
@@ -6498,9 +6838,11 @@
             currentMode = 'slot';
             slotModeBtn.classList.add('active');
             galleryModeBtn.classList.remove('active');
+            censorModeBtn.classList.remove('active');
             slotsToolbar.style.display = 'flex';
             slotsWrapper.style.display = 'flex';
             galleryContainer.style.display = 'none';
+            censorContainer.style.display = 'none';
         };
 
         galleryModeBtn.onclick = () => {
@@ -6508,11 +6850,26 @@
             currentMode = 'gallery';
             galleryModeBtn.classList.add('active');
             slotModeBtn.classList.remove('active');
+            censorModeBtn.classList.remove('active');
             slotsToolbar.style.display = 'none';
             slotsWrapper.style.display = 'none';
             galleryContainer.style.display = 'flex';
+            censorContainer.style.display = 'none';
             loadGalleryFolders();
             loadGallery(currentGalleryFolder);
+        };
+
+        censorModeBtn.onclick = () => {
+            if (currentMode === 'censor') return;
+            currentMode = 'censor';
+            censorModeBtn.classList.add('active');
+            slotModeBtn.classList.remove('active');
+            galleryModeBtn.classList.remove('active');
+            slotsToolbar.style.display = 'none';
+            slotsWrapper.style.display = 'none';
+            galleryContainer.style.display = 'none';
+            censorContainer.style.display = 'flex';
+            loadCensorFolders();
         };
 
         // 갤러리 폴더 열기 (현재 선택된 폴더)
@@ -7764,6 +8121,185 @@
         // 초기화
         setupMaskEditorEvents();
         setupBaseImageEvents();
+
+        // ============================================================
+        // Censor Mode
+        // ============================================================
+        const censorGrid = document.getElementById('censorGrid');
+        const censorEmpty = document.getElementById('censorEmpty');
+        let censorImages = []; // [{filename, path, status: 'pending'|'ok'|'warning', edited: false}]
+        let currentCensorIndex = 0;
+
+        // 폴더 목록 로드
+        async function loadCensorFolders() {
+            const sourceSelect = document.getElementById('censorSourceFolder');
+            const outputSelect = document.getElementById('censorOutputFolder');
+
+            // outputs 폴더 목록 로드
+            try {
+                const response = await fetch(`${API_BASE}/api/output-folders`);
+                const result = await response.json();
+                if (result.folders) {
+                    sourceSelect.innerHTML = '<option value="">📂 outputs</option>';
+                    result.folders.forEach(folder => {
+                        sourceSelect.innerHTML += `<option value="${folder}">📁 ${folder}</option>`;
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to load output folders:', err);
+            }
+
+            // censored 폴더 옵션 (기본값)
+            outputSelect.innerHTML = `
+                <option value="censored">📁 censored</option>
+                <option value="censored_ok">📁 censored_ok</option>
+            `;
+        }
+
+        // 이미지 그리드 렌더링
+        function renderCensorGrid() {
+            censorGrid.innerHTML = '';
+            if (censorImages.length === 0) {
+                censorEmpty.style.display = 'flex';
+                censorGrid.style.display = 'none';
+                return;
+            }
+
+            censorEmpty.style.display = 'none';
+            censorGrid.style.display = 'grid';
+
+            censorImages.forEach((img, index) => {
+                const item = document.createElement('div');
+                item.className = `censor-grid-item status-${img.status}`;
+                item.innerHTML = `
+                    <img src="${API_BASE}/api/image?path=${encodeURIComponent(img.path)}" alt="">
+                    ${img.status !== 'pending' ? `<span class="status-badge ${img.status}">${img.status === 'ok' ? '✓ OK' : '⚠️'}</span>` : ''}
+                    <div class="filename">${img.filename}</div>
+                `;
+                item.onclick = () => openCensorEditor(index);
+                censorGrid.appendChild(item);
+            });
+
+            updateCensorStats();
+        }
+
+        // 통계 업데이트
+        function updateCensorStats() {
+            document.getElementById('censorOkCount').textContent = censorImages.filter(i => i.status === 'ok').length;
+            document.getElementById('censorWarningCount').textContent = censorImages.filter(i => i.status === 'warning').length;
+            document.getElementById('censorTotalCount').textContent = censorImages.length;
+        }
+
+        // Quick Editor 열기
+        function openCensorEditor(index) {
+            currentCensorIndex = index;
+            const modal = document.getElementById('censorEditorModal');
+            modal.classList.add('active');
+            updateCensorEditorUI();
+            // TODO: 캔버스에 이미지 로드
+        }
+
+        // Quick Editor 닫기
+        function closeCensorEditor() {
+            document.getElementById('censorEditorModal').classList.remove('active');
+        }
+
+        // Editor UI 업데이트
+        function updateCensorEditorUI() {
+            document.getElementById('censorImageCounter').textContent = `${currentCensorIndex + 1} / ${censorImages.length}`;
+        }
+
+        // 자동 검열 실행 (스텁)
+        document.getElementById('runAutoCensorBtn').onclick = async () => {
+            const sourceFolder = document.getElementById('censorSourceFolder').value;
+            showToast('자동 검열 기능은 아직 구현되지 않았습니다', 'warning');
+
+            // TODO: 백엔드 API 호출하여 이미지 목록 가져오기
+            // 현재는 데모용 빈 목록
+            censorImages = [];
+            renderCensorGrid();
+        };
+
+        // 승인된 이미지 내보내기 (스텁)
+        document.getElementById('exportApprovedBtn').onclick = () => {
+            const okCount = censorImages.filter(i => i.status === 'ok').length;
+            if (okCount === 0) {
+                showToast('내보낼 이미지가 없습니다', 'warning');
+                return;
+            }
+            showToast('내보내기 기능은 아직 구현되지 않았습니다', 'warning');
+        };
+
+        // Quick Editor 버튼들
+        document.getElementById('censorEditorClose').onclick = closeCensorEditor;
+        document.getElementById('censorPrevBtn').onclick = () => {
+            if (currentCensorIndex > 0) {
+                currentCensorIndex--;
+                updateCensorEditorUI();
+            }
+        };
+        document.getElementById('censorNextBtn').onclick = () => {
+            if (currentCensorIndex < censorImages.length - 1) {
+                currentCensorIndex++;
+                updateCensorEditorUI();
+            }
+        };
+        document.getElementById('censorSkipBtn').onclick = () => {
+            if (currentCensorIndex < censorImages.length - 1) {
+                currentCensorIndex++;
+                updateCensorEditorUI();
+            } else {
+                closeCensorEditor();
+            }
+        };
+        document.getElementById('censorSaveNextBtn').onclick = () => {
+            // TODO: 현재 이미지 저장
+            censorImages[currentCensorIndex].status = 'ok';
+            censorImages[currentCensorIndex].edited = true;
+            if (currentCensorIndex < censorImages.length - 1) {
+                currentCensorIndex++;
+                updateCensorEditorUI();
+            } else {
+                closeCensorEditor();
+                renderCensorGrid();
+            }
+        };
+        document.getElementById('censorMarkOk').onclick = () => {
+            censorImages[currentCensorIndex].status = 'ok';
+            renderCensorGrid();
+        };
+        document.getElementById('censorMarkNeed').onclick = () => {
+            censorImages[currentCensorIndex].status = 'warning';
+            renderCensorGrid();
+        };
+
+        // Tool 버튼들 (스텁)
+        const censorToolBtns = ['censorToolRect', 'censorToolBrush', 'censorToolMove'];
+        censorToolBtns.forEach(id => {
+            document.getElementById(id).onclick = function() {
+                censorToolBtns.forEach(bid => document.getElementById(bid).classList.remove('active'));
+                this.classList.add('active');
+            };
+        });
+
+        const censorFillBtns = ['censorFillBlack', 'censorFillWhite', 'censorFillMosaic'];
+        censorFillBtns.forEach(id => {
+            document.getElementById(id).onclick = function() {
+                censorFillBtns.forEach(bid => document.getElementById(bid).classList.remove('active'));
+                this.classList.add('active');
+            };
+        });
+
+        document.getElementById('censorBrushSize').oninput = function() {
+            document.getElementById('censorBrushSizeValue').textContent = this.value;
+        };
+
+        document.getElementById('censorToolUndo').onclick = () => {
+            showToast('Undo 기능은 아직 구현되지 않았습니다', 'warning');
+        };
+        document.getElementById('censorToolClear').onclick = () => {
+            showToast('Clear 기능은 아직 구현되지 않았습니다', 'warning');
+        };
     </script>
 </body>
 </html>

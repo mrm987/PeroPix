@@ -3224,9 +3224,9 @@
             <div id="dropModalMetadata" class="metadata"></div>
             <div class="buttons" id="dropModalButtons">
                 <button type="button" class="btn btn-secondary" id="dropModalCancel">취소</button>
+                <button type="button" class="btn" id="dropModalAsVibe" style="display: none;">바이브로 추가</button>
                 <button type="button" class="btn" id="dropModalPromptOnly" style="display: none;">프롬프트만</button>
                 <button type="button" class="btn" id="dropModalSeedOnly" style="display: none;">시드만</button>
-                <button type="button" class="btn" id="dropModalAsVibe" style="display: none;">바이브 추가</button>
                 <button type="button" class="btn btn-primary" id="dropModalConfirm">적용</button>
             </div>
         </div>
@@ -6003,12 +6003,20 @@
             }
 
             // Vibe Transfer 설정 (캐시에서 이름 매칭)
+            // 바이브 정보가 없으면 기존 설정 유지 (변경하지 않음)
             if (metadata.vibe_transfer && metadata.vibe_transfer.length > 0) {
                 loadVibesFromMetadata(metadata.vibe_transfer);
             }
+            // vibe_transfer가 없으면 (NAI 원본 이미지) 바이브는 건드리지 않음
 
             autoSaveSettings();
-            showToast('설정을 불러왔습니다', 'success');
+
+            // 바이브 정보 없음 경고 (NAI 원본 이미지인 경우)
+            if (!metadata.vibe_transfer && vibeList.length > 0) {
+                showToast('설정 적용됨 (바이브는 복원 불가)', 'warning');
+            } else {
+                showToast('설정을 불러왔습니다', 'success');
+            }
         }
 
         // 메타데이터에서 바이브 로드 (캐시에서 이름 매칭)

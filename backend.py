@@ -1603,7 +1603,7 @@ async def process_job(job):
                 "image_path": image_path,
                 "filename": filename,
                 "prompt": full_prompt,
-                "metadata": peropix_metadata
+                "metadata": unified_metadata
             }
 
             # 재연결 동기화용 기록

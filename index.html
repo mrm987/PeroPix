@@ -5904,6 +5904,12 @@
             if (metadata.smea) document.getElementById('smea').value = metadata.smea;
             if (metadata.uc_preset) document.getElementById('ucPreset').value = metadata.uc_preset;
             if (metadata.quality_tags !== undefined) document.getElementById('qualityTags').checked = metadata.quality_tags;
+            if (metadata.cfg_rescale !== undefined) {
+                document.getElementById('cfgRescale').value = metadata.cfg_rescale;
+                document.getElementById('cfgRescaleValue').textContent = metadata.cfg_rescale;
+            }
+            if (metadata.variety_plus !== undefined) document.getElementById('varietyPlus').checked = metadata.variety_plus;
+            if (metadata.furry_mode !== undefined) setFurryMode(metadata.furry_mode);
 
             // Local 설정
             if (metadata.model) document.getElementById('localModel').value = metadata.model;
@@ -7247,7 +7253,10 @@
                                 nai_model: meta.nai_model || meta.request_type || '',
                                 smea: meta.smea || (meta.sm_dyn ? 'SMEA+DYN' : (meta.sm ? 'SMEA' : 'none')),
                                 uc_preset: meta.uc_preset || meta.ucPreset || '',
-                                quality_tags: meta.quality_tags
+                                quality_tags: meta.quality_tags,
+                                cfg_rescale: meta.cfg_rescale,
+                                variety_plus: meta.variety_plus,
+                                furry_mode: meta.furry_mode
                             };
                             showLoadSettingsConfirm(normalizedMeta);
                         } else {
@@ -7751,16 +7760,14 @@
                     document.getElementById('cfgRescale').value = meta.cfg_rescale;
                     document.getElementById('cfgRescaleValue').textContent = meta.cfg_rescale;
                 }
-                if (meta.uncond_scale !== undefined) {
-                    document.getElementById('uncondScale').value = meta.uncond_scale;
-                }
                 if (meta.skip_cfg_above_sigma !== undefined && meta.skip_cfg_above_sigma !== null) {
                     document.getElementById('varietyPlus').checked = true;
                 } else {
                     document.getElementById('varietyPlus').checked = false;
                 }
-                if (meta.dynamic_thresholding !== undefined) {
-                    document.getElementById('decrisper').checked = meta.dynamic_thresholding;
+                // Furry mode (from prompt prefix)
+                if (meta.prompt && meta.prompt.startsWith('fur dataset,')) {
+                    setFurryMode(true);
                 }
 
                 // UC Preset

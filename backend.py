@@ -1514,6 +1514,7 @@ async def process_job(job):
                 "quality_tags": req.quality_tags,
                 "cfg_rescale": req.cfg_rescale,
                 "variety_plus": req.variety_plus,
+                "furry_mode": req.furry_mode,
                 # Local 설정
                 "model": req.model,
             }

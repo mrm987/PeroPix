@@ -7807,6 +7807,7 @@
                         image: base64,
                         name: file.name
                     };
+                    window._isPureNaiImage = isPureNai;
                 } else {
                     // 일반 이미지 - 바이브로 추가 제안
                     document.getElementById('dropModalTitle').textContent = '📷 일반 이미지';
@@ -7831,6 +7832,7 @@
             dropModal.classList.remove('active');
             pendingDropData = null;
             window._pendingLoadMetadata = null;
+            window._isPureNaiImage = false;
             document.getElementById('dropModalPreview').style.display = '';
             document.getElementById('dropModalPromptOnly').style.display = 'none';
             document.getElementById('dropModalSeedOnly').style.display = 'none';

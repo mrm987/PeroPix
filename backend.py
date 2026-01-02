@@ -999,6 +999,19 @@ async def call_nai_api(req: GenerateRequest):
     has_char_ref = "director_reference_images" in params
     print(f"[NAI] Generating: {req.width}x{req.height}, steps={req.steps}, model={model_to_use}")
     print(f"[NAI] Vibe Transfer: {vibe_count} images, Character Reference: {has_char_ref}")
+
+    # 상세 디버그 로깅 (NAI 원본과 비교용)
+    print(f"[NAI-DEBUG] === Request Params ===")
+    print(f"[NAI-DEBUG] prompt: {params.get('prompt', '')[:100]}...")
+    print(f"[NAI-DEBUG] negative_prompt: {params.get('negative_prompt', '')[:100]}...")
+    print(f"[NAI-DEBUG] seed: {params.get('seed')}, scale: {params.get('scale')}")
+    print(f"[NAI-DEBUG] sampler: {params.get('sampler')}, scheduler: {params.get('noise_schedule')}")
+    print(f"[NAI-DEBUG] ucPreset: {params.get('ucPreset')}, qualityToggle: {params.get('qualityToggle')}")
+    print(f"[NAI-DEBUG] cfg_rescale: {params.get('cfg_rescale')}, skip_cfg_above_sigma: {params.get('skip_cfg_above_sigma', 'not set')}")
+    print(f"[NAI-DEBUG] sm: {params.get('sm')}, sm_dyn: {params.get('sm_dyn')}")
+    if req.character_prompts:
+        print(f"[NAI-DEBUG] character_prompts: {req.character_prompts}")
+    print(f"[NAI-DEBUG] ======================")
     
     # Vibe 상세 로그
     if vibe_count > 0:

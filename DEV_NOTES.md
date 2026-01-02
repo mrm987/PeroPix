@@ -89,6 +89,37 @@ if steps > 28:
 }
 ```
 
+### Inpaint / Img2Img
+
+#### Action 타입
+- `action: "generate"` - 일반 txt2img
+- `action: "img2img"` - 이미지 기반 생성 (strength, noise 사용)
+- `action: "infill"` - 인페인트 (strength만 사용, noise 없음)
+
+#### 인페인트 전용 모델 (중요!)
+V4/V4.5는 인페인트 시 별도 모델 필요. 일반 모델로 `infill` action 사용 시 에러 발생.
+
+```
+일반 모델                          → 인페인트 모델
+nai-diffusion-4-5-full            → nai-diffusion-4-5-full-inpainting
+nai-diffusion-4-5-curated         → nai-diffusion-4-5-curated-inpainting
+nai-diffusion-4-full              → nai-diffusion-4-full-inpainting
+nai-diffusion-4-curated-preview   → nai-diffusion-4-curated-inpainting
+nai-diffusion-3                   → nai-diffusion-3-inpainting
+```
+
+#### 마스크 형식
+- 검정(black) = 유지할 영역
+- 흰색(white) = 인페인트할 영역
+
+#### 참고 자료
+- novelai-python SDK: https://github.com/LlmKira/novelai-python
+- ComfyUI NAI Generator: https://github.com/bedovyy/ComfyUI_NAIDGenerator
+
+### V4 모델에서 제거된 옵션
+- `dynamic_thresholding` (Decrisper) - V4에서 효과 없음, 항상 False
+- `uncond_scale` - V4에서 제거됨, 항상 1.0
+
 ---
 
 ## 해결한 문제들

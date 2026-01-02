@@ -5091,7 +5091,9 @@
                         image: v.image,
                         info_extracted: v.info_extracted,
                         strength: v.strength,
-                        name: v.name || 'vibe'
+                        name: v.name || 'vibe',
+                        encoded: v.encoded,
+                        encoded_model: v.encoded_model
                     }));
                 }
 
@@ -6312,7 +6314,8 @@
             const vibes = vibeEnabled ? vibeList.map(v => ({
                 image: v.image,
                 info_extracted: v.info_extracted,
-                encoded: !!v.encoded  // 이미 인코딩된 바이브인지 여부
+                encoded: !!v.encoded,  // 이미 인코딩된 바이브인지 여부
+                encoded_model: v.encoded_model  // 인코딩된 모델
             })) : [];
 
             try {
@@ -7419,7 +7422,8 @@
                                 strength: result.strength,
                                 info_extracted: result.info_extracted,
                                 name: displayName,
-                                encoded: result.vibe_data  // Pre-encoded vibe data
+                                encoded: result.vibe_data,  // Pre-encoded vibe data
+                                encoded_model: result.model  // Model used for encoding
                             });
                             renderVibeList();
                             saveAppSettings();

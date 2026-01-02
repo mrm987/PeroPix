@@ -859,15 +859,24 @@ async def call_nai_api(req: GenerateRequest):
 
                 if is_v4_plus:
                     # V4+ 모델: encode-vibe 엔드포인트로 사전 인코딩
-                    # 이미 인코딩된 데이터가 있으면 그대로 사용 (캐시된 바이브)
-                    if v.get("encoded"):
-                        print(f"[NAI] Vibe {i+1}: using pre-encoded data (cached)")
+                    # 이미 인코딩된 데이터가 있고, 모델이 일치하면 그대로 사용
+                    encoded_model = v.get("encoded_model", "")
+                    # 모델명에서 베이스 모델 추출 (예: nai-diffusion-4-5-full-inpainting -> nai-diffusion-4-5-full)
+                    base_model = req.nai_model.replace("-inpainting", "")
+                    encoded_base_model = encoded_model.replace("-inpainting", "") if encoded_model else ""
+
+                    if v.get("encoded") and encoded_base_model == base_model:
+                        print(f"[NAI] Vibe {i+1}: using pre-encoded data (cached, model match)")
                         vibe_images.append(v["encoded"])
                     else:
                         orig_size = get_image_size_from_base64(v["image"])
                         png_image = ensure_png_base64(v["image"])
                         image_name = v.get("name", f"vibe_{i+1}")
-                        print(f"[NAI] Vibe {i+1}: {orig_size[0]}x{orig_size[1]}, encoding for V4+...")
+
+                        if v.get("encoded") and encoded_base_model != base_model:
+                            print(f"[NAI] Vibe {i+1}: model mismatch ({encoded_model} -> {req.nai_model}), re-encoding...")
+                        else:
+                            print(f"[NAI] Vibe {i+1}: {orig_size[0]}x{orig_size[1]}, encoding for V4+...")
 
                         encoded_vibe = await encode_vibe_v4(png_image, req.nai_model, info_extracted, strength, token, image_name)
                         vibe_images.append(encoded_vibe)
@@ -2362,9 +2371,15 @@ async def calculate_cost(request: dict):
     uncached_vibe_count = 0
 
     if vibes and "diffusion-4" in model:
+        base_model = model.replace("-inpainting", "")
         for v in vibes:
-            # 이미 인코딩된 바이브는 캐시된 것으로 처리
+            # 이미 인코딩된 바이브: 모델 일치 여부 확인
             if v.get("encoded"):
+                encoded_model = v.get("encoded_model", "")
+                encoded_base_model = encoded_model.replace("-inpainting", "") if encoded_model else ""
+                # 모델 불일치 시 재인코딩 필요
+                if encoded_base_model != base_model:
+                    uncached_vibe_count += 1
                 continue
 
             image_base64 = v.get("image", "")

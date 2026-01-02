@@ -2946,9 +2946,11 @@
                         <div id="naiAdvancedSettings" class="provider-section" data-provider="nai">
                             <div class="row">
                                 <div style="flex: 1;">
-                                    <label>Prompt Guidance Rescale</label>
+                                    <label style="display: flex; justify-content: space-between; align-items: center;">
+                                        <span>Prompt Guidance Rescale</span>
+                                        <span id="cfgRescaleValue" style="font-weight: 500;">0</span>
+                                    </label>
                                     <input type="range" id="cfgRescale" value="0" min="0" max="1" step="0.02" style="width: 100%;">
-                                    <small style="display: flex; justify-content: space-between;"><span>0</span><span id="cfgRescaleValue">0</span><span>1</span></small>
                                 </div>
                             </div>
                             <div class="checkbox-row">
@@ -3264,24 +3266,17 @@
             </div>
             <div class="mask-editor-toolbar">
                 <div class="tool-group">
-                    <button class="tool-btn active" id="maskToolBrush" title="브러시 (마스크 그리기)">🖌️</button>
-                    <button class="tool-btn" id="maskToolEraser" title="지우개">🧹</button>
+                    <button class="tool-btn active" id="maskToolBrush" title="브러시 (마스크 그리기)">🖌️ Brush</button>
+                    <button class="tool-btn" id="maskToolEraser" title="지우개">◼ Eraser</button>
                 </div>
                 <div class="slider-group">
                     <label>Size:</label>
                     <input type="range" id="maskBrushSize" min="5" max="100" value="30">
                     <span id="maskBrushSizeValue">30</span>
                 </div>
-                <div class="tool-group">
+                <div class="tool-group" style="margin-left: auto;">
                     <button class="tool-btn" id="maskToolClear" title="전체 지우기">🗑️ Clear</button>
                     <button class="tool-btn" id="maskToolInvert" title="마스크 반전">🔄 Invert</button>
-                </div>
-                <div class="slider-group" style="margin-left: auto;">
-                    <label>Mode:</label>
-                    <select id="maskEditorMode" style="padding: 6px; border-radius: 6px; background: var(--bg); color: var(--text); border: 1px solid var(--border);">
-                        <option value="inpaint">Inpaint</option>
-                        <option value="img2img">Img2Img</option>
-                    </select>
                 </div>
             </div>
             <div class="mask-editor-canvas-wrapper">
@@ -3295,15 +3290,10 @@
                     <input type="range" id="maskEditorStrength" min="0" max="1" step="0.05" value="0.7">
                     <span id="maskEditorStrengthValue">0.7</span>
                 </div>
-                <div class="slider-group" id="maskEditorNoiseGroup">
-                    <label>Noise:</label>
-                    <input type="range" id="maskEditorNoise" min="0" max="1" step="0.05" value="0">
-                    <span id="maskEditorNoiseValue">0</span>
-                </div>
             </div>
             <div class="mask-editor-footer">
                 <button class="btn btn-secondary" id="maskEditorCancel">취소</button>
-                <button class="btn btn-primary" id="maskEditorApply">✓ 설정에 적용</button>
+                <button class="btn btn-primary" id="maskEditorApply">✓ 베이스 이미지로 등록</button>
             </div>
         </div>
     </div>
@@ -3938,9 +3928,9 @@
                 // 이미지 base64 가져오기
                 let imageBase64 = card._imageData.image;
                 if (!imageBase64 && card._imageData.image_path) {
-                    // 파일 경로에서 이미지 로드
+                    // 파일 경로에서 이미지 로드 (outputs API 사용)
                     try {
-                        const response = await fetch(`${API_BASE}/api/image?path=${encodeURIComponent(card._imageData.image_path)}`);
+                        const response = await fetch(`${API_BASE}/api/outputs/${card._imageData.image_path}`);
                         const blob = await response.blob();
                         imageBase64 = await new Promise((resolve) => {
                             const reader = new FileReader();
@@ -7084,9 +7074,9 @@
                         <div class="seed">${img.seed ? 'Seed: ' + img.seed : '메타데이터 없음'}</div>
                     </div>
                     <div class="gallery-item-actions">
+                        <button class="inpaint-btn" title="인페인트">🎨 Inpaint</button>
                         <button class="copy-seed-btn" title="시드 복사">🎲 Seed</button>
                         <button class="apply-all-btn" title="전체 설정 적용">📋 Apply</button>
-                        <button class="inpaint-btn" title="인페인트">🎨 Inpaint</button>
                         <button class="delete-btn" title="삭제">🗑️</button>
                     </div>
                 `;
@@ -7888,13 +7878,9 @@
                     maskImg.src = existingMask;
                 }
 
-                // 설정 복원
-                document.getElementById('maskEditorMode').value = baseImageData.mode;
+                // 설정 복원 (인페인트 모드 고정)
                 document.getElementById('maskEditorStrength').value = baseImageData.strength;
                 document.getElementById('maskEditorStrengthValue').textContent = baseImageData.strength;
-                document.getElementById('maskEditorNoise').value = baseImageData.noise;
-                document.getElementById('maskEditorNoiseValue').textContent = baseImageData.noise;
-                updateMaskEditorNoiseVisibility();
 
                 modal.classList.add('active');
             };
@@ -7930,13 +7916,49 @@
                 ctx.fill();
             }
 
+            // 브러시 커서 미리보기
+            function drawCursor(e) {
+                const pos = getPos(e);
+                const ctx = maskEditor.drawCtx;
+                const size = maskEditor.brushSize;
+
+                // 이전 커서 지우기
+                ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+
+                // 커서 원 그리기
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, size / 2, 0, Math.PI * 2);
+                ctx.strokeStyle = maskEditor.tool === 'brush' ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.8)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // 내부 점선 테두리 (대비용)
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, size / 2, 0, Math.PI * 2);
+                ctx.strokeStyle = maskEditor.tool === 'brush' ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.5)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([4, 4]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            function clearCursor() {
+                maskEditor.drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+            }
+
             drawCanvas.addEventListener('mousedown', (e) => {
                 maskEditor.isDrawing = true;
                 draw(e);
             });
-            drawCanvas.addEventListener('mousemove', draw);
+            drawCanvas.addEventListener('mousemove', (e) => {
+                draw(e);
+                drawCursor(e);
+            });
             drawCanvas.addEventListener('mouseup', () => maskEditor.isDrawing = false);
-            drawCanvas.addEventListener('mouseleave', () => maskEditor.isDrawing = false);
+            drawCanvas.addEventListener('mouseleave', () => {
+                maskEditor.isDrawing = false;
+                clearCursor();
+            });
 
             // Touch support
             drawCanvas.addEventListener('touchstart', (e) => {
@@ -7988,16 +8010,9 @@
                 ctx.putImageData(imageData, 0, 0);
             };
 
-            // Strength/Noise sliders
+            // Strength slider
             document.getElementById('maskEditorStrength').oninput = function() {
                 document.getElementById('maskEditorStrengthValue').textContent = this.value;
-            };
-            document.getElementById('maskEditorNoise').oninput = function() {
-                document.getElementById('maskEditorNoiseValue').textContent = this.value;
-            };
-            // Mode change - hide noise for inpaint
-            document.getElementById('maskEditorMode').onchange = function() {
-                updateMaskEditorNoiseVisibility();
             };
 
             // Cancel
@@ -8027,16 +8042,16 @@
                 baseImageData.image = fullImageCanvas.toDataURL('image/png').split(',')[1];
 
                 baseImageData.mask = fullMaskCanvas.toDataURL('image/png').split(',')[1];
-                baseImageData.mode = document.getElementById('maskEditorMode').value;
+                baseImageData.mode = 'inpaint';  // 마스크 에디터는 항상 인페인트
                 baseImageData.strength = parseFloat(document.getElementById('maskEditorStrength').value);
-                baseImageData.noise = parseFloat(document.getElementById('maskEditorNoise').value);
+                baseImageData.noise = 0;  // 인페인트는 noise 미사용
                 baseImageData.width = maskEditor.originalImage.width;
                 baseImageData.height = maskEditor.originalImage.height;
 
                 // UI 업데이트
                 updateBaseImageUI();
                 closeMaskEditor();
-                showToast('Base Image 설정됨', 'success');
+                showToast('베이스 이미지로 등록됨', 'success');
             };
         }
 
@@ -8120,13 +8135,6 @@
             const noiseContainer = document.getElementById('baseImageNoiseContainer');
             const mode = document.getElementById('baseImageMode').value;
             noiseContainer.style.display = mode === 'inpaint' ? 'none' : 'block';
-        }
-
-        // 마스크 에디터 Noise 가시성 업데이트
-        function updateMaskEditorNoiseVisibility() {
-            const noiseGroup = document.getElementById('maskEditorNoiseGroup');
-            const mode = document.getElementById('maskEditorMode').value;
-            noiseGroup.style.display = mode === 'inpaint' ? 'none' : 'flex';
         }
 
         // Inpaint용 이미지 설정 함수 (외부에서 호출)

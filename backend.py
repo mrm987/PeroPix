@@ -1554,8 +1554,10 @@ async def process_job(job):
             }
 
             if existing_comment:
-                # NAI에서 생성된 이미지: 기존 Comment에 peropix 확장만 추가
+                # NAI에서 생성된 이미지: 기존 Comment에 peropix 확장 추가
+                # 그리고 request_type을 실제 사용한 모델로 덮어쓰기 (NAI 내부값 수정)
                 existing_comment["peropix"] = peropix_ext
+                existing_comment["request_type"] = req.nai_model  # NAI의 내부 타입 대신 실제 모델명
                 unified_metadata = existing_comment
             else:
                 # Local 또는 Comment 없는 경우: NAI 호환 형식으로 전체 생성

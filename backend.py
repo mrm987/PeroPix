@@ -1222,6 +1222,17 @@ async def call_nai_api(req: GenerateRequest):
 
             # 마스크를 이진화 (NAI는 순수 흑백만 지원, 회색 가장자리 제거)
             mask_png = binarize_mask(req.base_mask)
+
+            # DEBUG: NAI 웹 마스크 파일로 테스트 (True로 변경하여 테스트)
+            USE_NAI_TEST_MASK = True  # 테스트 후 False로 변경
+            if USE_NAI_TEST_MASK:
+                import os
+                nai_mask_path = os.path.join(os.path.dirname(__file__), "test_data", "nai_mask.png")
+                if os.path.exists(nai_mask_path):
+                    with open(nai_mask_path, "rb") as f:
+                        mask_png = base64.b64encode(f.read()).decode('utf-8')
+                    print(f"[NAI] DEBUG: Using NAI web mask file for testing")
+
             params["mask"] = mask_png
 
             # 마스크 크기 확인

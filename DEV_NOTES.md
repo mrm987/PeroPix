@@ -223,6 +223,37 @@ V45_UC_PRESETS = {
 - NAI 이미지 임포트 시 중복 방지를 위해 기존 태그를 자동으로 제거함 (`normalizeMetadata`)
 - 순수 NAI 이미지 임포트 시 경고 메시지 표시
 
+### 10. 인페인트 회색 경계선 아티팩트
+**문제**: 인페인트 마스크 경계에 회색 선이 생김
+**원인**: 마스크 에디터 캔버스가 **축소된 디스플레이 크기**로 그려진 후, Apply 시 원본 크기로 **업스케일**됨. 이 과정에서 미세한 보간 아티팩트 발생.
+
+```
+문제 상황:
+1. 원본 이미지: 1216×832
+2. 디스플레이 축소: 800×548 (화면에 맞춤)
+3. 캔버스 크기: 800×548 (축소된 크기로 설정됨) ← 문제!
+4. 마스크 그리기: 800×548 해상도로 그림
+5. Apply: 1216×832로 업스케일 ← 아티팩트 발생!
+```
+
+**해결**:
+1. 캔버스 실제 크기 = 원본 이미지 크기 (1216×832)
+2. CSS `style.width/height`로 디스플레이만 축소 (800×548)
+3. 마우스 좌표를 CSS 스케일 비율로 보정
+4. Apply 시 업스케일 불필요 (이미 원본 크기)
+
+```javascript
+// 캔버스 초기화
+canvas.width = originalWidth;      // 실제 해상도 = 원본
+canvas.height = originalHeight;
+canvas.style.width = displayWidth + 'px';   // CSS로 축소 표시
+canvas.style.height = displayHeight + 'px';
+
+// 마우스 좌표 변환 (디스플레이 → 캔버스)
+const canvasX = displayX * (canvas.width / rect.width);
+const canvasY = displayY * (canvas.height / rect.height);
+```
+
 ---
 
 ## 주요 데이터 구조

@@ -3816,12 +3816,14 @@ async def list_images_for_censor(folder: str = ""):
     
     for filepath in all_files[:200]:  # 최대 200개
         try:
-            # 썸네일 생성
+            # 썸네일 생성 (작은 크기 + JPEG로 빠르게)
             img = Image.open(filepath)
             thumb = img.copy()
-            thumb.thumbnail((200, 200), Image.LANCZOS)
+            thumb.thumbnail((80, 80), Image.BILINEAR)  # 더 작게, 빠른 리샘플링
+            if thumb.mode == 'RGBA':
+                thumb = thumb.convert('RGB')
             buffer = io.BytesIO()
-            thumb.save(buffer, format="PNG")
+            thumb.save(buffer, format="JPEG", quality=60)  # JPEG로 압축
             thumb_base64 = base64.b64encode(buffer.getvalue()).decode()
             
             images.append({
@@ -3857,11 +3859,14 @@ async def list_censored_images(folder: str = ""):
     
     for filepath in all_files[:200]:
         try:
+            # 썸네일 생성 (작은 크기 + JPEG로 빠르게)
             img = Image.open(filepath)
             thumb = img.copy()
-            thumb.thumbnail((200, 200), Image.LANCZOS)
+            thumb.thumbnail((80, 80), Image.BILINEAR)
+            if thumb.mode == 'RGBA':
+                thumb = thumb.convert('RGB')
             buffer = io.BytesIO()
-            thumb.save(buffer, format="PNG")
+            thumb.save(buffer, format="JPEG", quality=60)
             thumb_base64 = base64.b64encode(buffer.getvalue()).decode()
             
             images.append({

@@ -1910,6 +1910,16 @@
             height: 100%;
             object-fit: cover;
         }
+        .censor-loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            color: var(--text-dim);
+            font-size: 0.9rem;
+            padding: 20px;
+        }
         
         /* 큰 프리뷰 영역 */
         .censor-preview-area {
@@ -8994,6 +9004,9 @@
             const folder = document.getElementById('censorSourceFolder').value;
             const thumbnailsContainer = document.getElementById('censorThumbnails');
             
+            // 로딩 표시
+            thumbnailsContainer.innerHTML = '<div class="censor-loading">⏳ 이미지 로딩중...</div>';
+            
             try {
                 const endpoint = censorState.currentTab === 'before' 
                     ? `/api/censor/images?folder=${encodeURIComponent(folder)}`
@@ -9020,7 +9033,7 @@
                 }
             } catch (err) {
                 console.error('Failed to load censor images:', err);
-                thumbnailsContainer.innerHTML = '';
+                thumbnailsContainer.innerHTML = '<div class="censor-loading">로드 실패</div>';
                 clearCensorPreview();
             }
         }
@@ -9028,10 +9041,14 @@
         // 썸네일 렌더링
         function renderCensorThumbnails(images) {
             const container = document.getElementById('censorThumbnails');
+            if (images.length === 0) {
+                container.innerHTML = '<div class="censor-loading">이미지가 없습니다</div>';
+                return;
+            }
             container.innerHTML = images.map((img, index) => `
                 <div class="censor-thumbnail ${index === censorState.currentIndex ? 'active' : ''}" 
                      data-index="${index}" data-path="${img.path}">
-                    <img src="data:image/png;base64,${img.thumbnail}" alt="${img.filename}">
+                    <img src="data:image/jpeg;base64,${img.thumbnail}" alt="${img.filename}">
                 </div>
             `).join('');
             

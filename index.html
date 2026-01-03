@@ -8190,7 +8190,8 @@
             maskCtx: null,
             drawCtx: null,
             originalImage: null,
-            scale: 1
+            scale: 1,
+            paintedCells: new Set()  // 그리드 셀 추적 (8x8 그리드 브러시용)
         };
 
         // Mask Editor 열기
@@ -8259,6 +8260,11 @@
         function setupMaskEditorEvents() {
             const drawCanvas = document.getElementById('maskEditorDrawCanvas');
 
+            // NAIS2/NAI 웹 방식: 8x8 그리드 기반 브러시
+            const GRID_SIZE = 8;
+            let lastGridPos = null;  // 마지막 그리드 위치 (선 그리기용)
+            maskEditor.paintedCells.clear();  // 에디터 열 때 초기화
+
             function getPos(e) {
                 const rect = drawCanvas.getBoundingClientRect();
                 const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left;
@@ -8266,42 +8272,125 @@
                 return { x, y };
             }
 
+            // 픽셀 좌표를 그리드 좌표로 변환
+            function pixelToGrid(pixelX, pixelY) {
+                const gx = Math.floor(pixelX / GRID_SIZE);
+                const gy = Math.floor(pixelY / GRID_SIZE);
+                const maxGx = Math.floor(maskEditor.maskCanvas.width / GRID_SIZE) - 1;
+                const maxGy = Math.floor(maskEditor.maskCanvas.height / GRID_SIZE) - 1;
+                return {
+                    gx: Math.max(0, Math.min(gx, maxGx)),
+                    gy: Math.max(0, Math.min(gy, maxGy))
+                };
+            }
+
+            // 그리드 셀 채우기
+            function fillGridCell(ctx, gx, gy, erase) {
+                const cellKey = `${gx},${gy}`;
+
+                if (erase) {
+                    ctx.fillStyle = 'black';
+                    ctx.fillRect(gx * GRID_SIZE, gy * GRID_SIZE, GRID_SIZE, GRID_SIZE);
+                    maskEditor.paintedCells.delete(cellKey);
+                } else {
+                    if (maskEditor.paintedCells.has(cellKey)) return;  // 이미 칠한 셀은 스킵
+                    ctx.fillStyle = 'white';
+                    ctx.fillRect(gx * GRID_SIZE, gy * GRID_SIZE, GRID_SIZE, GRID_SIZE);
+                    maskEditor.paintedCells.add(cellKey);
+                }
+            }
+
+            // 브러시 영역 채우기 (브러시 크기에 따라 여러 셀)
+            function fillBrushArea(ctx, gx, gy, erase) {
+                const brushGridSize = Math.max(1, Math.floor(maskEditor.brushSize / GRID_SIZE));
+                const halfBrush = Math.floor(brushGridSize / 2);
+
+                for (let offsetY = -halfBrush; offsetY <= halfBrush; offsetY++) {
+                    for (let offsetX = -halfBrush; offsetX <= halfBrush; offsetX++) {
+                        const targetGx = gx + offsetX;
+                        const targetGy = gy + offsetY;
+                        const maxGx = Math.floor(maskEditor.maskCanvas.width / GRID_SIZE) - 1;
+                        const maxGy = Math.floor(maskEditor.maskCanvas.height / GRID_SIZE) - 1;
+
+                        if (targetGx >= 0 && targetGx <= maxGx && targetGy >= 0 && targetGy <= maxGy) {
+                            fillGridCell(ctx, targetGx, targetGy, erase);
+                        }
+                    }
+                }
+            }
+
+            // Bresenham 선 알고리즘 (그리드 셀 간 부드러운 연결)
+            function drawGridLine(ctx, startGx, startGy, endGx, endGy, erase) {
+                const dx = Math.abs(endGx - startGx);
+                const dy = Math.abs(endGy - startGy);
+                const sx = startGx < endGx ? 1 : -1;
+                const sy = startGy < endGy ? 1 : -1;
+                let err = dx - dy;
+
+                let gx = startGx;
+                let gy = startGy;
+
+                while (true) {
+                    fillBrushArea(ctx, gx, gy, erase);
+
+                    if (gx === endGx && gy === endGy) break;
+
+                    const e2 = 2 * err;
+                    if (e2 > -dy) {
+                        err -= dy;
+                        gx += sx;
+                    }
+                    if (e2 < dx) {
+                        err += dx;
+                        gy += sy;
+                    }
+                }
+            }
+
             function draw(e) {
                 if (!maskEditor.isDrawing) return;
                 const pos = getPos(e);
                 const ctx = maskEditor.maskCtx;
-                const size = maskEditor.brushSize;
+                const erase = maskEditor.tool !== 'brush';
 
-                // 부드러운 원형 브러시 (NAI 실제 마스크와 동일)
-                ctx.beginPath();
-                ctx.arc(pos.x, pos.y, size / 2, 0, Math.PI * 2);
-                ctx.fillStyle = maskEditor.tool === 'brush' ? 'white' : 'black';
-                ctx.fill();
+                const gridPos = pixelToGrid(pos.x, pos.y);
+
+                if (lastGridPos) {
+                    // 이전 위치에서 현재 위치까지 선 그리기
+                    drawGridLine(ctx, lastGridPos.gx, lastGridPos.gy, gridPos.gx, gridPos.gy, erase);
+                } else {
+                    // 첫 클릭
+                    fillBrushArea(ctx, gridPos.gx, gridPos.gy, erase);
+                }
+
+                lastGridPos = gridPos;
             }
 
-            // 브러시 커서 미리보기
+            // 브러시 커서 미리보기 (그리드 정렬)
             function drawCursor(e) {
                 const pos = getPos(e);
                 const ctx = maskEditor.drawCtx;
-                const size = maskEditor.brushSize;
+                const gridPos = pixelToGrid(pos.x, pos.y);
+                const brushGridSize = Math.max(1, Math.floor(maskEditor.brushSize / GRID_SIZE));
+                const halfBrush = Math.floor(brushGridSize / 2);
 
                 // 이전 커서 지우기
                 ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
 
-                // 원형 커서
-                ctx.beginPath();
-                ctx.arc(pos.x, pos.y, size / 2, 0, Math.PI * 2);
+                // 그리드 영역 표시
+                const startX = (gridPos.gx - halfBrush) * GRID_SIZE;
+                const startY = (gridPos.gy - halfBrush) * GRID_SIZE;
+                const size = (brushGridSize * 2 - 1) * GRID_SIZE;
+
                 ctx.strokeStyle = maskEditor.tool === 'brush' ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.8)';
                 ctx.lineWidth = 2;
-                ctx.stroke();
+                ctx.strokeRect(startX, startY, size, size);
 
                 // 내부 점선 테두리 (대비용)
-                ctx.beginPath();
-                ctx.arc(pos.x, pos.y, size / 2, 0, Math.PI * 2);
                 ctx.strokeStyle = maskEditor.tool === 'brush' ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.5)';
                 ctx.lineWidth = 1;
                 ctx.setLineDash([4, 4]);
-                ctx.stroke();
+                ctx.strokeRect(startX + 1, startY + 1, size - 2, size - 2);
                 ctx.setLineDash([]);
             }
 
@@ -8311,15 +8400,20 @@
 
             drawCanvas.addEventListener('mousedown', (e) => {
                 maskEditor.isDrawing = true;
+                lastGridPos = null;  // 새 스트로크 시작
                 draw(e);
             });
             drawCanvas.addEventListener('mousemove', (e) => {
                 draw(e);
                 drawCursor(e);
             });
-            drawCanvas.addEventListener('mouseup', () => maskEditor.isDrawing = false);
+            drawCanvas.addEventListener('mouseup', () => {
+                maskEditor.isDrawing = false;
+                lastGridPos = null;
+            });
             drawCanvas.addEventListener('mouseleave', () => {
                 maskEditor.isDrawing = false;
+                lastGridPos = null;
                 clearCursor();
             });
 
@@ -8327,13 +8421,17 @@
             drawCanvas.addEventListener('touchstart', (e) => {
                 e.preventDefault();
                 maskEditor.isDrawing = true;
+                lastGridPos = null;
                 draw(e);
             });
             drawCanvas.addEventListener('touchmove', (e) => {
                 e.preventDefault();
                 draw(e);
             });
-            drawCanvas.addEventListener('touchend', () => maskEditor.isDrawing = false);
+            drawCanvas.addEventListener('touchend', () => {
+                maskEditor.isDrawing = false;
+                lastGridPos = null;
+            });
 
             // 도구 버튼
             document.getElementById('maskToolBrush').onclick = () => {
@@ -8357,6 +8455,7 @@
             document.getElementById('maskToolClear').onclick = () => {
                 maskEditor.maskCtx.fillStyle = 'black';
                 maskEditor.maskCtx.fillRect(0, 0, maskEditor.maskCanvas.width, maskEditor.maskCanvas.height);
+                maskEditor.paintedCells.clear();  // 그리드 셀 추적도 초기화
             };
 
             // Invert (검정 ↔ 흰색 반전)

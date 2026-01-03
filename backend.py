@@ -678,6 +678,12 @@ class GenerateRequest(BaseModel):
     upscale_denoise: float = 0.5
     size_alignment: str = "none"  # "none", "8", "64"
 
+    # Save Options
+    save_format: str = "png"  # png, jpg, webp
+    jpg_quality: int = 95
+    strip_metadata: bool = False
+    output_folder: str = ""
+
 
 class PromptItem(BaseModel):
     name: str = ""

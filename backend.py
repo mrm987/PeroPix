@@ -129,13 +129,13 @@ def pad_image_to_canvas_base64(base64_image: str, target_size: tuple) -> str:
     W, H = pil_img.size
     tw, th = target_size
 
-    # 비율 유지하면서 리사이즈 (NAI 웹은 ceil 사용, BILINEAR 알고리즘)
+    # 비율 유지하면서 리사이즈 (NAI 웹은 ceil 사용)
     import math
     scale = min(tw / W, th / H)
     new_w = min(tw, max(1, math.ceil(W * scale)))
     new_h = min(th, max(1, math.ceil(H * scale)))
-    # ComfyUI_NAIDGenerator와 동일하게 BILINEAR 사용
-    pil_resized = pil_img.resize((new_w, new_h), PILImage.BILINEAR)
+    # BICUBIC 테스트 (PIL 기본값, sdwebui-nai-api와 동일)
+    pil_resized = pil_img.resize((new_w, new_h), PILImage.BICUBIC)
 
     # 검은 캔버스에 중앙 배치 (NAI 웹: RGBA, 알파=255)
     canvas = PILImage.new('RGBA', (tw, th), (0, 0, 0, 255))
@@ -1180,14 +1180,16 @@ async def call_nai_api(req: GenerateRequest):
         style_aware = req.character_reference.get("style_aware", True)
         caption_type = "character&style" if style_aware else "character"
 
-        # 테스트: 리사이즈 없이 원본 이미지 그대로 전송 (NAI 서버가 처리하는지 확인)
+        # 이미지 크기 확인 후 캔버스 패딩 (1472×1472, 1536×1024, 1024×1536)
         raw_image = req.character_reference["image"]
         try:
             w_raw, h_raw = get_image_size_from_base64(raw_image)
-            print(f"[NAI] Character Reference: {w_raw}x{h_raw} (no resize, sending original)")
+            canvas_w, canvas_h = _choose_cr_canvas(w_raw, h_raw)
+            padded_image = pad_image_to_canvas_base64(raw_image, (canvas_w, canvas_h))
+            print(f"[NAI] Character Reference: {w_raw}x{h_raw} -> padded to {canvas_w}x{canvas_h}")
         except Exception as e:
-            print(f"[NAI] Character Reference: size unknown")
-        padded_image = raw_image  # 원본 그대로 사용
+            print(f"[NAI] Character Reference padding failed, using original: {e}")
+            padded_image = raw_image
 
         # NAI 웹 방식: director_reference_images_cached 사용
         import hashlib

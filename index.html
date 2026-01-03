@@ -5870,7 +5870,7 @@
 
             // UC Preset: 숫자 → 문자열 변환
             const ucPresetMap = { 0: 'Heavy', 1: 'Light', 2: 'Human Focus', 3: 'None' };
-            const ucPreset = ucPresetMap[meta.ucPreset] || meta.ucPreset || 'Heavy';
+            let ucPreset = ucPresetMap[meta.ucPreset] || meta.ucPreset || 'Heavy';
             let qualityTags = meta.qualityToggle;
 
             // 순수 NAI 이미지 여부 확인 (peropix 확장이 없으면 순수 NAI)
@@ -5886,6 +5886,8 @@
                 if (prompt.endsWith(v45QualityTags)) {
                     prompt = prompt.slice(0, -v45QualityTags.length);
                     qualityTags = true; // 제거했으므로 옵션을 켜서 다시 추가되도록 함
+                } else {
+                    qualityTags = false; // 퀄리티 태그가 없으면 옵션 끄기
                 }
 
                 // V4.5 UC 프리셋 태그 제거 (네거티브 프롬프트 앞에 추가된 태그)
@@ -5896,12 +5898,21 @@
                     'Human Focus': 'nsfw, lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negative space, blank page, @_@, mismatched pupils, glowing eyes, bad anatomy'
                 };
 
-                // 현재 UC 프리셋에 해당하는 태그 제거
-                const presetTags = v45UcPresets[ucPreset];
-                if (presetTags && negativePrompt.startsWith(presetTags)) {
-                    negativePrompt = negativePrompt.slice(presetTags.length);
-                    // 앞에 ", " 가 남아있으면 제거
-                    negativePrompt = negativePrompt.replace(/^,\s*/, '');
+                // 실제 네거티브 프롬프트에서 UC 프리셋 감지 및 제거
+                let foundPreset = false;
+                for (const [presetName, presetTags] of Object.entries(v45UcPresets)) {
+                    if (negativePrompt.startsWith(presetTags)) {
+                        ucPreset = presetName;
+                        negativePrompt = negativePrompt.slice(presetTags.length);
+                        // 앞에 ", " 가 남아있으면 제거
+                        negativePrompt = negativePrompt.replace(/^,\s*/, '');
+                        foundPreset = true;
+                        break;
+                    }
+                }
+                // UC 프리셋 태그가 없으면 None으로 설정
+                if (!foundPreset) {
+                    ucPreset = 'None';
                 }
             }
 

@@ -8389,21 +8389,10 @@
                 fullMaskCanvas.height = maskEditor.originalImage.height;
                 const fullCtx = fullMaskCanvas.getContext('2d');
 
-                // 스케일 업 (보간 비활성화 - 순수 흑백 유지)
-                fullCtx.imageSmoothingEnabled = false;
+                // 스케일 업 (부드러운 보간으로 자연스러운 가장자리 블렌딩)
+                fullCtx.imageSmoothingEnabled = true;
+                fullCtx.imageSmoothingQuality = 'high';
                 fullCtx.drawImage(maskEditor.maskCanvas, 0, 0, fullMaskCanvas.width, fullMaskCanvas.height);
-
-                // 마스크 이진화 (회색 값 제거 - 128 이상은 흰색, 미만은 검정)
-                const maskImageData = fullCtx.getImageData(0, 0, fullMaskCanvas.width, fullMaskCanvas.height);
-                const maskData = maskImageData.data;
-                for (let i = 0; i < maskData.length; i += 4) {
-                    const val = maskData[i] >= 128 ? 255 : 0;
-                    maskData[i] = val;     // R
-                    maskData[i + 1] = val; // G
-                    maskData[i + 2] = val; // B
-                    maskData[i + 3] = 255; // A
-                }
-                fullCtx.putImageData(maskImageData, 0, 0);
 
                 // Base Image 데이터 설정
                 baseImageData.enabled = true;

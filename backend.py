@@ -263,6 +263,12 @@ def binarize_mask(base64_mask: str, threshold: int = 1) -> str:
         unique_values = set(gray.getdata())
 
     print(f"[DEBUG] Mask unique values: {unique_values}")
+    print(f"[DEBUG] Mask mode: {mask_img.mode}, size: {mask_img.size}")
+
+    # 원본 마스크 저장 (분석용)
+    with open("debug_original_mask.png", "wb") as f:
+        f.write(mask_data)
+    print(f"[DEBUG] Original mask saved ({len(mask_data)} bytes)")
 
     # 이미 순수 흑백(0, 255만 있음)이면 원본 그대로 반환
     if unique_values <= {0, 255}:

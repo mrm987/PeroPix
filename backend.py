@@ -1733,6 +1733,11 @@ async def process_job(job):
             upscale_cfg=req.upscale_cfg,
             upscale_denoise=req.upscale_denoise,
             size_alignment=req.size_alignment,
+            # Save Options
+            save_format=req.save_format,
+            jpg_quality=req.jpg_quality,
+            strip_metadata=req.strip_metadata,
+            output_folder=req.output_folder,
         )
         
         try:

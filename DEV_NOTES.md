@@ -188,7 +188,7 @@ director_reference_descriptions: [{
 - `fidelity` UI 값이 반전됨: UI 1.0 → API secondary 0.0
 - 이미지는 1472×1472, 1536×1024, 1024×1536 중 하나로 letterbox 패딩
 - `director_reference_images_cached` 형식 필수: `cache_secret_key`와 `data` 모두 포함
-- 이미지 형식: JPEG 95% 품질 (NAIS2 방식)
+- 이미지 형식: PNG RGBA (NAI 웹 확인)
 - 인페인트 모드에서는 캐릭터 레퍼런스 미지원
 
 ### V4 모델에서 제거된 옵션

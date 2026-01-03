@@ -9362,7 +9362,7 @@
         
         // 전체 검열 실행
         async function runBatchCensor() {
-            const folder = document.getElementById('censorSourceFolder').value;
+            const folder = censorState.currentUncensoredFolder;
             const model = document.getElementById('censorModel').value;
             const method = document.getElementById('censorMethod').value;
             

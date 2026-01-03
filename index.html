@@ -8884,11 +8884,17 @@
                 }
                 
                 if (result.models && result.models.length > 0) {
+                    // 기본 모델 우선 선택
+                    const defaultModel = 'ntd11_anime_nsfw_segm_v5-variant1.pt';
+                    const selectedModel = result.models.includes(defaultModel) 
+                        ? defaultModel 
+                        : result.models[0];
+                    
                     modelSelect.innerHTML = result.models.map(m => 
-                        `<option value="${m}">${m}</option>`
+                        `<option value="${m}" ${m === selectedModel ? 'selected' : ''}>${m}</option>`
                     ).join('');
-                    // 첫 번째 모델의 클래스 로드
-                    await loadModelClasses(result.models[0]);
+                    // 선택된 모델의 클래스 로드
+                    await loadModelClasses(selectedModel);
                 } else {
                     modelSelect.innerHTML = '<option value="">모델 없음</option>';
                 }
@@ -9102,10 +9108,10 @@
             
             const img = new Image();
             img.onload = () => {
-                // 캔버스 크기 설정
-                const container = document.getElementById('censorPreviewContainer');
-                const maxW = container.clientWidth - 32;
-                const maxH = container.clientHeight - 32;
+                // 캔버스 크기 설정 - 부모 영역(censor-preview-area)에서 크기 가져오기
+                const previewArea = document.querySelector('.censor-preview-area');
+                const maxW = previewArea.clientWidth - 48;
+                const maxH = previewArea.clientHeight - 48;
                 
                 let scale = Math.min(maxW / img.width, maxH / img.height, 1);
                 const displayW = Math.round(img.width * scale);

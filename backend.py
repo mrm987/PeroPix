@@ -37,7 +37,9 @@ PROMPTS_DIR = APP_DIR / "prompts"
 CONFIG_FILE = APP_DIR / "config.json"
 PYTHON_ENV_DIR = APP_DIR / "python_env"  # 로컬 생성용 Python 환경
 CENSOR_MODELS_DIR = MODELS_DIR / "censor"  # 검열 모델 (YOLO)
-CENSORED_DIR = APP_DIR / "censored"  # 검열 결과 저장
+CENSORING_DIR = APP_DIR / "censoring"  # 검열 작업 폴더
+UNCENSORED_DIR = CENSORING_DIR / "uncensored"  # 검열 전 이미지
+CENSORED_DIR = CENSORING_DIR / "censored"  # 검열 후 이미지
 
 # 카테고리별 이미지 순번 - 매번 실제 폴더 스캔
 def get_next_image_number(category: str, save_dir: Path = None, ext: str = 'png') -> int:
@@ -64,7 +66,7 @@ def get_next_image_number(category: str, save_dir: Path = None, ext: str = 'png'
     return max_num + 1
 
 # 디렉토리 생성
-for d in [CHECKPOINTS_DIR, LORA_DIR, UPSCALE_DIR, OUTPUT_DIR, PRESETS_DIR, CENSOR_MODELS_DIR, CENSORED_DIR]:
+for d in [CHECKPOINTS_DIR, LORA_DIR, UPSCALE_DIR, OUTPUT_DIR, PRESETS_DIR, CENSOR_MODELS_DIR, UNCENSORED_DIR, CENSORED_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
 # Prompts 하위 폴더 생성
@@ -3650,8 +3652,8 @@ async def scan_image_for_censor(req: CensorScanRequest):
     try:
         # 이미지 경로 결정
         if req.image_path:
-            # outputs 폴더 기준 상대 경로
-            image_path = OUTPUT_DIR / req.image_path
+            # censoring/uncensored 폴더 기준 상대 경로
+            image_path = UNCENSORED_DIR / req.image_path
             if not image_path.exists():
                 return {"success": False, "error": f"이미지 없음: {req.image_path}"}
         elif req.image_base64:
@@ -3699,7 +3701,7 @@ async def apply_censor(req: CensorApplyRequest):
     try:
         # 이미지 경로 결정
         if req.image_path:
-            image_path = OUTPUT_DIR / req.image_path
+            image_path = UNCENSORED_DIR / req.image_path
             if not image_path.exists():
                 return {"success": False, "error": f"이미지 없음: {req.image_path}"}
         elif req.image_base64:
@@ -3745,9 +3747,9 @@ async def save_censored_image(req: CensorSaveRequest):
     temp_file = None
     
     try:
-        # 이미지 경로 결정
+        # 이미지 경로 결정 (censoring/uncensored 기준)
         if req.image_path:
-            image_path = OUTPUT_DIR / req.image_path
+            image_path = UNCENSORED_DIR / req.image_path
             if not image_path.exists():
                 return {"success": False, "error": f"이미지 없음: {req.image_path}"}
             original_filename = Path(req.image_path).name
@@ -3761,7 +3763,7 @@ async def save_censored_image(req: CensorSaveRequest):
         else:
             return {"success": False, "error": "image_path 또는 image_base64 필요"}
         
-        # 저장 경로 결정
+        # 저장 경로 결정 (censoring/censored)
         output_folder = CENSORED_DIR / req.output_folder if req.output_folder else CENSORED_DIR
         output_folder.mkdir(parents=True, exist_ok=True)
         
@@ -3797,9 +3799,9 @@ async def save_censored_image(req: CensorSaveRequest):
 
 @app.get("/api/censor/images")
 async def list_images_for_censor(folder: str = ""):
-    """검열할 이미지 목록 (outputs 폴더)"""
+    """검열할 이미지 목록 (censoring/uncensored 폴더)"""
     images = []
-    target_folder = OUTPUT_DIR / folder if folder else OUTPUT_DIR
+    target_folder = UNCENSORED_DIR / folder if folder else UNCENSORED_DIR
     
     if not target_folder.exists():
         return {"success": True, "images": [], "folder": folder}
@@ -3824,7 +3826,7 @@ async def list_images_for_censor(folder: str = ""):
             
             images.append({
                 "filename": filepath.name,
-                "path": str(filepath.relative_to(OUTPUT_DIR)),
+                "path": str(filepath.relative_to(UNCENSORED_DIR)),
                 "thumbnail": thumb_base64,
                 "width": img.width,
                 "height": img.height
@@ -3876,10 +3878,10 @@ async def list_censored_images(folder: str = ""):
 
 
 @app.get("/api/censor/image")
-async def get_censor_image(path: str, source: str = "outputs"):
+async def get_censor_image(path: str, source: str = "uncensored"):
     """검열용 이미지 조회 (전체 크기)"""
-    if source == "outputs":
-        filepath = OUTPUT_DIR / path
+    if source == "uncensored" or source == "outputs":
+        filepath = UNCENSORED_DIR / path
     elif source == "censored":
         filepath = CENSORED_DIR / path
     else:
@@ -3920,7 +3922,7 @@ async def batch_censor(request: dict):
     method = request.get("method", "black")
     color = request.get("color")
     
-    source_path = OUTPUT_DIR / source_folder if source_folder else OUTPUT_DIR
+    source_path = UNCENSORED_DIR / source_folder if source_folder else UNCENSORED_DIR
     output_path = CENSORED_DIR / output_folder if output_folder else CENSORED_DIR
     output_path.mkdir(parents=True, exist_ok=True)
     

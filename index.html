@@ -8982,21 +8982,11 @@
             }, 300);
         }
         
-        // 폴더 목록 로드
+        // 폴더 목록 로드 (고정 폴더 사용)
         async function loadCensorFolders() {
+            // censoring/uncensored, censoring/censored 고정 폴더 사용
             const sourceSelect = document.getElementById('censorSourceFolder');
-            try {
-                const response = await fetch(`${API_BASE}/api/output-folders`);
-                const result = await response.json();
-                if (result.folders) {
-                    sourceSelect.innerHTML = '<option value="">📂 outputs</option>';
-                    result.folders.forEach(folder => {
-                        sourceSelect.innerHTML += `<option value="${folder.name}">📁 ${folder.name}</option>`;
-                    });
-                }
-            } catch (err) {
-                console.error('Failed to load output folders:', err);
-            }
+            sourceSelect.style.display = 'none';  // 폴더 선택 숨김
         }
         
         // 이미지 목록 로드
@@ -9077,7 +9067,7 @@
             
             // 전체 이미지 로드
             try {
-                const source = censorState.currentTab === 'before' ? 'outputs' : 'censored';
+                const source = censorState.currentTab === 'before' ? 'uncensored' : 'censored';
                 const response = await fetch(`${API_BASE}/api/censor/image?path=${encodeURIComponent(imgInfo.path)}&source=${source}`);
                 const result = await response.json();
                 

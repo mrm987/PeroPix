@@ -1212,6 +1212,16 @@ async def call_nai_api(req: GenerateRequest):
 
         print(f"[NAI] CharRef: fidelity={fidelity}, secondary={round(1.0 - fidelity, 2)}, caption={caption_type}, data_len={len(padded_image)}")
 
+        # 디버그: 처리된 이미지 저장 (NAI 웹과 비교용)
+        try:
+            from PIL import Image as PILImage
+            debug_bytes = base64.b64decode(padded_image)
+            debug_img = PILImage.open(io.BytesIO(debug_bytes))
+            debug_img.save("debug_charref_peropix.png")
+            print(f"[NAI] CharRef debug image saved: debug_charref_peropix.png ({debug_img.size}, {debug_img.mode})")
+        except Exception as e:
+            print(f"[NAI] CharRef debug save failed: {e}")
+
     # Base Image (img2img / inpaint) 처리
     action = "generate"
     model_to_use = req.nai_model

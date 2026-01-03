@@ -1789,6 +1789,7 @@ async def process_job(job):
             # 메타데이터 옵션
             strip_metadata = getattr(req, 'strip_metadata', False)
             jpg_quality = getattr(req, 'jpg_quality', 95)
+            print(f"[DEBUG] strip_metadata={strip_metadata}, save_format={save_format}")
 
             # NAI 호환 메타데이터 구조 생성
             # 기존 NAI Comment가 있으면 파싱, 없으면 새로 생성
@@ -2367,7 +2368,7 @@ async def open_gallery_folder(request: dict = None):
         system = platform.system()
 
         if system == "Windows":
-            subprocess.Popen(["explorer", folder_path])
+            subprocess.Popen(f'explorer /select,"{folder_path}"', shell=True)
         elif system == "Darwin":  # macOS
             subprocess.Popen(["open", folder_path])
         else:  # Linux
@@ -2564,8 +2565,8 @@ async def open_folder(request: dict):
         abs_path = str(folder_path.resolve())
 
         if system == "Windows":
-            # explorer.exe 직접 실행으로 창이 앞으로 오도록
-            subprocess.Popen(["explorer", abs_path])
+            # start 명령으로 탐색기 열고 포커스 이동
+            subprocess.Popen(f'explorer /select,"{abs_path}"', shell=True)
         elif system == "Darwin":
             subprocess.Popen(["open", abs_path])
         else:

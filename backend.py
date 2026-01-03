@@ -1851,7 +1851,6 @@ async def process_job(job):
             # 메타데이터 옵션
             strip_metadata = getattr(req, 'strip_metadata', False)
             jpg_quality = getattr(req, 'jpg_quality', 95)
-            print(f"[DEBUG] strip_metadata={strip_metadata}, save_format={save_format}")
 
             # NAI 호환 메타데이터 구조 생성
             # 기존 NAI Comment가 있으면 파싱, 없으면 새로 생성
@@ -2602,7 +2601,6 @@ async def open_folder(request: dict):
 
     folder_type = request.get("folder", "")
     subfolder = request.get("subfolder", "")  # outputs 서브폴더 지원
-    print(f"[DEBUG OpenFolder] folder_type={folder_type}, subfolder={subfolder}")
 
     folder_map = {
         "outputs": OUTPUT_DIR,

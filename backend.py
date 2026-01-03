@@ -2542,8 +2542,8 @@ async def open_folder(request: dict):
     if not folder_path:
         return {"error": "Unknown folder type"}
 
-    # 서브폴더가 지정된 경우 (outputs 전용)
-    if folder_type == "outputs" and subfolder:
+    # 서브폴더가 지정된 경우
+    if subfolder and folder_type in ["outputs", "uncensored", "censored"]:
         folder_path = folder_path / subfolder
 
     folder_path.mkdir(parents=True, exist_ok=True)
@@ -2553,7 +2553,8 @@ async def open_folder(request: dict):
         abs_path = str(folder_path.resolve())
 
         if system == "Windows":
-            os.startfile(abs_path)
+            # explorer.exe 직접 실행으로 창이 앞으로 오도록
+            subprocess.Popen(["explorer", abs_path])
         elif system == "Darwin":
             subprocess.Popen(["open", abs_path])
         else:
@@ -3605,6 +3606,53 @@ def apply_censor_boxes(image_path: str, boxes: list, method: str = "black",
 
 
 # === Censor API Endpoints ===
+
+@app.get("/api/censor/folders")
+async def list_censor_folders(type: str = "uncensored"):
+    """검열 폴더 하위 폴더 목록"""
+    base_dir = UNCENSORED_DIR if type == "uncensored" else CENSORED_DIR
+    folders = []
+    
+    if base_dir.exists():
+        for item in sorted(base_dir.iterdir()):
+            if item.is_dir():
+                # 폴더 내 이미지 수 카운트
+                image_count = 0
+                for ext in ['*.png', '*.jpg', '*.jpeg', '*.webp']:
+                    image_count += len(list(item.glob(ext)))
+                folders.append({
+                    "name": item.name,
+                    "image_count": image_count
+                })
+    
+    return {"success": True, "folders": folders, "type": type}
+
+
+@app.post("/api/censor/folders")
+async def create_censor_folder(request: dict):
+    """검열 폴더 생성"""
+    folder_type = request.get("type", "uncensored")
+    folder_name = request.get("name", "").strip()
+    
+    if not folder_name:
+        return {"success": False, "error": "폴더 이름이 필요합니다"}
+    
+    # 안전한 폴더명인지 확인
+    if "/" in folder_name or "\\" in folder_name or ".." in folder_name:
+        return {"success": False, "error": "유효하지 않은 폴더 이름입니다"}
+    
+    base_dir = UNCENSORED_DIR if folder_type == "uncensored" else CENSORED_DIR
+    folder_path = base_dir / folder_name
+    
+    if folder_path.exists():
+        return {"success": False, "error": "폴더가 이미 존재합니다"}
+    
+    try:
+        folder_path.mkdir(parents=True)
+        return {"success": True, "name": folder_name}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 
 @app.get("/api/censor/models")
 async def list_censor_models():

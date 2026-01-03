@@ -3374,14 +3374,20 @@
                         <button type="button" class="censor-tab" id="censorTabAfter">검열 후</button>
                     </div>
                     <div class="censor-folder-row">
-                        <!-- 검열 전 폴더 (uncensored) -->
+                        <!-- 검열 전 폴더 드롭다운 -->
                         <div class="censor-folder-group" id="censorFolderBefore">
-                            <span class="censor-folder-label">📂 censoring/uncensored</span>
+                            <select id="censorUncensoredFolder" class="censor-folder-select">
+                                <option value="">📂 uncensored</option>
+                            </select>
+                            <button type="button" class="censor-folder-btn" id="censorAddUncensoredBtn" title="폴더 추가">+📁</button>
                             <button type="button" class="censor-folder-btn" id="censorOpenUncensoredBtn" title="폴더 열기">📂</button>
                         </div>
-                        <!-- 검열 후 폴더 (censored) -->
+                        <!-- 검열 후 폴더 드롭다운 -->
                         <div class="censor-folder-group" id="censorFolderAfter" style="display: none;">
-                            <span class="censor-folder-label">📂 censoring/censored</span>
+                            <select id="censorCensoredFolder" class="censor-folder-select">
+                                <option value="">📂 censored</option>
+                            </select>
+                            <button type="button" class="censor-folder-btn" id="censorAddCensoredBtn" title="폴더 추가">+📁</button>
                             <button type="button" class="censor-folder-btn" id="censorOpenCensoredBtn" title="폴더 열기">📂</button>
                         </div>
                         <!-- 모델 선택 -->
@@ -9028,16 +9034,39 @@
             }, 300);
         }
         
-        // 폴더 목록 로드 (고정 폴더 사용)
+        // 폴더 목록 로드
         async function loadCensorFolders() {
-            // censoring/uncensored, censoring/censored 고정 폴더 사용
-            const sourceSelect = document.getElementById('censorSourceFolder');
-            sourceSelect.style.display = 'none';  // 폴더 선택 숨김
+            // uncensored 폴더 목록
+            await loadCensorSubfolders('uncensored', 'censorUncensoredFolder');
+            // censored 폴더 목록
+            await loadCensorSubfolders('censored', 'censorCensoredFolder');
+        }
+        
+        async function loadCensorSubfolders(type, selectId) {
+            const select = document.getElementById(selectId);
+            try {
+                const response = await fetch(`${API_BASE}/api/censor/folders?type=${type}`);
+                const result = await response.json();
+                
+                const rootLabel = type === 'uncensored' ? '📂 uncensored' : '📂 censored';
+                select.innerHTML = `<option value="">${rootLabel}</option>`;
+                
+                if (result.success && result.folders) {
+                    result.folders.forEach(folder => {
+                        select.innerHTML += `<option value="${folder.name}">📁 ${folder.name} (${folder.image_count})</option>`;
+                    });
+                }
+            } catch (err) {
+                console.error(`Failed to load ${type} folders:`, err);
+            }
         }
         
         // 이미지 목록 로드
         async function loadCensorImages() {
-            const folder = document.getElementById('censorSourceFolder').value;
+            // 현재 탭에 맞는 폴더 선택
+            const folder = censorState.currentTab === 'before'
+                ? document.getElementById('censorUncensoredFolder').value
+                : document.getElementById('censorCensoredFolder').value;
             const thumbnailsContainer = document.getElementById('censorThumbnails');
             
             // 로딩 표시
@@ -9334,13 +9363,67 @@
                 loadCensorImages();
             };
             
+            // 폴더 선택 변경
+            document.getElementById('censorUncensoredFolder').onchange = () => {
+                if (censorState.currentTab === 'before') loadCensorImages();
+            };
+            document.getElementById('censorCensoredFolder').onchange = () => {
+                if (censorState.currentTab === 'after') loadCensorImages();
+            };
+            
+            // 폴더 추가 버튼
+            document.getElementById('censorAddUncensoredBtn').onclick = () => {
+                showInputModal('📁 새 폴더', '폴더 이름을 입력하세요', async (folderName) => {
+                    if (!folderName) return;
+                    try {
+                        const response = await fetch(`${API_BASE}/api/censor/folders`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ type: 'uncensored', name: folderName })
+                        });
+                        const result = await response.json();
+                        if (result.success) {
+                            showToast(`폴더 생성: ${folderName}`, 'success');
+                            await loadCensorSubfolders('uncensored', 'censorUncensoredFolder');
+                        } else {
+                            showToast(result.error || '폴더 생성 실패', 'error');
+                        }
+                    } catch (err) {
+                        showToast('폴더 생성 오류', 'error');
+                    }
+                });
+            };
+            
+            document.getElementById('censorAddCensoredBtn').onclick = () => {
+                showInputModal('📁 새 폴더', '폴더 이름을 입력하세요', async (folderName) => {
+                    if (!folderName) return;
+                    try {
+                        const response = await fetch(`${API_BASE}/api/censor/folders`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ type: 'censored', name: folderName })
+                        });
+                        const result = await response.json();
+                        if (result.success) {
+                            showToast(`폴더 생성: ${folderName}`, 'success');
+                            await loadCensorSubfolders('censored', 'censorCensoredFolder');
+                        } else {
+                            showToast(result.error || '폴더 생성 실패', 'error');
+                        }
+                    } catch (err) {
+                        showToast('폴더 생성 오류', 'error');
+                    }
+                });
+            };
+            
             // 폴더 열기 버튼
             document.getElementById('censorOpenUncensoredBtn').onclick = async () => {
+                const subfolder = document.getElementById('censorUncensoredFolder').value;
                 try {
                     await fetch(`${API_BASE}/api/open-folder`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ folder: 'uncensored' })
+                        body: JSON.stringify({ folder: 'uncensored', subfolder: subfolder })
                     });
                 } catch (err) {
                     showToast('폴더 열기 실패', 'error');
@@ -9348,11 +9431,12 @@
             };
             
             document.getElementById('censorOpenCensoredBtn').onclick = async () => {
+                const subfolder = document.getElementById('censorCensoredFolder').value;
                 try {
                     await fetch(`${API_BASE}/api/open-folder`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ folder: 'censored' })
+                        body: JSON.stringify({ folder: 'censored', subfolder: subfolder })
                     });
                 } catch (err) {
                     showToast('폴더 열기 실패', 'error');

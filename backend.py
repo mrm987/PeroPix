@@ -262,29 +262,15 @@ def binarize_mask(base64_mask: str, threshold: int = 1) -> str:
         gray = mask_img.convert('L')
         unique_values = set(gray.getdata())
 
-    print(f"[DEBUG] Mask unique values: {unique_values}")
-    print(f"[DEBUG] Mask mode: {mask_img.mode}, size: {mask_img.size}")
-
-    # 원본 마스크 저장 (분석용)
-    with open("debug_original_mask.png", "wb") as f:
-        f.write(mask_data)
-    print(f"[DEBUG] Original mask saved ({len(mask_data)} bytes)")
-
     # 이미 순수 흑백(0, 255만 있음)이면 원본 그대로 반환
     if unique_values <= {0, 255}:
-        print(f"[DEBUG] Mask is already binary, using original PNG")
         return base64_mask
 
     # 회색 픽셀이 있으면 이진화 필요
-    print(f"[DEBUG] Mask has gray pixels, binarizing...")
     mask_gray = mask_img.convert('L')
     mask_binary = mask_gray.point(lambda x: 255 if x >= threshold else 0, mode='L')
     alpha = PILImage.new('L', mask_binary.size, 255)
     mask_rgba = PILImage.merge('RGBA', (mask_binary, mask_binary, mask_binary, alpha))
-
-    # 디버그 저장
-    mask_rgba.save("debug_binarized_mask.png")
-    print(f"[DEBUG] Binarized mask saved")
 
     # PNG로 저장
     buffer = io.BytesIO()
@@ -940,13 +926,6 @@ async def encode_vibe_v4(image_base64: str, model: str, info_extracted: float,
                         strength: float, token: str, image_name: str = "vibe") -> str:
     """V4+ 모델용 vibe 사전 인코딩 - /ai/encode-vibe 엔드포인트 사용 (캐시 지원)"""
     import httpx
-    import hashlib
-
-    # 디버그: 입력 이미지 정보
-    img_hash = hashlib.sha256(image_base64.encode()).hexdigest()[:16]
-    print(f"[NAI-VIBE-DEBUG] Input image hash: {img_hash}, length: {len(image_base64)}")
-    print(f"[NAI-VIBE-DEBUG] info_extracted: {info_extracted} (type: {type(info_extracted).__name__})")
-    print(f"[NAI-VIBE-DEBUG] model: {model}")
 
     # 캐시 확인
     cache_key = get_vibe_cache_key(image_base64, model, info_extracted)
@@ -1230,17 +1209,6 @@ async def call_nai_api(req: GenerateRequest):
 
             # 마스크를 이진화 (NAI는 순수 흑백만 지원, 회색 가장자리 제거)
             mask_png = binarize_mask(req.base_mask)
-
-            # DEBUG: NAI 웹 마스크 파일로 테스트 (True로 변경하여 테스트)
-            USE_NAI_TEST_MASK = False
-            if USE_NAI_TEST_MASK:
-                import os
-                nai_mask_path = os.path.join(os.path.dirname(__file__), "test_data", "nai_mask.png")
-                if os.path.exists(nai_mask_path):
-                    with open(nai_mask_path, "rb") as f:
-                        mask_png = base64.b64encode(f.read()).decode('utf-8')
-                    print(f"[NAI] DEBUG: Using NAI web mask file for testing")
-
             params["mask"] = mask_png
 
             # 마스크 크기 확인
@@ -1295,48 +1263,10 @@ async def call_nai_api(req: GenerateRequest):
         "parameters": params
     }
     
-    # 디버깅: payload를 파일로 저장 (이미지 데이터 제외)
-    debug_params = {k: v for k, v in params.items()}
-    if "reference_image_multiple" in debug_params:
-        debug_params["reference_image_multiple"] = [f"<base64 len={len(img)}>" for img in debug_params["reference_image_multiple"]]
-    if "director_reference_images" in debug_params:
-        debug_params["director_reference_images"] = [f"<base64 len={len(img)}>" for img in debug_params["director_reference_images"]]
-    if "image" in debug_params:
-        debug_params["image"] = f"<base64 len={len(debug_params['image'])}>"
-    if "mask" in debug_params:
-        debug_params["mask"] = f"<base64 len={len(debug_params['mask'])}>"
-    debug_payload = {"input": prompt_for_nai[:100], "model": model_to_use, "action": action, "parameters": debug_params}
-    with open("nai_debug_payload.json", "w", encoding="utf-8") as f:
-        json.dump(debug_payload, f, indent=2, ensure_ascii=False)
-    print(f"[NAI] Debug payload saved to nai_debug_payload.json")
-    
-    # 디버깅 로그
+    # 로그
     vibe_count = len(params.get("reference_image_multiple", []))
     has_char_ref = "director_reference_images" in params
-    print(f"[NAI] Generating: {req.width}x{req.height}, steps={req.steps}, model={model_to_use}")
-    print(f"[NAI] Vibe Transfer: {vibe_count} images, Character Reference: {has_char_ref}")
-
-    # 상세 디버그 로깅 (NAI 원본과 비교용)
-    print(f"[NAI-DEBUG] === Request Params ===")
-    print(f"[NAI-DEBUG] prompt: {params.get('prompt', '')[:100]}...")
-    print(f"[NAI-DEBUG] negative_prompt: {params.get('negative_prompt', '')[:100]}...")
-    print(f"[NAI-DEBUG] seed: {params.get('seed')}, scale: {params.get('scale')}")
-    print(f"[NAI-DEBUG] sampler: {params.get('sampler')}, scheduler: {params.get('noise_schedule')}")
-    print(f"[NAI-DEBUG] ucPreset: {params.get('ucPreset')}, qualityToggle: {params.get('qualityToggle')}")
-    print(f"[NAI-DEBUG] cfg_rescale: {params.get('cfg_rescale')}, skip_cfg_above_sigma: {params.get('skip_cfg_above_sigma', 'not set')}")
-    print(f"[NAI-DEBUG] sm: {params.get('sm')}, sm_dyn: {params.get('sm_dyn')}")
-    if req.character_prompts:
-        print(f"[NAI-DEBUG] character_prompts: {req.character_prompts}")
-    print(f"[NAI-DEBUG] ======================")
-    
-    # Vibe 상세 로그
-    if vibe_count > 0:
-        for i, img in enumerate(params["reference_image_multiple"]):
-            print(f"[NAI] Vibe {i+1}: base64 length={len(img)}, info={params['reference_information_extracted_multiple'][i]}, strength={params['reference_strength_multiple'][i]}")
-    
-    if has_char_ref:
-        char_ref_img = params['director_reference_images'][0]
-        print(f"[NAI] CharRef: data_len={len(char_ref_img)}")
+    print(f"[NAI] Generating: {req.width}x{req.height}, steps={req.steps}, model={model_to_use}, vibes={vibe_count}, charref={has_char_ref}")
     
     headers = {
         "Authorization": f"Bearer {token}",
@@ -2607,8 +2537,7 @@ async def open_folder(request: dict):
 
     try:
         system = platform.system()
-        abs_path = str(folder_path.resolve())  # 절대 경로로 변환
-        print(f"[OpenFolder] Opening: {abs_path}")  # 디버그 로그
+        abs_path = str(folder_path.resolve())
 
         if system == "Windows":
             os.startfile(abs_path)

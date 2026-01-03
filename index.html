@@ -6478,8 +6478,8 @@
                 if (data.error) {
                     showToast(`폴더 열기 실패: ${data.error}`, 'error');
                 } else {
-                    // 브라우저 포커스 해제하여 탐색기가 앞으로 오도록
-                    window.blur();
+                    // 탐색기가 열린 후 브라우저 포커스 해제
+                    setTimeout(() => window.blur(), 300);
                 }
             } catch (e) {
                 showToast('폴더 열기 실패', 'error');
@@ -7418,7 +7418,7 @@
                 if (!result.success) {
                     showToast('폴더 열기 실패', 'error');
                 } else {
-                    window.blur();
+                    setTimeout(() => window.blur(), 300);
                 }
             } catch (err) {
                 showToast('폴더 열기 오류', 'error');
@@ -9536,7 +9536,7 @@
                     });
                     const result = await response.json();
                     if (!result.error) {
-                        window.blur();
+                        setTimeout(() => window.blur(), 300);
                     }
                 } catch (err) {
                     showToast('폴더 열기 실패', 'error');

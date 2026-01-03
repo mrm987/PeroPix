@@ -8390,9 +8390,9 @@
                 fullMaskCanvas.height = maskEditor.originalImage.height;
                 const fullCtx = fullMaskCanvas.getContext('2d');
 
-                // 부드러운 스케일 업 (NAI 실제 마스크와 동일 - 안티앨리어싱)
-                fullCtx.imageSmoothingEnabled = true;
-                fullCtx.imageSmoothingQuality = 'high';
+                // 픽셀 정확한 스케일 업 (안티앨리어싱 비활성화)
+                // NAI는 순수 흑백 마스크만 지원 - 회색 픽셀이 생기면 경계선 아티팩트 발생
+                fullCtx.imageSmoothingEnabled = false;
                 fullCtx.drawImage(maskEditor.maskCanvas, 0, 0, fullMaskCanvas.width, fullMaskCanvas.height);
 
                 // Base Image 데이터 설정

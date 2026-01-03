@@ -1217,17 +1217,12 @@ async def call_nai_api(req: GenerateRequest):
             mask_png = binarize_mask(req.base_mask)
             params["mask"] = mask_png
 
-            # NAIS2 참고: 인페인트 파라미터 설정
-            # - add_original_image: True (NAIS2와 동일)
-            # - img2img: strength + color_correct 중첩 객체
-            # - inpaintImg2ImgStrength: 사용자 strength 값
-            # - noise 파라미터 삭제 (인페인트에서 미사용)
-            params["add_original_image"] = True
-            params["img2img"] = {
-                "strength": req.base_strength,
-                "color_correct": True
-            }
-            params["inpaintImg2ImgStrength"] = req.base_strength
+            # NAI 웹과 정확히 동일한 인페인트 파라미터
+            params["add_original_image"] = False
+            params["image_format"] = "png"
+            params["inpaintImg2ImgStrength"] = 1
+            params["legacy"] = False
+            params["legacy_v3_extend"] = False
 
             # noise 파라미터 삭제 (인페인트와 호환 안됨)
             if "noise" in params:

@@ -129,11 +129,12 @@ def pad_image_to_canvas_base64(base64_image: str, target_size: tuple) -> str:
     W, H = pil_img.size
     tw, th = target_size
 
-    # 비율 유지하면서 리사이즈
+    # 비율 유지하면서 리사이즈 (NAI 웹 브라우저와 동일하게 round 사용)
     scale = min(tw / W, th / H)
-    new_w = max(1, int(W * scale))
-    new_h = max(1, int(H * scale))
-    pil_resized = pil_img.resize((new_w, new_h), PILImage.LANCZOS)
+    new_w = max(1, round(W * scale))
+    new_h = max(1, round(H * scale))
+    # 브라우저는 보통 BILINEAR 사용 (canvas drawImage)
+    pil_resized = pil_img.resize((new_w, new_h), PILImage.BILINEAR)
 
     # 검은 캔버스에 중앙 배치 (NAI 웹: RGBA, 알파=255)
     canvas = PILImage.new('RGBA', (tw, th), (0, 0, 0, 255))

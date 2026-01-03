@@ -288,46 +288,59 @@ def binarize_mask(base64_mask: str, threshold: int = 1) -> str:
 # ============================================================
 
 def open_folder_in_explorer(path: str) -> bool:
-    """Windows에서 폴더를 열고 창을 앞으로 가져옴 (Electron/VS Code 방식)
+    """Windows에서 폴더를 열고 창을 앞으로 가져옴
     
-    SHOpenFolderAndSelectItems API를 사용하여:
-    - 폴더가 이미 열려있으면 해당 창에 포커스
-    - 열려있지 않으면 새로 열고 포커스
+    폴더 내부의 첫 번째 파일을 선택하여 SHOpenFolderAndSelectItems 호출
+    파일이 없으면 explorer /n,/e 사용
     """
+    import subprocess
+    
     try:
-        CoInitialize = ctypes.windll.ole32.CoInitialize
-        CoInitialize.argtypes = [ctypes.c_void_p]
-        CoInitialize.restype = ctypes.HRESULT
+        # 폴더 내 첫 번째 항목 찾기
+        folder_path = Path(path)
+        items = list(folder_path.iterdir())
         
-        CoUninitialize = ctypes.windll.ole32.CoUninitialize
-        CoUninitialize.restype = None
-        
-        ILCreateFromPath = ctypes.windll.shell32.ILCreateFromPathW
-        ILCreateFromPath.argtypes = [ctypes.c_wchar_p]
-        ILCreateFromPath.restype = ctypes.c_void_p
-        
-        ILFree = ctypes.windll.shell32.ILFree
-        ILFree.argtypes = [ctypes.c_void_p]
-        ILFree.restype = None
-        
-        SHOpenFolderAndSelectItems = ctypes.windll.shell32.SHOpenFolderAndSelectItems
-        SHOpenFolderAndSelectItems.argtypes = [
-            ctypes.c_void_p,
-            ctypes.c_uint,
-            ctypes.c_void_p,
-            ctypes.c_ulong,
-        ]
-        SHOpenFolderAndSelectItems.restype = ctypes.HRESULT
-        
-        CoInitialize(None)
-        pidl = ILCreateFromPath(path)
-        if pidl:
-            SHOpenFolderAndSelectItems(pidl, 0, None, 0)
-            ILFree(pidl)
-        CoUninitialize()
-        return True
+        if items:
+            # 폴더에 항목이 있으면 첫 번째 항목을 선택하며 열기
+            first_item = str(items[0])
+            
+            CoInitialize = ctypes.windll.ole32.CoInitialize
+            CoInitialize.argtypes = [ctypes.c_void_p]
+            CoInitialize.restype = ctypes.HRESULT
+            
+            CoUninitialize = ctypes.windll.ole32.CoUninitialize
+            CoUninitialize.restype = None
+            
+            ILCreateFromPath = ctypes.windll.shell32.ILCreateFromPathW
+            ILCreateFromPath.argtypes = [ctypes.c_wchar_p]
+            ILCreateFromPath.restype = ctypes.c_void_p
+            
+            ILFree = ctypes.windll.shell32.ILFree
+            ILFree.argtypes = [ctypes.c_void_p]
+            ILFree.restype = None
+            
+            SHOpenFolderAndSelectItems = ctypes.windll.shell32.SHOpenFolderAndSelectItems
+            SHOpenFolderAndSelectItems.argtypes = [
+                ctypes.c_void_p,
+                ctypes.c_uint,
+                ctypes.c_void_p,
+                ctypes.c_ulong,
+            ]
+            SHOpenFolderAndSelectItems.restype = ctypes.HRESULT
+            
+            CoInitialize(None)
+            pidl = ILCreateFromPath(first_item)
+            if pidl:
+                SHOpenFolderAndSelectItems(pidl, 0, None, 0)
+                ILFree(pidl)
+            CoUninitialize()
+            return True
+        else:
+            # 빈 폴더면 explorer로 직접 열기
+            subprocess.Popen(["explorer", path])
+            return True
     except Exception as e:
-        print(f"[OpenFolder] SHOpenFolderAndSelectItems failed: {e}")
+        print(f"[OpenFolder] Error: {e}")
         return False
 
 
@@ -2589,6 +2602,7 @@ async def open_folder(request: dict):
 
     folder_type = request.get("folder", "")
     subfolder = request.get("subfolder", "")  # outputs 서브폴더 지원
+    print(f"[DEBUG OpenFolder] folder_type={folder_type}, subfolder={subfolder}")
 
     folder_map = {
         "outputs": OUTPUT_DIR,

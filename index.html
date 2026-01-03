@@ -3997,17 +3997,19 @@
                         <button type="button" class="apply-seed-btn" title="이 시드 적용">🎲</button>
                         <button type="button" class="load-settings-btn" title="전체 설정 불러오기">📋</button>
                     </div>
-                    <div class="seed">Seed: ${data.seed}</div>
+                    <div class="seed">${data.metadata ? 'Seed: ' + data.seed : '메타데이터 없음'}</div>
                 </div>
             `;
 
             // 이미지 데이터 저장 (갤러리 저장용 + 설정 불러오기용)
+            // metadata가 null이면 seed/prompt도 null로 처리 (strip_metadata 옵션)
+            const hasMetadata = !!data.metadata;
             card._imageData = {
                 image_path: data.image_path || null,
                 image: data.image || null,  // 하위 호환
                 filename: data.filename,
-                seed: data.seed,
-                prompt: data.prompt || '',
+                seed: hasMetadata ? data.seed : null,
+                prompt: hasMetadata ? (data.prompt || '') : null,
                 metadata: data.metadata || null  // 전체 설정 메타데이터
             };
 

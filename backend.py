@@ -240,6 +240,39 @@ def ensure_png_base64(base64_image: str, force_reencode: bool = False) -> str:
     return base64.b64encode(buffer.getvalue()).decode('utf-8')
 
 
+def binarize_mask(base64_mask: str, threshold: int = 128) -> str:
+    """마스크를 이진화 (NAI는 순수 흑백 마스크만 지원)
+
+    안티앨리어싱된 회색 픽셀을 순수 흑백으로 변환.
+    threshold 이상은 흰색(255), 미만은 검정(0).
+    """
+    from PIL import Image as PILImage
+
+    # 마스크 로드
+    mask_data = base64.b64decode(base64_mask)
+    mask_img = PILImage.open(io.BytesIO(mask_data))
+
+    # RGBA → L (그레이스케일) 변환 후 이진화
+    if mask_img.mode == 'RGBA':
+        # RGB 평균으로 그레이스케일 변환
+        mask_gray = mask_img.convert('L')
+    elif mask_img.mode == 'RGB':
+        mask_gray = mask_img.convert('L')
+    else:
+        mask_gray = mask_img
+
+    # 이진화: threshold 이상 → 255, 미만 → 0
+    mask_binary = mask_gray.point(lambda x: 255 if x >= threshold else 0, mode='L')
+
+    # RGB로 변환 (흑백 이미지)
+    mask_rgb = PILImage.merge('RGB', (mask_binary, mask_binary, mask_binary))
+
+    # PNG로 저장
+    buffer = io.BytesIO()
+    mask_rgb.save(buffer, format='PNG')
+    return base64.b64encode(buffer.getvalue()).decode('utf-8')
+
+
 # ============================================================
 # EXIF 메타데이터 헬퍼 함수
 # ============================================================
@@ -1168,7 +1201,8 @@ async def call_nai_api(req: GenerateRequest):
 
         if req.base_mode == "inpaint" and req.base_mask:
             action = "infill"
-            mask_png = ensure_png_base64(req.base_mask)
+            # 마스크를 이진화 (NAI는 순수 흑백만 지원, 회색 가장자리 제거)
+            mask_png = binarize_mask(req.base_mask)
             params["mask"] = mask_png
             # NAI 웹과 동일한 인페인트 파라미터
             params["add_original_image"] = False
@@ -1176,15 +1210,6 @@ async def call_nai_api(req: GenerateRequest):
             params["inpaintImg2ImgStrength"] = 1
             params["legacy"] = False
             params["legacy_v3_extend"] = False
-
-            # 디버그: 마스크와 이미지를 파일로 저장 (비교용)
-            debug_mask_data = base64.b64decode(mask_png)
-            debug_image_data = base64.b64decode(base_png)
-            with open("debug_peropix_mask.png", "wb") as f:
-                f.write(debug_mask_data)
-            with open("debug_peropix_image.png", "wb") as f:
-                f.write(debug_image_data)
-            print(f"[DEBUG] Saved debug_peropix_mask.png ({len(debug_mask_data)} bytes) and debug_peropix_image.png ({len(debug_image_data)} bytes)")
 
             # 인페인트는 전용 모델 사용 (모델명 + "-inpainting")
             # 예: nai-diffusion-4-5-full → nai-diffusion-4-5-full-inpainting

@@ -4117,48 +4117,27 @@ async def batch_censor(request: dict):
 # ============================================================
 
 def select_folder_dialog(title: str = "폴더 선택") -> Optional[str]:
-    """시스템 폴더 선택 다이얼로그 (Windows/macOS/Linux)"""
-    import platform
-    system = platform.system()
-    
-    if system == "Windows":
-        # PowerShell로 폴더 선택 다이얼로그
-        import subprocess
-        ps_script = '''
-Add-Type -AssemblyName System.Windows.Forms
-$dialog = New-Object System.Windows.Forms.FolderBrowserDialog
-$dialog.Description = "''' + title + '''"
-$dialog.ShowNewFolderButton = $true
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-    Write-Output $dialog.SelectedPath
-}
-'''
-        try:
-            result = subprocess.run(
-                ["powershell", "-Command", ps_script],
-                capture_output=True,
-                text=True,
-                timeout=300  # 5분 타임아웃
-            )
-            folder_path = result.stdout.strip()
-            return folder_path if folder_path else None
-        except Exception as e:
-            print(f"[FolderDialog] PowerShell error: {e}")
-            return None
-    else:
-        # macOS/Linux: tkinter 사용
-        try:
-            import tkinter as tk
-            from tkinter import filedialog
-            root = tk.Tk()
-            root.withdraw()
-            root.attributes('-topmost', True)
-            folder_path = filedialog.askdirectory(title=title)
-            root.destroy()
-            return folder_path if folder_path else None
-        except Exception as e:
-            print(f"[FolderDialog] tkinter error: {e}")
-            return None
+    """시스템 폴더 선택 다이얼로그 (Windows/macOS/Linux) - tkinter 사용"""
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        
+        root = tk.Tk()
+        root.withdraw()
+        # Windows에서 다이얼로그가 뒤로 가는 문제 방지
+        root.attributes('-topmost', True)
+        root.update()
+        
+        folder_path = filedialog.askdirectory(
+            title=title,
+            parent=root
+        )
+        
+        root.destroy()
+        return folder_path if folder_path else None
+    except Exception as e:
+        print(f"[FolderDialog] tkinter error: {e}")
+        return None
 
 
 class SaveImageSetRequest(BaseModel):

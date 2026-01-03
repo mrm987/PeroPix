@@ -1894,7 +1894,7 @@ async def process_job(job):
                 "image_path": image_path,
                 "filename": filename,
                 "prompt": full_prompt,
-                "metadata": unified_metadata
+                "metadata": None if strip_metadata else unified_metadata
             }
 
             # 재연결 동기화용 기록

@@ -1217,22 +1217,34 @@ async def call_nai_api(req: GenerateRequest):
             mask_png = binarize_mask(req.base_mask)
             params["mask"] = mask_png
 
-            # NAI 웹과 정확히 동일한 인페인트 파라미터
-            params["add_original_image"] = False
-            params["image_format"] = "png"
-            params["inpaintImg2ImgStrength"] = 1
-            params["legacy"] = False
-            params["legacy_v3_extend"] = False
+            # NAIS2 방식: 인페인트 파라미터 (정확한 구조)
+            # 최상위 strength는 고정 0.7, img2img 안에 실제 사용자 값
+            params["strength"] = 0.7  # 고정값 (NAIS2와 동일)
+            params["img2img"] = {
+                "strength": req.base_strength,
+                "color_correct": True
+            }
+            params["inpaintImg2ImgStrength"] = req.base_strength
+            params["add_original_image"] = True
 
-            # noise 파라미터 삭제 (인페인트와 호환 안됨)
-            if "noise" in params:
-                del params["noise"]
+            # 인페인트와 호환 안되는 파라미터 삭제 (NAIS2와 동일)
+            params_to_delete = [
+                "noise",
+                "director_reference_images",
+                "director_reference_information_extracted",
+                "director_reference_strength_values",
+                "director_reference_secondary_strength_values",
+                "director_reference_descriptions"
+            ]
+            for param in params_to_delete:
+                if param in params:
+                    del params[param]
 
             # 인페인트는 전용 모델 사용 (모델명 + "-inpainting")
             # 예: nai-diffusion-4-5-full → nai-diffusion-4-5-full-inpainting
             if not model_to_use.endswith("-inpainting"):
                 model_to_use = f"{model_to_use}-inpainting"
-            print(f"[NAI] Mode: Inpaint, model={model_to_use}, strength={req.base_strength}")
+            print(f"[NAI] Mode: Inpaint, model={model_to_use}, user_strength={req.base_strength}")
         else:
             action = "img2img"
             # img2img만 noise 파라미터 사용

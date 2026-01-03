@@ -13,6 +13,7 @@ import asyncio
 import datetime
 import math
 import random
+import ctypes
 from pathlib import Path
 from typing import Optional, List
 from contextlib import asynccontextmanager
@@ -280,6 +281,54 @@ def binarize_mask(base64_mask: str, threshold: int = 1) -> str:
     buffer = io.BytesIO()
     mask_rgba.save(buffer, format='PNG')
     return base64.b64encode(buffer.getvalue()).decode('utf-8')
+
+
+# ============================================================
+# Windows Explorer 폴더 열기 (포커스 포함)
+# ============================================================
+
+def open_folder_in_explorer(path: str) -> bool:
+    """Windows에서 폴더를 열고 창을 앞으로 가져옴 (Electron/VS Code 방식)
+    
+    SHOpenFolderAndSelectItems API를 사용하여:
+    - 폴더가 이미 열려있으면 해당 창에 포커스
+    - 열려있지 않으면 새로 열고 포커스
+    """
+    try:
+        CoInitialize = ctypes.windll.ole32.CoInitialize
+        CoInitialize.argtypes = [ctypes.c_void_p]
+        CoInitialize.restype = ctypes.HRESULT
+        
+        CoUninitialize = ctypes.windll.ole32.CoUninitialize
+        CoUninitialize.restype = None
+        
+        ILCreateFromPath = ctypes.windll.shell32.ILCreateFromPathW
+        ILCreateFromPath.argtypes = [ctypes.c_wchar_p]
+        ILCreateFromPath.restype = ctypes.c_void_p
+        
+        ILFree = ctypes.windll.shell32.ILFree
+        ILFree.argtypes = [ctypes.c_void_p]
+        ILFree.restype = None
+        
+        SHOpenFolderAndSelectItems = ctypes.windll.shell32.SHOpenFolderAndSelectItems
+        SHOpenFolderAndSelectItems.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_uint,
+            ctypes.c_void_p,
+            ctypes.c_ulong,
+        ]
+        SHOpenFolderAndSelectItems.restype = ctypes.HRESULT
+        
+        CoInitialize(None)
+        pidl = ILCreateFromPath(path)
+        if pidl:
+            SHOpenFolderAndSelectItems(pidl, 0, None, 0)
+            ILFree(pidl)
+        CoUninitialize()
+        return True
+    except Exception as e:
+        print(f"[OpenFolder] SHOpenFolderAndSelectItems failed: {e}")
+        return False
 
 
 # ============================================================
@@ -2368,7 +2417,8 @@ async def open_gallery_folder(request: dict = None):
         system = platform.system()
 
         if system == "Windows":
-            subprocess.Popen(["explorer", folder_path])
+            if not open_folder_in_explorer(folder_path):
+                os.startfile(folder_path)
         elif system == "Darwin":  # macOS
             subprocess.Popen(["open", folder_path])
         else:  # Linux
@@ -2565,8 +2615,10 @@ async def open_folder(request: dict):
         abs_path = str(folder_path.resolve())
 
         if system == "Windows":
-            # explorer.exe 직접 호출 - 항상 새 창 열림
-            subprocess.Popen(["explorer", abs_path])
+            # SHOpenFolderAndSelectItems API 사용 (Electron/VS Code 방식)
+            if not open_folder_in_explorer(abs_path):
+                # 실패 시 fallback
+                os.startfile(abs_path)
         elif system == "Darwin":
             subprocess.Popen(["open", abs_path])
         else:

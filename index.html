@@ -8272,10 +8272,9 @@
                 const ctx = maskEditor.maskCtx;
                 const size = maskEditor.brushSize;
 
-                ctx.beginPath();
-                ctx.arc(pos.x, pos.y, size / 2, 0, Math.PI * 2);
+                // 스퀘어 브러시 (NAI와 동일)
                 ctx.fillStyle = maskEditor.tool === 'brush' ? 'white' : 'black';
-                ctx.fill();
+                ctx.fillRect(pos.x - size / 2, pos.y - size / 2, size, size);
             }
 
             // 브러시 커서 미리보기
@@ -8287,20 +8286,18 @@
                 // 이전 커서 지우기
                 ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
 
-                // 커서 원 그리기
-                ctx.beginPath();
-                ctx.arc(pos.x, pos.y, size / 2, 0, Math.PI * 2);
+                // 커서 사각형 그리기 (NAI와 동일)
+                const x = pos.x - size / 2;
+                const y = pos.y - size / 2;
                 ctx.strokeStyle = maskEditor.tool === 'brush' ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.8)';
                 ctx.lineWidth = 2;
-                ctx.stroke();
+                ctx.strokeRect(x, y, size, size);
 
                 // 내부 점선 테두리 (대비용)
-                ctx.beginPath();
-                ctx.arc(pos.x, pos.y, size / 2, 0, Math.PI * 2);
                 ctx.strokeStyle = maskEditor.tool === 'brush' ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.5)';
                 ctx.lineWidth = 1;
                 ctx.setLineDash([4, 4]);
-                ctx.stroke();
+                ctx.strokeRect(x + 1, y + 1, size - 2, size - 2);
                 ctx.setLineDash([]);
             }
 

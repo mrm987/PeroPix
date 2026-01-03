@@ -139,22 +139,8 @@ def pad_image_to_canvas_base64(base64_image: str, target_size: tuple) -> str:
 
     # 검은 캔버스에 중앙 배치 (NAI 웹: RGBA, 알파=255)
     canvas = PILImage.new('RGBA', (tw, th), (0, 0, 0, 255))
-    offset_x = (tw - new_w) // 2
-    offset_y = (th - new_h) // 2
-    canvas.paste(pil_resized, (offset_x, offset_y))
-
-    # NAI 웹 가장자리 블렌딩: 콘텐츠 첫 번째/마지막 행을 검은색과 50% 블렌딩
-    # (letterbox 경계에서 anti-aliasing 효과)
-    for x in range(offset_x, offset_x + new_w):
-        # 상단 가장자리 (첫 번째 콘텐츠 행)
-        if offset_y > 0:
-            r, g, b, a = canvas.getpixel((x, offset_y))
-            canvas.putpixel((x, offset_y), (r // 2, g // 2, b // 2, a))
-        # 하단 가장자리 (마지막 콘텐츠 행)
-        bottom_y = offset_y + new_h - 1
-        if bottom_y < th - 1:
-            r, g, b, a = canvas.getpixel((x, bottom_y))
-            canvas.putpixel((x, bottom_y), (r // 2, g // 2, b // 2, a))
+    offset = ((tw - new_w) // 2, (th - new_h) // 2)
+    canvas.paste(pil_resized, offset)
 
     # NAI 웹 방식: PNG
     buffer = io.BytesIO()

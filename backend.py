@@ -1232,19 +1232,22 @@ async def call_nai_api(req: GenerateRequest):
             if img_pil.size != mask_pil.size:
                 print(f"[NAI] WARNING: Image and mask size mismatch!")
 
-            # NAIS2 방식: 인페인트 파라미터
+            # NAI 웹과 정확히 동일한 인페인트 파라미터
             params["strength"] = 0.7
-            params["img2img"] = {
-                "strength": req.base_strength,
-                "color_correct": True
-            }
-            params["inpaintImg2ImgStrength"] = req.base_strength
-            params["add_original_image"] = True
+            params["add_original_image"] = False
+            params["image_format"] = "png"
+            params["inpaintImg2ImgStrength"] = 1
+            params["legacy"] = False
+            params["legacy_v3_extend"] = False
+            params["noise"] = 0  # 삭제가 아니라 0으로 설정
 
-            # 인페인트와 호환 안되는 파라미터 삭제 (noise, character reference만)
-            # 바이브는 NAI 웹에서도 사용하므로 유지
+            # 인페인트는 바이브/캐릭터레퍼런스 미지원 (NAI 웹 확인)
             params_to_delete = [
-                "noise",
+                # Vibe Transfer
+                "reference_image_multiple",
+                "reference_information_extracted_multiple",
+                "reference_strength_multiple",
+                # Character Reference
                 "director_reference_images",
                 "director_reference_information_extracted",
                 "director_reference_strength_values",

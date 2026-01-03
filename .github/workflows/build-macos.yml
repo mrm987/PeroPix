@@ -1,6 +1,8 @@
 name: Build macOS
 
 on:
+  release:
+    types: [created]
   workflow_dispatch:
 
 jobs:
@@ -67,7 +69,17 @@ jobs:
           cd dist
           zip -r ../PeroPix-macOS.zip PeroPix
 
+      - name: Upload Release Asset
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: PeroPix-macOS.zip
+          tag_name: ${{ github.event.release.tag_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Upload Build Artifact
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: PeroPix-macOS

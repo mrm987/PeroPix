@@ -140,14 +140,13 @@ jobs:
       - name: Send to Discord
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-          RELEASE_NAME: ${{ github.event.release.name }}
           RELEASE_BODY: ${{ github.event.release.body }}
           TAG_NAME: ${{ github.event.release.tag_name }}
         run: |
           jq -n \
-            --arg name "$RELEASE_NAME" \
+            --arg tag "$TAG_NAME" \
             --arg body "$RELEASE_BODY" \
             --arg win "https://github.com/${{ github.repository }}/releases/download/${TAG_NAME}/PeroPix-Windows.zip" \
             --arg mac "https://github.com/${{ github.repository }}/releases/download/${TAG_NAME}/PeroPix-macOS.zip" \
-            '{content: "🚀 **\($name)** 릴리즈!\n\n\($body)\n\n📥 [Windows](\($win)) | [macOS](\($mac))"}' \
+            '{content: "🚀 **\($tag)** 릴리즈!\n\n\($body)\n\n📥 [Windows](\($win)) | [macOS](\($mac))"}' \
           | curl -H "Content-Type: application/json" -d @- $DISCORD_WEBHOOK

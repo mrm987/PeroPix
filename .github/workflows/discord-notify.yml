@@ -19,5 +19,5 @@ jobs:
             --arg name "$RELEASE_NAME" \
             --arg body "$RELEASE_BODY" \
             --arg url "$RELEASE_URL" \
-            '{content: "🚀 **\($name)** 릴리즈!\n\n\($body)\n\n\($url)"}' \
+            '{content: "🚀 **\($name)** 릴리즈!\n\n\($body)\n\n<\($url)>"}' \
           | curl -H "Content-Type: application/json" -d @- $DISCORD_WEBHOOK

@@ -11,7 +11,13 @@ jobs:
       - name: Send to Discord
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          RELEASE_NAME: ${{ github.event.release.name }}
+          RELEASE_BODY: ${{ github.event.release.body }}
+          RELEASE_URL: ${{ github.event.release.html_url }}
         run: |
-          curl -H "Content-Type: application/json" \
-            -d "{\"content\": \"🚀 **${{ github.event.release.name }}** 릴리즈!\n${{ github.event.release.html_url }}\"}" \
-            $DISCORD_WEBHOOK
+          jq -n \
+            --arg name "$RELEASE_NAME" \
+            --arg body "$RELEASE_BODY" \
+            --arg url "$RELEASE_URL" \
+            '{content: "🚀 **\($name)** 릴리즈!\n\n\($body)\n\n\($url)"}' \
+          | curl -H "Content-Type: application/json" -d @- $DISCORD_WEBHOOK

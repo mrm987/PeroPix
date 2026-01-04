@@ -15,6 +15,7 @@ config.json
 outputs/
 vibe_cache/
 gallery/
+censoring/
 *.log
 
 # 모델 파일 (용량 큼)

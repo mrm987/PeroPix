@@ -522,7 +522,19 @@ class ModelCache:
     def dtype(self):
         if self._dtype is None:
             lazy_imports()
-            self._dtype = torch.float16 if self.device == "cuda" else torch.float32
+            # bfloat16 on Ampere+ (compute capability >= 8.0) for better VAE stability
+            if self.device == "cuda":
+                try:
+                    cc = torch.cuda.get_device_capability()
+                    if cc[0] >= 8:  # Ampere (RTX 30xx) or newer
+                        self._dtype = torch.bfloat16
+                        print(f"[GPU] Using bfloat16 (compute capability {cc[0]}.{cc[1]})")
+                    else:
+                        self._dtype = torch.float16
+                except:
+                    self._dtype = torch.float16
+            else:
+                self._dtype = torch.float32
         return self._dtype
     
     def load_model(self, model_path: str):
@@ -552,6 +564,13 @@ class ModelCache:
         
         if self.device == "cuda":
             self.pipe.enable_attention_slicing()
+            # VAE tiling for faster decode (new API)
+            try:
+                self.pipe.vae.enable_tiling()
+                print(f"[Load] VAE tiling enabled")
+            except Exception as e:
+                print(f"[Load] VAE tiling not available: {e}")
+            # xformers for memory efficient attention
             try:
                 self.pipe.enable_xformers_memory_efficient_attention()
             except:
@@ -3324,11 +3343,9 @@ def extract_archive(archive_path: Path, dest_dir: Path):
             tf.extractall(dest_dir)
 
 
-async def install_local_environment():
-    """로컬 생성 환경 설치 - PyTorch + diffusers"""
+def _install_local_environment_sync():
+    """로컬 생성 환경 설치 - 동기 버전 (스레드에서 실행)"""
     global install_status
-    
-    install_status = {"installing": True, "progress": 0, "message": "Starting...", "error": None}
     
     try:
         PYTHON_ENV_DIR.mkdir(parents=True, exist_ok=True)
@@ -3415,7 +3432,7 @@ async def install_local_environment():
         
         def run_uv_install(packages, index_url=None, progress_base=40, progress_end=70):
             """uv로 패키지 설치"""
-            cmd = [str(uv_exe), "pip", "install", "--python", str(python_exe)]
+            cmd = [str(uv_exe), "pip", "install", "--reinstall", "--python", str(python_exe)]
             if index_url:
                 cmd.extend(["--index-url", index_url])
             cmd.extend(packages)
@@ -3441,11 +3458,12 @@ async def install_local_environment():
             return proc.returncode
         
         # Step 1: PyTorch with CUDA (40% -> 70%)
+        # Note: Must specify version - latest torch may not have cu121 wheels
         install_status["message"] = "Installing PyTorch with CUDA..."
         install_status["progress"] = 40
         
         ret = run_uv_install(
-            ["torch", "torchvision"],
+            ["torch==2.5.1", "torchvision==0.20.1"],
             index_url="https://download.pytorch.org/whl/cu121",
             progress_base=40,
             progress_end=65
@@ -3471,8 +3489,8 @@ async def install_local_environment():
         install_status["progress"] = 85
         
         ret = run_uv_install(
-            ["fastapi", "uvicorn", "httpx", "aiofiles", "python-multipart"],
-            index_url=None,
+            ["fastapi", "uvicorn[standard]", "httpx", "aiofiles", "python-multipart", "pillow", "piexif", "websockets"],
+            index_url=None,  # 기본 PyPI
             progress_base=85,
             progress_end=95
         )
@@ -3498,11 +3516,23 @@ async def install_local_environment():
         return False
 
 
+async def install_local_environment():
+    """로컬 생성 환경 설치 - 스레드에서 실행하여 이벤트 루프 블로킹 방지"""
+    global install_status
+    install_status = {"installing": True, "progress": 0, "message": "Starting...", "error": None}
+    
+    # 동기 함수를 스레드 풀에서 실행
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _install_local_environment_sync)
+
+
 @app.get("/api/local/status")
 async def get_local_status():
     """로컬 환경 상태 확인"""
+    # 설치 중일 때는 installed를 false로 (torch 폴더가 생겨도 아직 완료 아님)
+    is_installed = False if install_status["installing"] else is_local_env_installed()
     return {
-        "installed": is_local_env_installed(),
+        "installed": is_installed,
         "installing": install_status["installing"],
         "progress": install_status["progress"],
         "message": install_status["message"],
@@ -3514,11 +3544,16 @@ async def get_local_status():
 @app.post("/api/local/install")
 async def start_local_install(background_tasks: BackgroundTasks):
     """로컬 환경 설치 시작"""
+    global install_status
+    
     if install_status["installing"]:
         raise HTTPException(status_code=400, detail="Installation already in progress")
     
     if is_local_env_installed():
         raise HTTPException(status_code=400, detail="Local environment already installed")
+    
+    # 먼저 상태를 installing으로 설정 (race condition 방지)
+    install_status = {"installing": True, "progress": 0, "message": "Starting...", "error": None}
     
     # 백그라운드에서 설치 실행
     asyncio.create_task(install_local_environment())
@@ -3536,6 +3571,58 @@ async def uninstall_local():
         shutil.rmtree(PYTHON_ENV_DIR, ignore_errors=True)
     
     return {"status": "uninstalled"}
+
+
+@app.post("/api/restart")
+async def restart_server():
+    """서버 재시작 (embedded Python으로 전환)"""
+    import subprocess
+    import sys
+    
+    if platform.system() == "Windows":
+        # Windows: 새 CMD 창에서 bat 파일 실행
+        bat_file = APP_DIR / "PeroPix.bat"
+        if bat_file.exists():
+            # start cmd /c: 새 창에서 실행
+            subprocess.Popen(
+                f'start cmd /c "{bat_file}"',
+                shell=True,
+                cwd=str(APP_DIR)
+            )
+        else:
+            # bat 파일이 없으면 직접 Python 실행
+            embedded_python = PYTHON_ENV_DIR / "python" / "python.exe"
+            python_to_use = str(embedded_python) if embedded_python.exists() else sys.executable
+            subprocess.Popen(
+                f'start cmd /k "{python_to_use}" backend.py',
+                shell=True,
+                cwd=str(APP_DIR)
+            )
+    else:
+        # Unix: 새 터미널에서 실행
+        command_file = APP_DIR / "PeroPix.command"
+        if command_file.exists():
+            subprocess.Popen(
+                ["open", str(command_file)],
+                cwd=str(APP_DIR)
+            )
+        else:
+            embedded_python = PYTHON_ENV_DIR / "python" / "bin" / "python3"
+            python_to_use = str(embedded_python) if embedded_python.exists() else sys.executable
+            subprocess.Popen(
+                [python_to_use, "backend.py"],
+                start_new_session=True,
+                cwd=str(APP_DIR)
+            )
+    
+    # 현재 프로세스 종료 예약 (응답 반환 후)
+    async def delayed_shutdown():
+        await asyncio.sleep(0.5)
+        os._exit(0)
+    
+    asyncio.create_task(delayed_shutdown())
+    
+    return {"status": "restarting"}
 
 
 # ============================================================
@@ -3592,7 +3679,7 @@ def get_censor_model(model_name: str = None):
 
 def detect_nsfw_regions(image_path: str, model_name: str = None, 
                         target_labels: list = None, label_conf: dict = None,
-                        default_conf: float = 0.25):
+                        default_conf: float = 0.25, return_all: bool = False):
     """이미지에서 NSFW 영역 감지 (bbox only)"""
     import cv2
     
@@ -3604,8 +3691,11 @@ def detect_nsfw_regions(image_path: str, model_name: str = None,
     if label_conf is None:
         label_conf = {}
     
-    # 최소 confidence로 모델 실행
-    min_conf = min([label_conf.get(label, default_conf) for label in target_labels] + [default_conf])
+    # 최소 confidence로 모델 실행 (return_all이면 매우 낮은 threshold 사용)
+    if return_all:
+        min_conf = 0.01
+    else:
+        min_conf = min([label_conf.get(label, default_conf) for label in target_labels] + [default_conf])
     results = model(image_path, conf=min_conf, verbose=False)
     
     detections = []
@@ -3620,13 +3710,18 @@ def detect_nsfw_regions(image_path: str, model_name: str = None,
                 
                 # 라벨별 confidence 체크
                 required_conf = label_conf.get(label, default_conf)
-                if float(conf) < required_conf:
+                conf_val = float(conf)
+                passes_threshold = conf_val >= required_conf
+                
+                # return_all이 아니면 threshold 미달 건너뛰기
+                if not return_all and not passes_threshold:
                     continue
                 
                 detections.append({
                     "label": label,
-                    "confidence": round(float(conf), 3),
-                    "box": [int(x) for x in box.tolist()]  # [x1, y1, x2, y2]
+                    "confidence": round(conf_val, 3),
+                    "box": [int(x) for x in box.tolist()],  # [x1, y1, x2, y2]
+                    "passes_threshold": passes_threshold
                 })
     
     return detections
@@ -3634,35 +3729,99 @@ def detect_nsfw_regions(image_path: str, model_name: str = None,
 
 def apply_censor_boxes(image_path: str, boxes: list, method: str = "black", 
                        color: str = None, output_path: str = None):
-    """이미지에 검열 박스 적용"""
+    """이미지에 검열 박스 적용 (회전 지원)"""
     import cv2
+    import numpy as np
+    import math
     
     image = cv2.imread(image_path)
     if image is None:
         raise ValueError(f"이미지 로드 실패: {image_path}")
     
-    for box_info in boxes:
-        x1, y1, x2, y2 = box_info["box"]
+    def get_rotated_corners(x1, y1, x2, y2, rotation):
+        """회전된 사각형의 네 코너 좌표 계산"""
+        cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
+        # 로컬 코너 (중심 기준)
+        corners_local = [
+            (x1 - cx, y1 - cy),  # NW
+            (x2 - cx, y1 - cy),  # NE
+            (x2 - cx, y2 - cy),  # SE
+            (x1 - cx, y2 - cy),  # SW
+        ]
+        # 회전 적용
+        cos_r, sin_r = math.cos(rotation), math.sin(rotation)
+        corners_world = []
+        for lx, ly in corners_local:
+            wx = cx + lx * cos_r - ly * sin_r
+            wy = cy + lx * sin_r + ly * cos_r
+            corners_world.append((int(round(wx)), int(round(wy))))
+        return corners_world
+    
+    for i, box_info in enumerate(boxes):
+        # 박스 데이터 검증
+        box = box_info.get("box")
+        if box is None:
+            print(f"[WARNING] Box {i}: 'box' 키 없음, box_info={box_info}")
+            continue
+        if not isinstance(box, (list, tuple)):
+            print(f"[WARNING] Box {i}: box가 리스트/튜플이 아님, type={type(box)}, value={box}")
+            continue
+        if len(box) != 4:
+            print(f"[WARNING] Box {i}: box 길이가 4가 아님, len={len(box)}, box={box}")
+            continue
+        
+        try:
+            x1, y1, x2, y2 = int(box[0]), int(box[1]), int(box[2]), int(box[3])
+        except (ValueError, TypeError, IndexError) as e:
+            print(f"[WARNING] Box {i}: 좌표 변환 실패, box={box}, error={e}")
+            continue
+        
         box_method = box_info.get("method", method)
         box_color = box_info.get("color", color)
+        rotation = box_info.get("rotation", 0)
+        
+        # 회전된 코너 계산
+        corners = get_rotated_corners(x1, y1, x2, y2, rotation)
+        pts = np.array(corners, dtype=np.int32)
         
         if box_method == "black":
-            cv2.rectangle(image, (x1, y1), (x2, y2), (0, 0, 0), -1)
+            cv2.fillPoly(image, [pts], (0, 0, 0), lineType=cv2.LINE_AA)
         elif box_method == "white":
-            cv2.rectangle(image, (x1, y1), (x2, y2), (255, 255, 255), -1)
-        elif box_method == "blur":
-            roi = image[y1:y2, x1:x2]
-            if roi.size > 0:
-                blurred = cv2.GaussianBlur(roi, (99, 99), 30)
-                image[y1:y2, x1:x2] = blurred
-        elif box_method == "mosaic":
-            roi = image[y1:y2, x1:x2]
-            if roi.size > 0:
-                h, w = roi.shape[:2]
-                if h > 0 and w > 0:
-                    small = cv2.resize(roi, (max(1, w // 10), max(1, h // 10)), interpolation=cv2.INTER_LINEAR)
-                    mosaic = cv2.resize(small, (w, h), interpolation=cv2.INTER_NEAREST)
-                    image[y1:y2, x1:x2] = mosaic
+            cv2.fillPoly(image, [pts], (255, 255, 255), lineType=cv2.LINE_AA)
+        elif box_method == "blur" or box_method == "mosaic":
+            # 회전된 영역에 blur/mosaic 적용
+            # 바운딩 박스로 ROI 추출 후 마스크 적용
+            bx, by, bw, bh = cv2.boundingRect(pts)
+            bx = max(0, bx)
+            by = max(0, by)
+            bx2 = min(image.shape[1], bx + bw)
+            by2 = min(image.shape[0], by + bh)
+            
+            if bx2 > bx and by2 > by:
+                roi = image[by:by2, bx:bx2].copy()
+                
+                # 안티앨리어싱 마스크 생성 (ROI 좌표계로 변환)
+                mask = np.zeros((by2 - by, bx2 - bx), dtype=np.uint8)
+                pts_local = pts - np.array([bx, by])
+                cv2.fillPoly(mask, [pts_local], 255, lineType=cv2.LINE_AA)
+                
+                if box_method == "blur":
+                    blurred = cv2.GaussianBlur(roi, (99, 99), 30)
+                else:  # mosaic
+                    h, w = roi.shape[:2]
+                    if h > 0 and w > 0:
+                        small = cv2.resize(roi, (max(1, w // 10), max(1, h // 10)), interpolation=cv2.INTER_LINEAR)
+                        blurred = cv2.resize(small, (w, h), interpolation=cv2.INTER_NEAREST)
+                    else:
+                        blurred = roi
+                
+                # 알파 블렌딩으로 부드러운 경계 적용
+                alpha = mask.astype(np.float32) / 255.0
+                alpha_3ch = cv2.merge([alpha, alpha, alpha])
+                roi_result = (blurred.astype(np.float32) * alpha_3ch + 
+                             roi.astype(np.float32) * (1 - alpha_3ch)).astype(np.uint8)
+                image[by:by2, bx:bx2] = roi_result
+                
         elif box_method == "color" and box_color:
             # hex color to BGR
             if box_color.startswith("#"):
@@ -3670,7 +3829,7 @@ def apply_censor_boxes(image_path: str, boxes: list, method: str = "black",
                 r = int(hex_color[0:2], 16)
                 g = int(hex_color[2:4], 16)
                 b = int(hex_color[4:6], 16)
-                cv2.rectangle(image, (x1, y1), (x2, y2), (b, g, r), -1)
+                cv2.fillPoly(image, [pts], (b, g, r), lineType=cv2.LINE_AA)
     
     # 저장
     if output_path:
@@ -3764,6 +3923,7 @@ class CensorScanRequest(BaseModel):
     target_labels: List[str] = None
     label_conf: dict = None
     default_conf: float = 0.25
+    return_all: bool = False  # True면 threshold 미달도 반환
 
 
 @app.post("/api/censor/scan")
@@ -3798,7 +3958,8 @@ async def scan_image_for_censor(req: CensorScanRequest):
             model_name=req.model,
             target_labels=req.target_labels,
             label_conf=req.label_conf,
-            default_conf=req.default_conf
+            default_conf=req.default_conf,
+            return_all=req.return_all
         )
         
         return {"success": True, "detections": detections}
@@ -3864,6 +4025,7 @@ class CensorSaveRequest(BaseModel):
     color: str = None
     output_folder: str = ""  # censored 하위 폴더
     filename: str = None  # 저장 파일명 (없으면 원본명 사용)
+    source: str = "uncensored"  # uncensored 또는 censored
 
 
 @app.post("/api/censor/save")
@@ -3872,10 +4034,17 @@ async def save_censored_image(req: CensorSaveRequest):
     import tempfile
     temp_file = None
     
+    # 디버깅: 받은 박스 데이터 로깅
+    print(f"[DEBUG] save_censored_image - image_path: {req.image_path}")
+    print(f"[DEBUG] save_censored_image - boxes count: {len(req.boxes)}")
+    for i, box in enumerate(req.boxes):
+        print(f"[DEBUG] Box {i}: {box}")
+    
     try:
-        # 이미지 경로 결정 (censoring/uncensored 기준)
+        # 이미지 경로 결정 (source에 따라 uncensored 또는 censored 폴더)
         if req.image_path:
-            image_path = UNCENSORED_DIR / req.image_path
+            source_dir = CENSORED_DIR if req.source == "censored" else UNCENSORED_DIR
+            image_path = source_dir / req.image_path
             if not image_path.exists():
                 return {"success": False, "error": f"이미지 없음: {req.image_path}"}
             original_filename = Path(req.image_path).name
@@ -3896,14 +4065,7 @@ async def save_censored_image(req: CensorSaveRequest):
         filename = req.filename or original_filename
         output_path = output_folder / filename
         
-        # 중복 파일명 처리
-        if output_path.exists():
-            stem = output_path.stem
-            suffix = output_path.suffix
-            counter = 1
-            while output_path.exists():
-                output_path = output_folder / f"{stem}_{counter}{suffix}"
-                counter += 1
+        # 동일 파일명 있으면 덮어쓰기 (넘버링 없음)
         
         # 검열 적용 및 저장
         apply_censor_boxes(

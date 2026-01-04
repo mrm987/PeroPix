@@ -3,13 +3,25 @@ title PeroPix Server
 
 echo Starting PeroPix...
 
-:: 백엔드 시작 (백그라운드)
-start /B pythonw backend.py 2>nul || start /B python backend.py
+:: Embedded Python path (with CUDA torch for Local generation)
+set EMBEDDED_PYTHON=%~dp0python_env\python\python.exe
+set EMBEDDED_PYTHONW=%~dp0python_env\python\pythonw.exe
 
-:: 서버 시작 대기
+:: Start backend in background - prefer embedded Python
+if exist "%EMBEDDED_PYTHONW%" (
+    echo Using embedded Python with CUDA support...
+    start /B "%EMBEDDED_PYTHONW%" backend.py
+) else if exist "%EMBEDDED_PYTHON%" (
+    start /B "%EMBEDDED_PYTHON%" backend.py
+) else (
+    echo Using system Python...
+    start /B pythonw backend.py 2>nul || start /B python backend.py
+)
+
+:: Wait for server to start
 timeout /t 2 /nobreak >nul
 
-:: Chrome 앱 모드로 열기 (테두리 없이)
+:: Open in Chrome app mode (borderless)
 start "" chrome --app=http://127.0.0.1:8765 2>nul || start "" msedge --app=http://127.0.0.1:8765 2>nul || start "" "http://127.0.0.1:8765"
 
 echo.

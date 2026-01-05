@@ -24,6 +24,7 @@ NovelAI 웹에서 감정 표현 20장 만드는 데 몇 시간 걸리셨나요?
 - 슬롯 8: `sleeping, zzz`
 
 각 슬롯마다 생성 횟수 설정 가능. 감정 표현 8종류 × 각 5장 = 40장을 한 번에 큐에 넣습니다.
+
 슬롯 형태의 UI는 출력된 이미지 에셋을 쉽게 비교할 수 있게 해줍니다.
 
 프리셋 저장으로 "감정팩", "H씬팩" 같은 설정을 원클릭 불러오기도 가능.
@@ -68,11 +69,13 @@ PeroPix는 NAI와 로컬(Stable Diffusion) 둘 다 지원하고, 탭 전환으�
 ## 시스템 요구사항
 
 NovelAI 구독만 있으면 됩니다. (Windows 10/11 또는 macOS)
+
 로컬 생성을 원하면 NVIDIA GPU 8GB 이상 필요.
 
 ## 크레딧
 
 태그 자동완성: [Danbooru Tag Database](https://github.com/DraconicDragon/dbr-e621-lists-archive) (2026-01-01)
+
 자동 검열: YOLOv8 Nudenet Detector
 
 ---

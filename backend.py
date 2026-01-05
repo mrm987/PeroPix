@@ -35,8 +35,9 @@ UPSCALE_DIR = MODELS_DIR / "upscale_models"
 OUTPUT_DIR = APP_DIR / "outputs"
 PRESETS_DIR = APP_DIR / "presets"
 PROMPTS_DIR = APP_DIR / "prompts"
+DATA_DIR = APP_DIR / "data"  # 데이터 파일 (tags.json 등)
 CONFIG_FILE = APP_DIR / "config.json"
-PYTHON_ENV_DIR = APP_DIR / "python_env"  # 로컬 생성용 Python 환경
+PYTHON_ENV_DIR = APP_DIR / "python"  # Python 환경 (빌드와 동일 경로)
 CENSOR_MODELS_DIR = MODELS_DIR / "censor"  # 검열 모델 (YOLO)
 CENSORING_DIR = APP_DIR / "censoring"  # 검열 작업 폴더
 UNCENSORED_DIR = CENSORING_DIR / "uncensored"  # 검열 전 이미지
@@ -67,7 +68,7 @@ def get_next_image_number(category: str, save_dir: Path = None, ext: str = 'png'
     return max_num + 1
 
 # 디렉토리 생성
-for d in [CHECKPOINTS_DIR, LORA_DIR, UPSCALE_DIR, OUTPUT_DIR, PRESETS_DIR, CENSOR_MODELS_DIR, UNCENSORED_DIR, CENSORED_DIR]:
+for d in [CHECKPOINTS_DIR, LORA_DIR, UPSCALE_DIR, OUTPUT_DIR, PRESETS_DIR, DATA_DIR, CENSOR_MODELS_DIR, UNCENSORED_DIR, CENSORED_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
 # Prompts 하위 폴더 생성
@@ -1557,6 +1558,8 @@ def tiled_upscale(model, img_tensor, tile_size=512, overlap=32):
 # ============================================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global install_status
+    
     print("=" * 50)
     print("NAI + Local Generator Backend")
     print(f"App dir: {APP_DIR}")
@@ -1566,7 +1569,7 @@ async def lifespan(app: FastAPI):
     
     # 큐 처리 백그라운드 태스크 시작
     queue_task = asyncio.create_task(process_queue())
-    
+
     # 서버 준비 완료 후 브라우저 열기 (짧은 지연으로 서버가 완전히 시작되도록)
     async def open_browser_delayed():
         await asyncio.sleep(0.5)
@@ -2603,6 +2606,24 @@ async def serve_assets(filepath: str):
     return FileResponse(file_path, media_type=media_type)
 
 
+@app.get("/data/{filepath:path}")
+async def serve_data(filepath: str):
+    """Serve data files (e.g., tags.json)"""
+    file_path = APP_DIR / "data" / filepath
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    # Determine media type
+    suffix = file_path.suffix.lower()
+    media_types = {
+        ".json": "application/json",
+        ".txt": "text/plain",
+        ".csv": "text/csv",
+    }
+    media_type = media_types.get(suffix, "application/octet-stream")
+    return FileResponse(file_path, media_type=media_type)
+
+
 @app.get("/api/config")
 async def get_config():
     return {
@@ -3235,7 +3256,7 @@ import shutil
 import platform
 import urllib.request
 
-# 설치 상태 추적
+# 설치 상태 추적 (런타임)
 install_status = {
     "installing": False,
     "progress": 0,
@@ -3243,35 +3264,76 @@ install_status = {
     "error": None
 }
 
+# 설치 상태 파일 (영구 저장)
+INSTALL_STATUS_FILE = PYTHON_ENV_DIR / "install_status.json"
+
+def load_install_status():
+    """설치 상태 파일 로드"""
+    default_status = {
+        "python": False,
+        "torch": None,      # "cpu" | "cuda" | None
+        "censor": False,    # ultralytics 설치됨
+        "local": False      # diffusers 등 설치됨
+    }
+    if INSTALL_STATUS_FILE.exists():
+        try:
+            status = json.loads(INSTALL_STATUS_FILE.read_text(encoding='utf-8'))
+            # 기본값과 병합 (새 키 추가 대비)
+            return {**default_status, **status}
+        except:
+            pass
+    return default_status
+
+def save_install_status(status: dict):
+    """설치 상태 파일 저장"""
+    PYTHON_ENV_DIR.mkdir(parents=True, exist_ok=True)
+    INSTALL_STATUS_FILE.write_text(json.dumps(status, indent=2), encoding='utf-8')
+
+def get_env_status():
+    """환경 설치 상태 반환"""
+    status = load_install_status()
+    return {
+        "installed": status["python"],
+        "torch_version": status["torch"],
+        "censor_ready": status["censor"],
+        "local_ready": status["local"],
+        "installing": install_status["installing"],
+        "progress": install_status["progress"],
+        "message": install_status["message"],
+        "error": install_status["error"]
+    }
+
 # Python 버전 및 URL (python-build-standalone)
-PYTHON_VERSION = "3.12.8"
-PYTHON_BUILD_DATE = "20241219"
+PYTHON_VERSION = "3.11.9"
+PYTHON_BUILD_DATE = "20240415"
 
 def get_python_download_url():
-    """플랫폼에 맞는 Python standalone URL 반환"""
+    """플랫폼에 맞는 Python URL 반환 (빌드와 동일)"""
     system = platform.system().lower()
     machine = platform.machine().lower()
-    
+
     if system == "windows":
+        # Windows: python.org embedded Python (빌드와 동일)
         if machine in ["amd64", "x86_64"]:
-            arch = "x86_64"
+            return f"https://www.python.org/ftp/python/{PYTHON_VERSION}/python-{PYTHON_VERSION}-embed-amd64.zip"
         else:
-            arch = "i686"
-        filename = f"cpython-{PYTHON_VERSION}+{PYTHON_BUILD_DATE}-{arch}-pc-windows-msvc-install_only_stripped.tar.gz"
+            return f"https://www.python.org/ftp/python/{PYTHON_VERSION}/python-{PYTHON_VERSION}-embed-win32.zip"
     elif system == "darwin":
+        # macOS: python-build-standalone
         if machine == "arm64":
             arch = "aarch64"
         else:
             arch = "x86_64"
-        filename = f"cpython-{PYTHON_VERSION}+{PYTHON_BUILD_DATE}-{arch}-apple-darwin-install_only_stripped.tar.gz"
+        filename = f"cpython-{PYTHON_VERSION}+{PYTHON_BUILD_DATE}-{arch}-apple-darwin-install_only.tar.gz"
+        return f"https://github.com/indygreg/python-build-standalone/releases/download/{PYTHON_BUILD_DATE}/{filename}"
     else:  # linux
+        # Linux: python-build-standalone
         if machine == "aarch64":
             arch = "aarch64"
         else:
             arch = "x86_64"
-        filename = f"cpython-{PYTHON_VERSION}+{PYTHON_BUILD_DATE}-{arch}-unknown-linux-gnu-install_only_stripped.tar.gz"
-    
-    return f"https://github.com/astral-sh/python-build-standalone/releases/download/{PYTHON_BUILD_DATE}/{filename}"
+        filename = f"cpython-{PYTHON_VERSION}+{PYTHON_BUILD_DATE}-{arch}-unknown-linux-gnu-install_only.tar.gz"
+        return f"https://github.com/indygreg/python-build-standalone/releases/download/{PYTHON_BUILD_DATE}/{filename}"
 
 
 def get_uv_download_url():
@@ -3298,10 +3360,22 @@ def get_uv_download_url():
 
 def is_local_env_installed():
     """로컬 환경 설치 여부 확인"""
-    python_exe = PYTHON_ENV_DIR / "python" / "python.exe" if platform.system() == "Windows" else PYTHON_ENV_DIR / "python" / "bin" / "python3"
-    torch_check = PYTHON_ENV_DIR / "python" / "Lib" / "site-packages" / "torch" if platform.system() == "Windows" else PYTHON_ENV_DIR / "python" / "lib" / f"python{PYTHON_VERSION[:4]}" / "site-packages" / "torch"
-    
-    return python_exe.exists() and torch_check.exists()
+    if platform.system() == "Windows":
+        # Windows embedded Python: python/python.exe
+        python_exe = PYTHON_ENV_DIR / "python.exe"
+        torch_check = PYTHON_ENV_DIR / "Lib" / "site-packages" / "torch"
+    else:
+        # macOS/Linux: python-build-standalone
+        python_exe = PYTHON_ENV_DIR / "python" / "bin" / "python3"
+        torch_check = PYTHON_ENV_DIR / "python" / "lib" / f"python{PYTHON_VERSION[:4]}" / "site-packages" / "torch"
+
+    python_exists = python_exe.exists()
+    torch_exists = torch_check.exists()
+
+    print(f"[Local Env Check] Python: {python_exe} exists={python_exists}")
+    print(f"[Local Env Check] Torch: {torch_check} exists={torch_exists}")
+
+    return python_exists and torch_exists
 
 
 def download_file(url: str, dest: Path, progress_callback=None):
@@ -3335,173 +3409,320 @@ def extract_archive(archive_path: Path, dest_dir: Path):
     if archive_path.suffix == '.zip':
         with zipfile.ZipFile(archive_path, 'r') as zf:
             zf.extractall(dest_dir)
-    elif archive_path.name.endswith('.tar.gz'):
-        with tarfile.open(archive_path, 'r:gz') as tf:
-            tf.extractall(dest_dir)
-    elif archive_path.suffix == '.tar':
-        with tarfile.open(archive_path, 'r') as tf:
-            tf.extractall(dest_dir)
+    elif archive_path.name.endswith('.tar.gz') or archive_path.suffix == '.tar':
+        # Windows에서 tarfile 인코딩 문제 방지 - tar 명령어 사용
+        if platform.system() == "Windows":
+            import subprocess
+            # Windows 10 이상에 tar 기본 포함
+            subprocess.run(
+                ["tar", "-xzf", str(archive_path), "-C", str(dest_dir)],
+                check=True,
+                capture_output=True,
+                encoding='utf-8',
+                errors='replace'
+            )
+        else:
+            mode = 'r:gz' if archive_path.name.endswith('.tar.gz') else 'r'
+            with tarfile.open(archive_path, mode) as tf:
+                tf.extractall(dest_dir)
 
 
-def _install_local_environment_sync():
-    """로컬 생성 환경 설치 - 동기 버전 (스레드에서 실행)"""
+def _setup_python_and_uv():
+    """Python과 uv 설치 (공통 부분)"""
+    global install_status
+    
+    PYTHON_ENV_DIR.mkdir(parents=True, exist_ok=True)
+    temp_dir = PYTHON_ENV_DIR / "temp"
+    temp_dir.mkdir(exist_ok=True)
+    
+    # Python과 uv 경로
+    if platform.system() == "Windows":
+        # Windows embedded Python: python/python.exe (빌드와 동일)
+        python_exe = PYTHON_ENV_DIR / "python.exe"
+        uv_exe = PYTHON_ENV_DIR / "uv.exe"
+    else:
+        # macOS/Linux: python-build-standalone은 python/bin/python3
+        python_exe = PYTHON_ENV_DIR / "python" / "bin" / "python3"
+        uv_exe = PYTHON_ENV_DIR / "uv"
+    
+    # Python이 이미 있으면 다운로드 스킵
+    if not python_exe.exists():
+        install_status["message"] = "Downloading Python..."
+        install_status["progress"] = 5
+
+        python_url = get_python_download_url()
+        # Windows는 ZIP, 다른 플랫폼은 tar.gz
+        if platform.system() == "Windows":
+            python_archive = temp_dir / "python.zip"
+        else:
+            python_archive = temp_dir / "python.tar.gz"
+
+        def python_progress(downloaded, total):
+            install_status["progress"] = 5 + int((downloaded / total) * 15)
+
+        if not download_file(python_url, python_archive, python_progress):
+            raise Exception("Failed to download Python")
+
+        install_status["message"] = "Extracting Python..."
+        install_status["progress"] = 20
+
+        if platform.system() == "Windows":
+            # Windows embedded Python: 직접 PYTHON_ENV_DIR (python/)에 압축 해제
+            extract_archive(python_archive, PYTHON_ENV_DIR)
+
+            # python311._pth 파일 수정 (import site 활성화)
+            pth_file = PYTHON_ENV_DIR / f"python{PYTHON_VERSION.replace('.', '')[:3]}._pth"
+            if pth_file.exists():
+                content = pth_file.read_text(encoding='utf-8', errors='replace')
+                content = content.replace("#import site", "import site")
+                pth_file.write_text(content, encoding='utf-8')
+
+            # get-pip.py 다운로드 및 설치
+            install_status["message"] = "Installing pip..."
+            get_pip_url = "https://bootstrap.pypa.io/get-pip.py"
+            get_pip_file = temp_dir / "get-pip.py"
+            if download_file(get_pip_url, get_pip_file):
+                subprocess.run(
+                    [str(python_exe), str(get_pip_file), "--no-warn-script-location"],
+                    check=True,
+                    encoding='utf-8',
+                    errors='replace'
+                )
+        else:
+            # macOS/Linux: python-build-standalone
+            extract_archive(python_archive, PYTHON_ENV_DIR)
+    
+    install_status["progress"] = 25
+    
+    # uv가 이미 있으면 다운로드 스킵
+    if not uv_exe.exists():
+        install_status["message"] = "Downloading uv..."
+        install_status["progress"] = 25
+        
+        uv_url = get_uv_download_url()
+        uv_archive = temp_dir / ("uv.zip" if platform.system() == "Windows" else "uv.tar.gz")
+        
+        def uv_progress(downloaded, total):
+            install_status["progress"] = 25 + int((downloaded / total) * 10)
+        
+        if not download_file(uv_url, uv_archive, uv_progress):
+            raise Exception("Failed to download uv")
+        
+        install_status["message"] = "Extracting uv..."
+        uv_dir = temp_dir / "uv_extracted"
+        extract_archive(uv_archive, uv_dir)
+        
+        # uv 실행파일 찾기 및 복사
+        if platform.system() == "Windows":
+            uv_found = None
+            for p in uv_dir.rglob("uv.exe"):
+                uv_found = p
+                break
+            if uv_found:
+                shutil.copy(uv_found, PYTHON_ENV_DIR / "uv.exe")
+        else:
+            uv_found = None
+            for p in uv_dir.rglob("uv"):
+                if p.is_file():
+                    uv_found = p
+                    break
+            if uv_found:
+                dest = PYTHON_ENV_DIR / "uv"
+                shutil.copy(uv_found, dest)
+                dest.chmod(0o755)
+    
+    install_status["progress"] = 35
+    return python_exe, uv_exe, temp_dir
+
+
+def _run_uv_install(uv_exe, python_exe, packages, index_url=None, progress_base=40, progress_end=70):
+    """uv로 패키지 설치"""
+    global install_status
+    
+    env = os.environ.copy()
+    env["UV_PYTHON"] = str(python_exe)
+    
+    cmd = [str(uv_exe), "pip", "install", "--reinstall", "--python", str(python_exe)]
+    if index_url:
+        cmd.extend(["--index-url", index_url])
+    cmd.extend(packages)
+    
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding='utf-8',
+        errors='replace',  # 디코딩 불가능한 문자는 ? 로 대체
+        env=env
+    )
+    
+    install_keywords = ["Downloading", "Installing", "Prepared", "Built", "Resolved"]
+    line_count = 0
+    for line in proc.stdout:
+        line_count += 1
+        print(f"[uv] {line.strip()}")
+        if any(kw in line for kw in install_keywords):
+            progress = min(progress_base + (line_count // 3), progress_end)
+            install_status["progress"] = progress
+    
+    proc.wait()
+    return proc.returncode
+
+
+def _install_base_environment_sync():
+    """기본 환경 설치 (첫 실행 시 자동) - torch CPU + ultralytics"""
     global install_status
     
     try:
-        PYTHON_ENV_DIR.mkdir(parents=True, exist_ok=True)
-        temp_dir = PYTHON_ENV_DIR / "temp"
-        temp_dir.mkdir(exist_ok=True)
+        python_exe, uv_exe, temp_dir = _setup_python_and_uv()
         
-        # Python과 uv 경로
-        if platform.system() == "Windows":
-            python_exe = PYTHON_ENV_DIR / "python" / "python.exe"
-            uv_exe = PYTHON_ENV_DIR / "uv.exe"
-        else:
-            python_exe = PYTHON_ENV_DIR / "python" / "bin" / "python3"
-            uv_exe = PYTHON_ENV_DIR / "uv"
+        # torch CPU 설치 (35% -> 60%)
+        install_status["message"] = "Installing PyTorch (CPU)..."
+        install_status["progress"] = 35
         
-        # Python이 이미 있으면 다운로드 스킵 (배포판에 포함된 경우)
-        if not python_exe.exists():
-            # 1. Python standalone 다운로드 (10%)
-            install_status["message"] = "Downloading Python..."
-            install_status["progress"] = 5
-            
-            python_url = get_python_download_url()
-            python_archive = temp_dir / "python.tar.gz"
-            
-            def python_progress(downloaded, total):
-                install_status["progress"] = 5 + int((downloaded / total) * 15)
-            
-            if not download_file(python_url, python_archive, python_progress):
-                raise Exception("Failed to download Python")
-            
-            # 2. Python 압축 해제 (25%)
-            install_status["message"] = "Extracting Python..."
-            install_status["progress"] = 20
-            
-            extract_archive(python_archive, PYTHON_ENV_DIR)
-        
-        install_status["progress"] = 25
-        
-        # uv가 이미 있으면 다운로드 스킵
-        if not uv_exe.exists():
-            # 3. uv 다운로드 (35%)
-            install_status["message"] = "Downloading uv..."
-            install_status["progress"] = 25
-            
-            uv_url = get_uv_download_url()
-            uv_archive = temp_dir / ("uv.zip" if platform.system() == "Windows" else "uv.tar.gz")
-            
-            def uv_progress(downloaded, total):
-                install_status["progress"] = 25 + int((downloaded / total) * 10)
-            
-            if not download_file(uv_url, uv_archive, uv_progress):
-                raise Exception("Failed to download uv")
-            
-            # 4. uv 압축 해제 (40%)
-            install_status["message"] = "Extracting uv..."
-            uv_dir = temp_dir / "uv_extracted"
-            extract_archive(uv_archive, uv_dir)
-            
-            # uv 실행파일 찾기 및 복사
-            if platform.system() == "Windows":
-                uv_found = None
-                for p in uv_dir.rglob("uv.exe"):
-                    uv_found = p
-                    break
-                if uv_found:
-                    shutil.copy(uv_found, PYTHON_ENV_DIR / "uv.exe")
-            else:
-                uv_found = None
-                for p in uv_dir.rglob("uv"):
-                    if p.is_file():
-                        uv_found = p
-                        break
-                if uv_found:
-                    dest = PYTHON_ENV_DIR / "uv"
-                    shutil.copy(uv_found, dest)
-                    dest.chmod(0o755)
-        
-        install_status["progress"] = 40
-        
-        # 5. PyTorch + diffusers 설치 (40% -> 95%)
-        install_status["message"] = "Installing PyTorch (this may take a few minutes)..."
-        
-        env = os.environ.copy()
-        env["UV_PYTHON"] = str(python_exe)
-        
-        def run_uv_install(packages, index_url=None, progress_base=40, progress_end=70):
-            """uv로 패키지 설치"""
-            cmd = [str(uv_exe), "pip", "install", "--reinstall", "--python", str(python_exe)]
-            if index_url:
-                cmd.extend(["--index-url", index_url])
-            cmd.extend(packages)
-            
-            proc = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                env=env
-            )
-            
-            install_keywords = ["Downloading", "Installing", "Prepared", "Built", "Resolved"]
-            line_count = 0
-            for line in proc.stdout:
-                line_count += 1
-                print(f"[uv] {line.strip()}")
-                if any(kw in line for kw in install_keywords):
-                    progress = min(progress_base + (line_count // 3), progress_end)
-                    install_status["progress"] = progress
-            
-            proc.wait()
-            return proc.returncode
-        
-        # Step 1: PyTorch with CUDA (40% -> 70%)
-        # Note: Must specify version - latest torch may not have cu121 wheels
-        install_status["message"] = "Installing PyTorch with CUDA..."
-        install_status["progress"] = 40
-        
-        ret = run_uv_install(
+        ret = _run_uv_install(
+            uv_exe, python_exe,
             ["torch==2.5.1", "torchvision==0.20.1"],
-            index_url="https://download.pytorch.org/whl/cu121",
-            progress_base=40,
-            progress_end=65
+            index_url="https://download.pytorch.org/whl/cpu",
+            progress_base=35,
+            progress_end=60
         )
         if ret != 0:
-            raise Exception(f"PyTorch installation failed with code {ret}")
+            raise Exception(f"PyTorch CPU installation failed with code {ret}")
         
-        # Step 2: diffusers and others (65% -> 85%)
-        install_status["message"] = "Installing diffusers..."
-        install_status["progress"] = 65
+        # ultralytics + opencv 설치 (60% -> 80%)
+        install_status["message"] = "Installing ultralytics..."
+        install_status["progress"] = 60
         
-        ret = run_uv_install(
-            ["diffusers", "transformers", "accelerate", "safetensors", "peft", "spandrel"],
-            index_url=None,  # 기본 PyPI
-            progress_base=65,
-            progress_end=85
+        ret = _run_uv_install(
+            uv_exe, python_exe,
+            ["ultralytics", "opencv-python"],
+            progress_base=60,
+            progress_end=80
         )
         if ret != 0:
-            raise Exception(f"diffusers installation failed with code {ret}")
+            raise Exception(f"ultralytics installation failed with code {ret}")
         
-        # Step 3: FastAPI and backend dependencies (85% -> 95%)
+        # backend dependencies (80% -> 95%)
         install_status["message"] = "Installing backend dependencies..."
-        install_status["progress"] = 85
+        install_status["progress"] = 80
         
-        ret = run_uv_install(
+        ret = _run_uv_install(
+            uv_exe, python_exe,
             ["fastapi", "uvicorn[standard]", "httpx", "aiofiles", "python-multipart", "pillow", "piexif", "websockets"],
-            index_url=None,  # 기본 PyPI
-            progress_base=85,
+            progress_base=80,
             progress_end=95
         )
         if ret != 0:
             raise Exception(f"Backend dependencies installation failed with code {ret}")
         
-        install_status["progress"] = 95
-        
-        # 6. 정리 (100%)
+        # 정리 및 상태 저장
         install_status["message"] = "Cleaning up..."
+        install_status["progress"] = 95
         shutil.rmtree(temp_dir, ignore_errors=True)
+        
+        # 설치 상태 저장
+        save_install_status({
+            "python": True,
+            "torch": "cpu",
+            "censor": True,
+            "local": False
+        })
+        
+        install_status["progress"] = 100
+        install_status["message"] = "Installation complete!"
+        install_status["installing"] = False
+        
+        return True
+        
+    except Exception as e:
+        install_status["error"] = str(e)
+        install_status["installing"] = False
+        print(f"[Install Error] {e}")
+        return False
+
+
+def _install_local_environment_sync():
+    """로컬 생성 환경 설치 - torch CUDA + diffusers"""
+    global install_status
+
+    try:
+        status = load_install_status()
+
+        # Python과 uv 경로 (_setup_python_and_uv와 동일하게)
+        if platform.system() == "Windows":
+            # Windows embedded Python: python/python.exe (직접)
+            python_exe = PYTHON_ENV_DIR / "python.exe"
+            uv_exe = PYTHON_ENV_DIR / "uv.exe"
+        else:
+            # macOS/Linux: python-build-standalone
+            python_exe = PYTHON_ENV_DIR / "python" / "bin" / "python3"
+            uv_exe = PYTHON_ENV_DIR / "uv"
+
+        # 기본 환경이 없으면 먼저 설치
+        if not python_exe.exists() or not uv_exe.exists():
+            python_exe, uv_exe, temp_dir = _setup_python_and_uv()
+        
+        # torch CUDA로 업그레이드 (0% -> 50%)
+        install_status["message"] = "Upgrading PyTorch to CUDA version..."
+        install_status["progress"] = 10
+        
+        ret = _run_uv_install(
+            uv_exe, python_exe,
+            ["torch==2.5.1", "torchvision==0.20.1"],
+            index_url="https://download.pytorch.org/whl/cu121",
+            progress_base=10,
+            progress_end=50
+        )
+        if ret != 0:
+            raise Exception(f"PyTorch CUDA installation failed with code {ret}")
+        
+        # diffusers 등 설치 (50% -> 80%)
+        install_status["message"] = "Installing diffusers..."
+        install_status["progress"] = 50
+        
+        ret = _run_uv_install(
+            uv_exe, python_exe,
+            ["diffusers", "transformers", "accelerate", "safetensors", "peft", "spandrel"],
+            progress_base=50,
+            progress_end=80
+        )
+        if ret != 0:
+            raise Exception(f"diffusers installation failed with code {ret}")
+        
+        # ultralytics가 없으면 설치 (80% -> 90%)
+        if not status.get("censor"):
+            install_status["message"] = "Installing ultralytics..."
+            install_status["progress"] = 80
+            
+            ret = _run_uv_install(
+                uv_exe, python_exe,
+                ["ultralytics", "opencv-python"],
+                progress_base=80,
+                progress_end=90
+            )
+            if ret != 0:
+                raise Exception(f"ultralytics installation failed with code {ret}")
+        
+        # backend dependencies (이미 있어도 확인용)
+        install_status["message"] = "Verifying dependencies..."
+        install_status["progress"] = 90
+        
+        ret = _run_uv_install(
+            uv_exe, python_exe,
+            ["fastapi", "uvicorn[standard]", "httpx", "aiofiles", "python-multipart", "pillow", "piexif", "websockets"],
+            progress_base=90,
+            progress_end=95
+        )
+        
+        # 설치 상태 저장
+        save_install_status({
+            "python": True,
+            "torch": "cuda",
+            "censor": True,
+            "local": True
+        })
         
         install_status["progress"] = 100
         install_status["message"] = "Installation complete!"
@@ -3537,7 +3758,8 @@ async def get_local_status():
         "progress": install_status["progress"],
         "message": install_status["message"],
         "error": install_status["error"],
-        "python_env_dir": str(PYTHON_ENV_DIR)
+        "python_env_dir": str(PYTHON_ENV_DIR),
+        "censor_ready": YOLO_AVAILABLE
     }
 
 
@@ -3568,7 +3790,20 @@ async def uninstall_local():
         raise HTTPException(status_code=400, detail="Installation in progress")
     
     if PYTHON_ENV_DIR.exists():
-        shutil.rmtree(PYTHON_ENV_DIR, ignore_errors=True)
+        try:
+            shutil.rmtree(PYTHON_ENV_DIR)
+        except Exception as e:
+            # Windows에서 파일 잠금 문제 시 재시도
+            import time
+            time.sleep(1)
+            try:
+                shutil.rmtree(PYTHON_ENV_DIR)
+            except Exception as e2:
+                raise HTTPException(status_code=500, detail=f"삭제 실패: {e2}. 앱을 종료하고 수동으로 python_env 폴더를 삭제해주세요.")
+    
+    # 삭제 확인
+    if PYTHON_ENV_DIR.exists():
+        raise HTTPException(status_code=500, detail="폴더가 완전히 삭제되지 않았습니다. 앱을 종료하고 수동으로 삭제해주세요.")
     
     return {"status": "uninstalled"}
 
@@ -4361,6 +4596,47 @@ async def save_image_set(req: SaveImageSetRequest):
     }
 
 
+def run_first_install_if_needed():
+    """첫 실행 시 기본 환경 설치 (CMD에서 동기식으로 진행)"""
+    status = load_install_status()
+    
+    if status.get("python"):
+        # 이미 설치됨
+        print(f"[Environment] Ready: torch={status.get('torch')}, censor={status.get('censor')}, local={status.get('local')}")
+        return True
+    
+    # 첫 실행 - 설치 시작
+    print()
+    print("=" * 60)
+    print("  First run detected! Installing base environment...")
+    print("  This will install Python + PyTorch (CPU) + Ultralytics")
+    print("  Please wait... (약 3-5분 소요)")
+    print("=" * 60)
+    print()
+    
+    global install_status
+    install_status = {"installing": True, "progress": 0, "message": "Starting...", "error": None}
+    
+    # 동기식으로 설치 진행 (CMD에서 진행 상황 출력됨)
+    success = _install_base_environment_sync()
+    
+    if success:
+        print()
+        print("=" * 60)
+        print("  Installation complete! Starting PeroPix...")
+        print("=" * 60)
+        print()
+        return True
+    else:
+        print()
+        print("=" * 60)
+        print(f"  Installation failed: {install_status.get('error', 'Unknown error')}")
+        print("  Please check your internet connection and try again.")
+        print("=" * 60)
+        print()
+        return False
+
+
 if __name__ == "__main__":
     import uvicorn
 
@@ -4372,5 +4648,28 @@ if __name__ == "__main__":
     ╚═════════════════════════════════════════════════╝
     """
     print(banner)
+
+    # 첫 실행 감지 및 동기 설치 (서버 시작 전)
+    status = load_install_status()
+    if not status.get("python"):
+        print("\n" + "=" * 50)
+        print("  첫 실행 감지 - 기본 환경 설치를 시작합니다")
+        print("  (torch CPU + ultralytics, 약 3-5분 소요)")
+        print("=" * 50 + "\n")
+        
+        success = _install_base_environment_sync()
+        
+        if success:
+            print("\n" + "=" * 50)
+            print("  ✅ 기본 환경 설치 완료!")
+            print("  서버를 시작합니다...")
+            print("=" * 50 + "\n")
+        else:
+            print("\n" + "=" * 50)
+            print("  ❌ 설치 실패. 로그를 확인해주세요.")
+            print("=" * 50 + "\n")
+            # 실패해도 서버는 시작 (NAI 모드는 사용 가능)
+    else:
+        print(f"[Environment] torch={status.get('torch')}, censor={status.get('censor')}, local={status.get('local')}")
 
     uvicorn.run(app, host="127.0.0.1", port=8765, log_level="warning")

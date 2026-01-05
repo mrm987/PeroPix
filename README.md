@@ -49,9 +49,17 @@
 - 마스크 에디터 내장
 
 ### 프롬프트 관리
-- Character Prompts - 캐릭터별 분리 프롬프트 (최대 6개)
-- Quality Tags / UC Preset 자동 적용
-- 프롬프트 프리셋 저장/불러오기
+- **Character Prompts** - 캐릭터별 분리 프롬프트 (최대 6개)
+- **Quality Tags / UC Preset** 자동 적용
+- **프롬프트 프리셋** 저장/불러오기
+- **가중치 하이라이팅** - NAI/Local 문법 실시간 색상 표시
+  - NAI: `{강화}`, `[약화]`, `1.2::태그::`
+  - Local: `(강화)`, `[약화]`, `(태그:1.5)`
+  - 가중치 수준에 따라 골드/블루 색상 강조
+- **스마트 태그 자동완성**
+  - 242만+ Danbooru 태그 데이터베이스
+  - 스페이스 입력 시 자동으로 언더바로 변환 검색
+  - 연속 스페이스 2번 입력으로 자동완성 종료
 
 ### 갤러리
 - 생성된 이미지 브라우징 및 관리
@@ -87,6 +95,20 @@ PeroPix/
 ### Local 생성
 - Windows 10/11
 - NVIDIA GPU (8GB+ VRAM 권장)
+
+## Credits
+
+### Tag Autocomplete
+- **Danbooru Tag Database** (2026-01-01)
+  - Source: [DraconicDragon/dbr-e621-lists-archive](https://github.com/DraconicDragon/dbr-e621-lists-archive)
+  - License: Public Domain
+  - 242만+ 태그 데이터로 프롬프트 입력 시 자동완성 지원
+
+### Censoring Model
+- **YOLOv8 Nudenet Detector**
+  - Model: `yolov8x-seg_nudenet_dataset-detector_best.pt`
+  - Purpose: 자동 이미지 검열 기능
+  - NAI 생성 이미지 자동 탐지 및 모자이크 처리
 
 ## License
 

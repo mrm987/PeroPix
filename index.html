@@ -276,6 +276,69 @@
             background: var(--text-dim);
         }
 
+        /* Prompt Weight Highlighting */
+        .prompt-highlight-container {
+            position: relative;
+            width: 100%;
+            margin-bottom: 12px;
+        }
+
+        .prompt-highlight-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            padding: 10px 12px;
+            margin: 0;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-family: inherit;
+            line-height: 1.5;
+            letter-spacing: normal;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 1;
+            color: var(--text);
+            background: var(--bg);
+            box-sizing: border-box;
+        }
+
+        .prompt-highlight-container textarea {
+            position: relative;
+            z-index: 2;
+            background: transparent !important;
+            color: var(--text) !important;
+            caret-color: var(--text);
+            margin: 0;
+            margin-bottom: 0;
+            padding: 10px 12px;
+            line-height: 1.5;
+            letter-spacing: normal;
+            -webkit-text-fill-color: transparent;
+            text-fill-color: transparent;
+            box-sizing: border-box;
+        }
+
+        .prompt-highlight-container textarea::selection {
+            background: rgba(74, 122, 184, 0.3);
+            -webkit-text-fill-color: var(--text);
+            text-fill-color: var(--text);
+        }
+
+        /* Character prompt의 overlay는 bg-light 사용 */
+        .character-item .prompt-highlight-overlay {
+            background: var(--bg-light);
+        }
+
+        .prompt-highlight-overlay span {
+            border-radius: 3px;
+        }
+
         .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
         
@@ -524,6 +587,40 @@
             color: var(--text-dim);
         }
 
+        /* 캐릭터 드래그 핸들 */
+        .char-drag {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            cursor: grab;
+            padding: 0 4px;
+            font-size: 0.9rem;
+            line-height: 1;
+            opacity: 0.4;
+            transition: opacity 0.2s;
+            flex-shrink: 0;
+        }
+
+        .char-drag:hover {
+            opacity: 0.8;
+        }
+
+        .char-drag:active {
+            cursor: grabbing;
+        }
+
+        .character-item.dragging {
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            opacity: 0.9;
+        }
+
+        .char-placeholder {
+            background: var(--bg-lighter);
+            border: 2px dashed var(--border);
+            border-radius: 6px;
+            margin: 3px 0;
+        }
+
         /* Prompt Preset Dropdown */
         .prompt-label-row {
             display: flex;
@@ -724,7 +821,184 @@
             color: var(--text-dim);
             font-size: 0.8rem;
         }
-        
+
+        /* Tag Autocomplete Dropdown */
+        .tag-autocomplete-dropdown {
+            position: fixed;
+            display: none;
+            min-width: 250px;
+            max-width: 450px;
+            max-height: 300px;
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+            z-index: 10000;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        .tag-autocomplete-dropdown.show {
+            display: block;
+        }
+
+        /* Custom scrollbar for autocomplete dropdown */
+        .tag-autocomplete-dropdown::-webkit-scrollbar {
+            width: 8px;
+        }
+        .tag-autocomplete-dropdown::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .tag-autocomplete-dropdown::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+        .tag-autocomplete-dropdown::-webkit-scrollbar-thumb:hover {
+            background: var(--text-dim);
+        }
+
+        .tag-autocomplete-item {
+            padding: 6px 12px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid var(--border-dim);
+            transition: background 0.15s;
+        }
+
+        .tag-autocomplete-item:last-child {
+            border-bottom: none;
+        }
+
+        .tag-autocomplete-item:hover,
+        .tag-autocomplete-item.selected {
+            background: var(--bg);
+        }
+
+        .tag-autocomplete-item-name {
+            flex: 1;
+            font-size: 0.85rem;
+            color: var(--text);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .tag-autocomplete-item-count {
+            flex-shrink: 0;
+            width: 42px;
+            font-size: 0.7rem;
+            font-family: monospace;
+            color: var(--text-dim);
+            text-align: right;
+        }
+
+        .tag-autocomplete-item-badge {
+            flex-shrink: 0;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.65rem;
+            font-weight: 600;
+            text-align: center;
+            line-height: 1;
+        }
+
+        .tag-autocomplete-item-badge.general {
+            background: var(--bg-tertiary);
+            color: var(--text-dim);
+        }
+
+        .tag-autocomplete-item-badge.artist {
+            background: #4a3520;
+            color: #f4a261;
+        }
+
+        .tag-autocomplete-item-badge.character {
+            background: #1f4037;
+            color: #70e1a8;
+        }
+
+        .tag-autocomplete-item-badge.copyright {
+            background: #3d2f5b;
+            color: #b794f4;
+        }
+
+        .tag-autocomplete-item-badge.meta {
+            background: #2d3748;
+            color: #90cdf4;
+        }
+
+        .tag-autocomplete-empty {
+            padding: 12px;
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 0.8rem;
+        }
+
+        .tag-autocomplete-loading {
+            padding: 12px;
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 0.8rem;
+        }
+
+        /* Toggle Switch */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 24px;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--bg-tertiary);
+            transition: 0.3s;
+            border-radius: 24px;
+            border: 1px solid var(--border);
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background-color: var(--text-dim);
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background-color: var(--accent-gold);
+            border-color: var(--accent-gold);
+        }
+
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(24px);
+            background-color: #fff;
+        }
+
+        .toggle-switch input:focus + .toggle-slider {
+            box-shadow: 0 0 0 2px var(--accent-gold-dim);
+        }
+
         /* 폴더 열기 아이콘 버튼 (작은 크기) */
         .folder-btn {
             padding: 4px 8px !important;
@@ -1119,6 +1393,38 @@
 
         .add-slot-btn:hover {
             background: var(--accent-hover);
+        }
+
+        /* 슬롯 사이즈 프리셋 */
+        .slot-size-presets {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 0 4px;
+        }
+
+        .slot-size-preset-btn {
+            background: var(--bg-lighter);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-family: monospace;
+            min-width: 50px;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .slot-size-preset-btn:hover {
+            background: var(--bg-light);
+            border-color: var(--accent-gold);
+        }
+
+        .slot-size-preset-btn.active {
+            color: var(--accent-gold);
+            font-weight: bold;
         }
 
         .header-btn.icon-only {
@@ -2014,6 +2320,91 @@
         }
         .censor-preview-empty .icon { font-size: 4rem; margin-bottom: 16px; opacity: 0.5; }
         .censor-preview-empty p { font-size: 1.1rem; }
+
+        /* 이미지 네비게이션 화살표 */
+        .censor-nav-arrow {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.5);
+            border: none;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            display: none; /* 초기에는 숨김 */
+            align-items: center;
+            justify-content: center;
+            color: white;
+            cursor: pointer;
+            opacity: 0.6;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(8px);
+        }
+        .censor-nav-arrow:hover {
+            opacity: 1;
+            background: rgba(0, 0, 0, 0.7);
+            transform: translateY(-50%) scale(1.1);
+        }
+        .censor-nav-arrow:active {
+            transform: translateY(-50%) scale(0.95);
+        }
+        .censor-nav-arrow:disabled {
+            opacity: 0.2;
+            cursor: not-allowed;
+        }
+        .censor-nav-left {
+            left: 24px;
+        }
+        .censor-nav-right {
+            right: 24px;
+        }
+
+        /* 이미지 번호 표시 */
+        .censor-image-counter {
+            position: absolute;
+            bottom: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 6px 16px;
+            border-radius: 16px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9rem;
+            font-weight: 500;
+            backdrop-filter: blur(8px);
+            pointer-events: none;
+            user-select: none;
+            display: none; /* 초기에는 숨김 */
+        }
+
+        /* 단축키 안내 */
+        .censor-shortcuts-guide {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            align-items: center;
+            padding: 8px 0;
+            color: var(--text-dim);
+            font-size: 0.9rem;
+        }
+        .shortcut-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .censor-shortcuts-guide kbd {
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85rem;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            color: var(--text);
+        }
         
         /* 하단 옵션 패널 - 고정 높이 */
         .censor-options-panel {
@@ -2152,14 +2543,18 @@
             white-space: nowrap;
         }
         .censor-target-item input[type="range"] {
-            width: 50px;
-            height: 14px;
+            width: 100px;
+            height: 6px;
             margin: 0;
             cursor: pointer;
             -webkit-appearance: none;
             appearance: none;
             background: var(--bg-darker, #1a1a1a);
             border-radius: 3px;
+            transition: opacity 0.2s;
+        }
+        .censor-target-item input[type="range"]:hover {
+            opacity: 0.9;
         }
         
         /* 전역 슬라이더 스타일 - 트랙 (Chrome, Safari, Edge) */
@@ -2175,17 +2570,19 @@
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
-            width: 14px;
-            height: 14px;
+            width: 12px;
+            height: 12px;
             background: var(--text, #fff);
             border-radius: 50%;
             border: 2px solid var(--accent-gold, #d4a853);
             cursor: pointer;
             box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            margin-top: -3px; /* 중앙 정렬 (슬라이더 높이 6px 기준) */
         }
         input[type="range"]::-webkit-slider-thumb:hover {
             background: var(--accent-gold, #d4a853);
             border-color: var(--accent-gold-bright, #e6b85a);
+            transform: scale(1.1);
         }
         
         /* 전역 슬라이더 스타일 - 트랙 (Firefox) */
@@ -2199,8 +2596,8 @@
         
         /* 전역 슬라이더 스타일 - 썸 (Firefox) */
         input[type="range"]::-moz-range-thumb {
-            width: 10px;
-            height: 10px;
+            width: 12px;
+            height: 12px;
             background: var(--text, #fff);
             border-radius: 50%;
             border: 2px solid var(--accent-gold, #d4a853);
@@ -2210,6 +2607,7 @@
         input[type="range"]::-moz-range-thumb:hover {
             background: var(--accent-gold, #d4a853);
             border-color: var(--accent-gold-bright, #e6b85a);
+            transform: scale(1.1);
         }
         
         /* Firefox 진행 바 채움 */
@@ -3645,6 +4043,15 @@
             <div class="slots-toolbar" id="slotsToolbar">
                 <div class="toolbar-left">
                     <button type="button" class="add-slot-btn" id="addSlotBtn" title="슬롯 추가">+🎰</button>
+                    <div class="slot-size-presets">
+                        <button type="button" class="slot-size-preset-btn" id="slotSizePreset1" title="좌클릭: 프리셋 1 적용 | 우클릭: 현재 크기 저장">150</button>
+                        <button type="button" class="slot-size-preset-btn" id="slotSizePreset2" title="좌클릭: 프리셋 2 적용 | 우클릭: 현재 크기 저장">675</button>
+                        <button type="button" class="slot-size-preset-btn" id="slotSizePreset3" title="좌클릭: 프리셋 3 적용 | 우클릭: 현재 크기 저장">1200</button>
+                    </div>
+                    <button type="button" class="header-btn" id="clearImagesBtn" title="미리보기 이미지 지우기 (파일은 삭제되지 않음)">
+                        <span>🧹</span>
+                        <span>Clear</span>
+                    </button>
                     <div class="preset-dropdown" id="presetDropdown">
                         <button type="button" class="header-btn preset-btn" id="presetBtn">
                             <span>🔖</span>
@@ -3671,10 +4078,6 @@
                     </button>
                 </div>
                 <div class="toolbar-right">
-                    <button type="button" class="header-btn" id="clearImagesBtn" title="미리보기 이미지 지우기 (파일은 삭제되지 않음)">
-                        <span>🧹</span>
-                        <span>Clear</span>
-                    </button>
                     <span class="toolbar-label">Save to:</span>
                     <div class="folder-dropdown" id="outputFolderDropdown">
                         <button type="button" class="header-btn folder-btn" id="outputFolderBtn">
@@ -3785,10 +4188,28 @@
                 
                 <!-- 큰 프리뷰 + 편집 영역 -->
                 <div class="censor-preview-area">
+                    <!-- 좌측 네비게이션 화살표 -->
+                    <button class="censor-nav-arrow censor-nav-left" id="censorNavLeft" title="이전 이미지 (휠 위)">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                        </svg>
+                    </button>
+
                     <div class="censor-preview-container" id="censorPreviewContainer">
                         <canvas id="censorPreviewCanvas"></canvas>
                         <canvas id="censorOverlayCanvas"></canvas>
                     </div>
+
+                    <!-- 우측 네비게이션 화살표 -->
+                    <button class="censor-nav-arrow censor-nav-right" id="censorNavRight" title="다음 이미지 (휠 아래)">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </button>
+
+                    <!-- 이미지 번호 표시 -->
+                    <div class="censor-image-counter" id="censorImageCounter">0 / 0</div>
+
                     <div class="censor-preview-empty" id="censorPreviewEmpty">
                         <div class="icon">🔍</div>
                         <p>이미지를 선택하세요</p>
@@ -3833,13 +4254,16 @@
                     <div class="censor-options-processing" id="censorOptionsProcessing" style="display: none;">
                         <div class="censor-panel-left">
                             <div class="censor-proc-content">
-                                <div class="censor-nav-info">
-                                    <span class="nav-label">이미지</span>
-                                    <div class="nav-buttons">
-                                        <button type="button" class="nav-btn" id="censorProcPrevBtn">◀</button>
-                                        <span id="censorProcProgress" class="nav-progress">1 / 10</span>
-                                        <button type="button" class="nav-btn" id="censorProcNextBtn">▶</button>
-                                    </div>
+                                <div class="censor-shortcuts-guide">
+                                    <span class="shortcut-item">
+                                        <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> 모드 전환
+                                    </span>
+                                    <span class="shortcut-item">
+                                        <kbd>휠</kbd> 이미지 전환
+                                    </span>
+                                    <span class="shortcut-item">
+                                        <kbd>우클릭</kbd> 박스 삭제
+                                    </span>
                                 </div>
                                 <div class="censor-proc-tools">
                                     <button type="button" class="tool-btn active" id="procToolSelect">↔ 선택</button>
@@ -3868,13 +4292,16 @@
                     <div class="censor-options-after" id="censorOptionsAfter" style="display: none;">
                         <div class="censor-panel-left">
                             <div class="censor-after-content">
-                                <div class="censor-nav-info">
-                                    <span class="nav-label">이미지</span>
-                                    <div class="nav-buttons">
-                                        <button type="button" class="nav-btn" id="censorAfterPrevBtn">◀</button>
-                                        <span id="censorAfterProgress" class="nav-progress">1 / 1</span>
-                                        <button type="button" class="nav-btn" id="censorAfterNextBtn">▶</button>
-                                    </div>
+                                <div class="censor-shortcuts-guide">
+                                    <span class="shortcut-item">
+                                        <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> 모드 전환
+                                    </span>
+                                    <span class="shortcut-item">
+                                        <kbd>휠</kbd> 이미지 전환
+                                    </span>
+                                    <span class="shortcut-item">
+                                        <kbd>우클릭</kbd> 박스 삭제
+                                    </span>
                                 </div>
                                 <div class="censor-proc-tools">
                                     <button type="button" class="tool-btn active" id="afterToolSelect">↔ 선택</button>
@@ -4063,7 +4490,33 @@
                 <label>LoRA Directory</label>
                 <input type="text" id="loraDir" placeholder="./models/loras">
             </div>
-            
+
+            <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px;">
+                <label class="toggle-switch" style="flex-shrink: 0; margin-top: 2px;">
+                    <input type="checkbox" id="tagAutocompleteToggle" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+                <div style="flex: 1; min-width: 0;">
+                    <div style="font-weight: 600; margin-bottom: 4px;">태그 자동 완성</div>
+                    <small style="color: var(--text-dim); display: block; line-height: 1.4;">
+                        댄부루 태그 데이터베이스 기반 자동완성 제안 (Base/Negative/Character 프롬프트)
+                    </small>
+                </div>
+            </div>
+
+            <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px;">
+                <label class="toggle-switch" style="flex-shrink: 0; margin-top: 2px;">
+                    <input type="checkbox" id="promptHighlightToggle" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+                <div style="flex: 1; min-width: 0;">
+                    <div style="font-weight: 600; margin-bottom: 4px;">프롬프트 가중치 강조</div>
+                    <small style="color: var(--text-dim); display: block; line-height: 1.4;">
+                        가중치 문법 색상 표시 (NAI: {강화} [약화], Local: (강화) [약화])
+                    </small>
+                </div>
+            </div>
+
             <hr style="border: none; border-top: 1px solid var(--border); margin: 16px 0;">
             
             <div class="input-group">
@@ -4080,7 +4533,7 @@
                     </div>
                     <span class="local-env-progress-text" id="localEnvProgressText">0%</span>
                 </div>
-                <small style="display: block; margin-top: 12px; color: var(--text-dim);">Python + PyTorch CUDA + diffusers (~3GB, 3-5분)</small>
+                <small style="display: block; margin-top: 12px; color: var(--text-dim);">Python + PyTorch CUDA (~5GB, 3-5분)</small>
             </div>
 
             <button class="btn" onclick="saveSettings()" style="margin-top: 16px;">Save Settings</button>
@@ -4091,12 +4544,12 @@
     <div class="modal" id="localInstallModal">
         <div class="modal-content" style="max-width: 450px;">
             <div class="modal-header">
-                <h2>🖥️ 로컬 생성</h2>
+                <h2>⚙️ 환경 설치</h2>
                 <button class="modal-close" id="localInstallModalClose" onclick="closeLocalInstallModal()">&times;</button>
             </div>
             
             <p style="color: var(--text-dim); margin-bottom: 16px;">
-                로컬 생성을 위해 Python 환경과 PyTorch CUDA를 설치해야 합니다. (최초 1회)
+                로컬 생성/검열 기능을 위해 Python 환경과 PyTorch를 설치해야 합니다. (최초 1회)
             </p>
             
             <div class="input-group">
@@ -4113,7 +4566,7 @@
             
             <div style="display: flex; gap: 8px; margin-top: 16px;">
                 <button class="btn" id="installModalBtn" onclick="installFromModal()" style="flex: 1;">
-                    ⬇️ 설치 (~3GB)
+                    ⬇️ 설치 (~5GB)
                 </button>
                 <button class="btn" id="installModalCancelBtn" onclick="closeLocalInstallModal()" style="flex: 1; background: var(--surface-light);">
                     취소
@@ -4185,8 +4638,10 @@
     <div class="toast" id="toast"></div>
     
     <script>
+        console.log('[PeroPix] Script initialized');
+
         const API_BASE = 'http://127.0.0.1:8765';
-        
+
         let currentProvider = 'nai';
         let currentIndex = 0;
         let totalImages = 0;
@@ -4235,8 +4690,64 @@
         function setSlotWidth(width) {
             currentSlotWidth = Math.max(MIN_SLOT_WIDTH, Math.min(MAX_SLOT_WIDTH, width));
             document.documentElement.style.setProperty('--slot-width', currentSlotWidth + 'px');
+            updateSlotSizePresetButtons();
             autoSaveSettings();
         }
+
+        // 슬롯 사이즈 프리셋
+        let slotSizePresets = [150, 675, 1200]; // 초기값: 최소, 중간, 최대
+
+        function loadSlotSizePresets() {
+            const saved = localStorage.getItem('slotSizePresets');
+            if (saved) {
+                try {
+                    slotSizePresets = JSON.parse(saved);
+                } catch (e) {
+                    console.warn('Failed to load slot size presets:', e);
+                }
+            }
+            updateSlotSizePresetButtons();
+        }
+
+        function saveSlotSizePresets() {
+            localStorage.setItem('slotSizePresets', JSON.stringify(slotSizePresets));
+        }
+
+        function updateSlotSizePresetButtons() {
+            for (let i = 0; i < 3; i++) {
+                const btn = document.getElementById(`slotSizePreset${i + 1}`);
+                if (btn) {
+                    btn.textContent = slotSizePresets[i];
+                    // 활성 프리셋 표시 (현재 슬롯 폭과 일치 시)
+                    if (Math.abs(currentSlotWidth - slotSizePresets[i]) < 5) {
+                        btn.classList.add('active');
+                    } else {
+                        btn.classList.remove('active');
+                    }
+                }
+            }
+        }
+
+        // 프리셋 버튼 이벤트 리스너
+        (function setupSlotSizePresets() {
+            for (let i = 0; i < 3; i++) {
+                const btn = document.getElementById(`slotSizePreset${i + 1}`);
+                if (!btn) continue;
+
+                // 좌클릭: 프리셋 적용
+                btn.addEventListener('click', () => {
+                    setSlotWidth(slotSizePresets[i]);
+                });
+
+                // 우클릭: 현재 크기 저장
+                btn.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    slotSizePresets[i] = currentSlotWidth;
+                    saveSlotSizePresets();
+                    updateSlotSizePresetButtons();
+                });
+            }
+        })();
 
         function setupSlotResize(slot) {
             const handle = slot.querySelector('.slot-resize-handle');
@@ -4342,8 +4853,12 @@
                 }
             };
 
-            slot.querySelector('textarea').oninput = updateQueueButton;
-            
+            const tagsTextarea = slot.querySelector('textarea');
+            tagsTextarea.oninput = updateQueueButton;
+
+            // 태그 자동완성 설정
+            setupTagAutocomplete(tagsTextarea);
+
             // 탭 키로 같은 타입 필드 간 이동
             const nameInput = slot.querySelector('.slot-name');
             const tagsInput = slot.querySelector('.slot-tags');
@@ -5483,6 +5998,8 @@
                                 const content = await getPromptPreset(category, filename);
                                 if (content !== null) {
                                     textarea.value = content;
+                                    // 하이라이팅 업데이트를 위해 input 이벤트 트리거
+                                    textarea.dispatchEvent(new Event('input', { bubbles: true }));
                                     menu.classList.remove('show');
                                 }
                             };
@@ -5558,6 +6075,13 @@
             const header = document.createElement('div');
             header.className = 'character-item-header';
 
+            // 드래그 핸들
+            const dragHandle = document.createElement('button');
+            dragHandle.type = 'button';
+            dragHandle.className = 'char-drag';
+            dragHandle.innerHTML = '⋮⋮';
+            dragHandle.title = '드래그하여 순서 변경';
+
             // 접기 버튼
             const collapseBtn = document.createElement('button');
             collapseBtn.type = 'button';
@@ -5604,6 +6128,7 @@
                 autoSaveSettings();
             };
 
+            header.appendChild(dragHandle);
             header.appendChild(collapseBtn);
             header.appendChild(enableToggle);
             header.appendChild(charNum);
@@ -5619,12 +6144,25 @@
             textarea.placeholder = 'Character prompt...';
             textarea.rows = 2;
 
+            // content가 있으면 나중에 input 이벤트 트리거
+            if (content) {
+                setTimeout(() => {
+                    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                }, 50);
+            }
+
             contentDiv.appendChild(textarea);
+
+            // 드래그 핸들 이벤트
+            dragHandle.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                startCharDrag(item, e);
+            });
 
             // 헤더 바 전체 클릭으로 접기/펴기
             header.addEventListener('click', (e) => {
-                // 체크박스, 프리셋, 삭제 버튼 클릭은 무시
-                if (e.target.closest('.char-enable-toggle, .prompt-preset-dropdown, .delete-char-btn')) return;
+                // 체크박스, 프리셋, 삭제, 드래그 버튼 클릭은 무시
+                if (e.target.closest('.char-enable-toggle, .prompt-preset-dropdown, .delete-char-btn, .char-drag')) return;
                 collapseBtn.classList.toggle('collapsed');
                 contentDiv.classList.toggle('collapsed');
                 autoSaveSettings();
@@ -5635,6 +6173,12 @@
 
             // 프리셋 드롭다운 이벤트 연결
             setupPromptPresetDropdown(presetDropdown, textarea);
+
+            // 태그 자동완성 설정
+            setupTagAutocomplete(textarea);
+
+            // 프롬프트 가중치 하이라이팅 설정
+            setupPromptHighlighting(textarea);
 
             return item;
         }
@@ -5694,12 +6238,111 @@
                 enabled: item.querySelector('.char-enable-toggle').checked
             }));
         }
-        
+
+        // 캐릭터 드래그 앤 드롭
+        let draggedChar = null;
+        let dragStartY = 0;
+        let charStartY = 0;
+        let charPlaceholder = null;
+
+        function startCharDrag(item, e) {
+            draggedChar = item;
+            dragStartY = e.clientY;
+
+            const rect = item.getBoundingClientRect();
+            charStartY = rect.top;
+
+            // 플레이스홀더 생성
+            charPlaceholder = document.createElement('div');
+            charPlaceholder.className = 'char-placeholder';
+            charPlaceholder.style.height = rect.height + 'px';
+
+            // 드래그 중 스타일
+            item.classList.add('dragging');
+            item.style.position = 'fixed';
+            item.style.left = rect.left + 'px';
+            item.style.top = rect.top + 'px';
+            item.style.width = rect.width + 'px';
+            item.style.zIndex = '1000';
+
+            item.parentNode.insertBefore(charPlaceholder, item);
+            document.body.appendChild(item);
+
+            // 마우스 이벤트 등록
+            document.addEventListener('mousemove', onCharDrag);
+            document.addEventListener('mouseup', endCharDrag);
+        }
+
+        function onCharDrag(e) {
+            if (!draggedChar) return;
+
+            const deltaY = e.clientY - dragStartY;
+            draggedChar.style.top = (charStartY + deltaY) + 'px';
+
+            // 다른 캐릭터 아이템들과 위치 비교
+            const items = charactersList.querySelectorAll('.character-item:not(.dragging)');
+            let targetItem = null;
+            let insertBefore = true;
+
+            for (const item of items) {
+                const rect = item.getBoundingClientRect();
+                const midY = rect.top + rect.height / 2;
+
+                if (e.clientY < midY) {
+                    targetItem = item;
+                    insertBefore = true;
+                    break;
+                }
+                targetItem = item;
+                insertBefore = false;
+            }
+
+            // 플레이스홀더 위치 업데이트
+            if (targetItem) {
+                if (insertBefore) {
+                    charactersList.insertBefore(charPlaceholder, targetItem);
+                } else {
+                    if (targetItem.nextSibling) {
+                        charactersList.insertBefore(charPlaceholder, targetItem.nextSibling);
+                    } else {
+                        charactersList.appendChild(charPlaceholder);
+                    }
+                }
+            }
+        }
+
+        function endCharDrag() {
+            if (!draggedChar) return;
+
+            // 플레이스홀더 위치에 아이템 삽입
+            charactersList.insertBefore(draggedChar, charPlaceholder);
+            charPlaceholder.remove();
+
+            // 드래그 스타일 제거
+            draggedChar.classList.remove('dragging');
+            draggedChar.style.position = '';
+            draggedChar.style.left = '';
+            draggedChar.style.top = '';
+            draggedChar.style.width = '';
+            draggedChar.style.zIndex = '';
+
+            // 번호 업데이트 및 저장
+            updateCharacterNumbers();
+            autoSaveSettings();
+
+            // 이벤트 제거
+            document.removeEventListener('mousemove', onCharDrag);
+            document.removeEventListener('mouseup', endCharDrag);
+
+            draggedChar = null;
+            charPlaceholder = null;
+        }
+
         addCharBtn.onclick = () => {
             addCharacter();
             autoSaveSettings();
         };
-        
+
         // LoRA 슬롯 시스템
         let availableLoras = [];  // 폴더에서 로드된 LoRA 목록
         let loraSlots = [];       // 현재 활성화된 LoRA 슬롯들 [{ name, scale }]
@@ -6323,6 +6966,8 @@
         // Settings
         function openSettings() {
             document.getElementById('settingsModal').classList.add('active');
+            // Sync tag autocomplete checkbox with current state
+            document.getElementById('tagAutocompleteToggle').checked = tagAutocompleteEnabled;
             checkLocalEnvStatus();
         }
         
@@ -6407,7 +7052,7 @@
             } else if (data.installed) {
                 statusEl.className = 'local-env-status installed';
                 statusEl.innerHTML = `<span class="status-icon">✅</span><span class="status-text">Installed</span>`;
-                actionsEl.innerHTML = `<button class="btn btn-danger" onclick="uninstallLocalEnv()">Uninstall</button>`;
+                actionsEl.innerHTML = `<button class="btn btn-danger" onclick="uninstallLocalEnv()">제거</button>`;
                 progressEl.style.display = 'none';
                 stopLocalEnvPolling();
                 
@@ -6462,7 +7107,10 @@
         }
         
         // Local Install Modal
-        function showLocalInstallModal() {
+        let installModalSource = 'local'; // 'local' | 'censor' - 어디서 팝업을 열었는지
+        
+        function showLocalInstallModal(source = 'local') {
+            installModalSource = source;
             document.getElementById('localInstallModal').classList.add('active');
             updateInstallModalStatus();
         }
@@ -6499,20 +7147,44 @@
                         if (closeBtn) closeBtn.style.display = '';
                         if (cancelBtn) cancelBtn.disabled = false;
                         
-                        // 방금 설치가 완료된 경우 → 재시작 모달 표시
+                        // 방금 설치가 완료된 경우 → 상태 업데이트 후 재시작 모달 표시
                         if (wasInstalling) {
+                            // Local 탭 활성화 (재시작 안 해도 접근 가능하게)
+                            localEnvInstalled = true;
+                            enableLocalTab(true);
+
                             setTimeout(() => {
                                 closeLocalInstallModal();
                                 showRestartModal();
                             }, 500);
                         } else {
-                            // 이미 설치된 상태로 모달 열린 경우 → 그냥 탭 전환
+                        // 이미 설치된 상태로 모달 열린 경우
                             setTimeout(() => {
                                 closeLocalInstallModal();
-                                localEnvInstalled = true;
-                                currentProvider = 'local';
-                                tabs.forEach(t => t.classList.toggle('active', t.dataset.provider === 'local'));
-                                providerSections.forEach(s => s.classList.toggle('active', s.dataset.provider === 'local'));
+                                if (installModalSource === 'censor') {
+                                    // 검열 모드에서 열었으면 검열 모드로 진입
+                                    if (data.censor_ready) {
+                                        // ultralytics 설치됨 - 검열 모드 진입
+                                        currentMode = 'censor';
+                                        censorModeBtn.classList.add('active');
+                                        slotModeBtn.classList.remove('active');
+                                        galleryModeBtn.classList.remove('active');
+                                        document.getElementById('slotsToolbar').style.display = 'none';
+                                        document.getElementById('slotsWrapper').style.display = 'none';
+                                        document.getElementById('galleryContainer').style.display = 'none';
+                                        document.getElementById('censorContainer').style.display = 'flex';
+                                        if (typeof initCensorMode === 'function') initCensorMode();
+                                    } else {
+                                        // ultralytics 미설치 - 재설치 필요 안내
+                                        showToast('검열 기능을 위해 환경 재설치가 필요합니다. Settings > Local에서 제거 후 다시 설치해주세요.', 'error', 5000);
+                                    }
+                                } else {
+                                    // 로컬에서 열었으면 로컬 탭으로 전환
+                                    localEnvInstalled = true;
+                                    currentProvider = 'local';
+                                    tabs.forEach(t => t.classList.toggle('active', t.dataset.provider === 'local'));
+                                    providerSections.forEach(s => s.classList.toggle('active', s.dataset.provider === 'local'));
+                                }
                             }, 500);
                         }
                     } else if (data.installing) {
@@ -6558,7 +7230,7 @@
                             stopInstallPolling();
                             statusEl.className = 'local-env-status not-installed';
                             statusEl.innerHTML = '<span class="status-text">⚠️ 설치 필요</span>';
-                            btn.textContent = '⬇️ 설치 (~3GB)';
+                            btn.textContent = '⬇️ 설치 (~5GB)';
                             btn.disabled = false;
                             btn.style.opacity = '1';
                             progressEl.style.display = 'none';
@@ -6596,24 +7268,42 @@
         function showRestartModal() {
             document.getElementById('restartModal').classList.add('active');
         }
-        
-        async function confirmRestart() {
-            const btn = document.getElementById('restartConfirmBtn');
-            btn.textContent = '⏳ 재시작 중...';
-            btn.disabled = true;
-            btn.style.opacity = '0.5';
-            
+
+        async function autoRestart() {
+            // 자동 재시작 (토스트 알림만 표시)
+            showToast('⏳ 재시작 중... 잠시만 기다려주세요.', 'info', 0);
+
             try {
                 // 서버에 재시작 요청
                 await fetch(`${API_BASE}/api/restart`, { method: 'POST' });
             } catch (e) {
                 // 서버가 종료되면서 연결이 끊어질 수 있음
             }
-            
+
+            // 서버가 다시 올라올 때까지 대기 후 페이지 새로고침
+            await waitForServer();
+
+            // 페이지 새로고침
+            window.location.reload();
+        }
+
+        async function confirmRestart() {
+            const btn = document.getElementById('restartConfirmBtn');
+            btn.textContent = '⏳ 재시작 중...';
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+
+            try {
+                // 서버에 재시작 요청
+                await fetch(`${API_BASE}/api/restart`, { method: 'POST' });
+            } catch (e) {
+                // 서버가 종료되면서 연결이 끊어질 수 있음
+            }
+
             // 서버가 다시 올라올 때까지 대기 후 페이지 새로고침
             btn.textContent = '⏳ 서버 대기 중...';
             await waitForServer();
-            
+
             // 페이지 새로고침
             window.location.reload();
         }
@@ -6672,7 +7362,7 @@
                     showToast(data.detail || '설치 시작 실패', 'error');
                     // 실패 시 UI 복원
                     isInstalling = false;
-                    btn.textContent = '⬇️ 설치 (~3GB)';
+                    btn.textContent = '⬇️ 설치 (~5GB)';
                     btn.disabled = false;
                     btn.style.opacity = '1';
                     if (closeBtn) closeBtn.style.display = '';
@@ -6685,7 +7375,7 @@
                 showToast('설치 시작 실패', 'error');
                 // 실패 시 UI 복원
                 isInstalling = false;
-                btn.textContent = '⬇️ 설치 (~3GB)';
+                btn.textContent = '⬇️ 설치 (~5GB)';
                 btn.disabled = false;
                 btn.style.opacity = '1';
                 if (closeBtn) closeBtn.style.display = '';
@@ -6713,17 +7403,20 @@
         
         async function uninstallLocalEnv() {
             showConfirmModal(
-                '🗑️ 로컬 엔진 제거',
-                '<p>로컬 생성 엔진을 제거하시겠습니까?</p><p style="color: var(--text-dim); font-size: 0.9rem;">약 3GB 디스크 공간이 확보됩니다.</p>',
+                '🗑️ 환경 제거',
+                '<p>로컬 생성/검열 환경을 제거하시겠습니까?</p><p style="color: var(--text-dim); font-size: 0.9rem;">약 5GB 디스크 공간이 확보됩니다.</p>',
                 async () => {
                     try {
+                        showToast('제거 중...', '', 30000);
                         const res = await fetch(`${API_BASE}/api/local/uninstall`, { method: 'DELETE' });
                         if (res.ok) {
-                            showToast('제거됨', 'success');
+                            showToast('제거 완료', 'success');
                             checkLocalEnvStatus();
+                        } else {
+                            showToast('제거 실패', 'error');
                         }
                     } catch (e) {
-                        showToast('제거 실패', 'error');
+                        showToast('제거 실패: ' + e.message, 'error');
                     }
                 },
                 '제거',
@@ -6854,11 +7547,22 @@
 
             if (isPureNai) {
                 // V4.5 Quality Tags 제거 (프롬프트 끝에 추가된 태그)
-                const v45QualityTags = ", very aesthetic, masterpiece, no text";
-                if (prompt.endsWith(v45QualityTags)) {
-                    prompt = prompt.slice(0, -v45QualityTags.length);
-                    qualityTags = true; // 제거했으므로 옵션을 켜서 다시 추가되도록 함
-                } else {
+                const v45QualityTagsPatterns = [
+                    ", very aesthetic, masterpiece, no text, -2::upscaled, blurry::,", // Enhance
+                    ", very aesthetic, masterpiece, no text" // 일반
+                ];
+
+                let tagRemoved = false;
+                for (const pattern of v45QualityTagsPatterns) {
+                    if (prompt.endsWith(pattern)) {
+                        prompt = prompt.slice(0, -pattern.length);
+                        qualityTags = true; // 제거했으므로 옵션을 켜서 다시 추가되도록 함
+                        tagRemoved = true;
+                        break;
+                    }
+                }
+
+                if (!tagRemoved) {
                     qualityTags = false; // 퀄리티 태그가 없으면 옵션 끄기
                 }
 
@@ -7037,8 +7741,18 @@
         // 메타데이터 설정 적용
         function applyMetadataSettings(metadata) {
             // 프롬프트 (공란이어도 적용)
-            if (metadata.prompt !== undefined) document.getElementById('basePrompt').value = metadata.prompt;
-            if (metadata.negative_prompt !== undefined) document.getElementById('negativePrompt').value = metadata.negative_prompt;
+            if (metadata.prompt !== undefined) {
+                const basePrompt = document.getElementById('basePrompt');
+                basePrompt.value = metadata.prompt;
+                // 하이라이팅 업데이트를 위해 input 이벤트 트리거
+                basePrompt.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            if (metadata.negative_prompt !== undefined) {
+                const negativePrompt = document.getElementById('negativePrompt');
+                negativePrompt.value = metadata.negative_prompt;
+                // 하이라이팅 업데이트를 위해 input 이벤트 트리거
+                negativePrompt.dispatchEvent(new Event('input', { bubbles: true }));
+            }
 
             // 캐릭터 프롬프트 적용
             if (metadata.character_prompts && metadata.character_prompts.length > 0) {
@@ -7782,6 +8496,826 @@
         updateSmeaVisibility(); // 초기 실행
 
         // ============================================================
+        // Prompt Weight Highlighting System
+        // ============================================================
+
+        let promptHighlightEnabled = true;
+
+        /**
+         * NAI 문법 파싱: {text}, [text], number::text ::
+         * @param {string} text - 파싱할 프롬프트 텍스트
+         * @returns {Array} - [{text: string, level: number}, ...]
+         */
+        function parseNAIWeights(text) {
+            const result = [];
+            let i = 0;
+            let currentLevel = 0;
+            let levelStack = [];
+
+            while (i < text.length) {
+                // 수치 가중치 파싱: number::
+                if (text[i].match(/\d/) || text[i] === '-') {
+                    const numMatch = text.substring(i).match(/^(-?\d+\.?\d*)::(.*?)::/);
+                    if (numMatch) {
+                        const weight = parseFloat(numMatch[1]);
+                        const content = numMatch[2];
+
+                        // 가중치를 레벨로 변환 (1.0 = 0, 1.5 = +5, 0.5 = -5)
+                        let level = Math.round((weight - 1.0) * 10);
+
+                        // 수치 문법은 괄호 포함
+                        result.push({ text: `${numMatch[1]}::${content}::`, level });
+                        i += numMatch[0].length;
+                        continue;
+                    }
+                }
+
+                // { 강화 괄호
+                if (text[i] === '{') {
+                    result.push({ text: '{', level: 0 }); // 괄호는 강조 없음
+                    levelStack.push(currentLevel);
+                    currentLevel++;
+                    i++;
+                    continue;
+                }
+
+                // [ 약화 괄호
+                if (text[i] === '[') {
+                    result.push({ text: '[', level: 0 }); // 괄호는 강조 없음
+                    levelStack.push(currentLevel);
+                    currentLevel--;
+                    i++;
+                    continue;
+                }
+
+                // 닫는 괄호 } ]
+                if (text[i] === '}' || text[i] === ']') {
+                    if (levelStack.length > 0) {
+                        currentLevel = levelStack.pop();
+                    }
+                    result.push({ text: text[i], level: 0 }); // 괄호는 강조 없음
+                    i++;
+                    continue;
+                }
+
+                // 일반 텍스트 수집
+                let textChunk = '';
+                while (i < text.length && text[i] !== '{' && text[i] !== '[' && text[i] !== '}' && text[i] !== ']') {
+                    // 수치 가중치 체크
+                    if (text[i].match(/\d/) || text[i] === '-') {
+                        const numMatch = text.substring(i).match(/^(-?\d+\.?\d*)::(.*?)::/);
+                        if (numMatch) break;
+                    }
+                    textChunk += text[i];
+                    i++;
+                }
+
+                if (textChunk) {
+                    result.push({ text: textChunk, level: currentLevel });
+                }
+            }
+
+            return result;
+        }
+
+        /**
+         * Local (Stable Diffusion) 문법 파싱: (text), [text], (text:number)
+         * @param {string} text - 파싱할 프롬프트 텍스트
+         * @returns {Array} - [{text: string, level: number}, ...]
+         */
+        function parseLocalWeights(text) {
+            const result = [];
+            let i = 0;
+            let currentLevel = 0;
+            let levelStack = [];
+
+            while (i < text.length) {
+                // ( 강화 괄호
+                if (text[i] === '(') {
+                    // (text:number) 형식 체크
+                    const weightMatch = text.substring(i).match(/^\(([^:)]+):(-?\d+\.?\d*)\)/);
+                    if (weightMatch) {
+                        const content = weightMatch[1];
+                        const weight = parseFloat(weightMatch[2]);
+
+                        // 가중치를 레벨로 변환 (1.0 = 0, 1.1 = +1, 0.9 = -1)
+                        let level = Math.round((weight - 1.0) * 10);
+
+                        // 수치 문법은 괄호 포함
+                        result.push({ text: `(${content}:${weightMatch[2]})`, level });
+                        i += weightMatch[0].length;
+                        continue;
+                    }
+
+                    // 일반 (text) 형식
+                    result.push({ text: '(', level: 0 }); // 괄호는 강조 없음
+                    levelStack.push(currentLevel);
+                    currentLevel++;
+                    i++;
+                    continue;
+                }
+
+                // [ 약화 괄호
+                if (text[i] === '[') {
+                    result.push({ text: '[', level: 0 }); // 괄호는 강조 없음
+                    levelStack.push(currentLevel);
+                    currentLevel--;
+                    i++;
+                    continue;
+                }
+
+                // 닫는 괄호 ) ]
+                if (text[i] === ')' || text[i] === ']') {
+                    if (levelStack.length > 0) {
+                        currentLevel = levelStack.pop();
+                    }
+                    result.push({ text: text[i], level: 0 }); // 괄호는 강조 없음
+                    i++;
+                    continue;
+                }
+
+                // 일반 텍스트 수집
+                let textChunk = '';
+                while (i < text.length && text[i] !== '(' && text[i] !== '[' && text[i] !== ')' && text[i] !== ']') {
+                    textChunk += text[i];
+                    i++;
+                }
+
+                if (textChunk) {
+                    result.push({ text: textChunk, level: currentLevel });
+                }
+            }
+
+            return result;
+        }
+
+        /**
+         * 가중치 레벨을 색상으로 변환 (-2 ~ +2 범위로 제한)
+         * @param {number} level - 가중치 레벨
+         * @returns {string} - CSS 색상 문자열
+         */
+        function levelToColor(level) {
+            // 레벨을 -2 ~ +2 범위로 제한
+            const clampedLevel = Math.max(-2, Math.min(2, level));
+
+            if (clampedLevel === 0) {
+                return 'transparent';
+            }
+
+            const goldColor = '#F5B942'; // --accent-gold
+            const blueColor = '#4A7AB8'; // --accent
+
+            if (clampedLevel > 0) {
+                // 강화: 골드 (투명도로 강도 표현)
+                const opacity = 0.2 + (clampedLevel / 2) * 0.3; // 0.2 ~ 0.5
+                return `rgba(245, 185, 66, ${opacity})`;
+            } else {
+                // 약화: 블루 (투명도로 강도 표현)
+                const opacity = 0.2 + (Math.abs(clampedLevel) / 2) * 0.3; // 0.2 ~ 0.5
+                return `rgba(74, 122, 184, ${opacity})`;
+            }
+        }
+
+        /**
+         * 프롬프트 텍스트를 하이라이팅하여 overlay에 렌더링
+         * @param {HTMLTextAreaElement} textarea - 프롬프트 textarea
+         * @param {HTMLElement} overlay - overlay div
+         */
+        function highlightPrompt(textarea, overlay) {
+            const text = textarea.value;
+            if (!text) {
+                overlay.innerHTML = '';
+                return;
+            }
+
+            // 하이라이트가 꺼져있으면 일반 텍스트만 표시
+            if (!promptHighlightEnabled) {
+                const escapedText = text
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+                overlay.innerHTML = escapedText;
+                overlay.scrollTop = textarea.scrollTop;
+                overlay.scrollLeft = textarea.scrollLeft;
+                return;
+            }
+
+            // 현재 모드에 따라 파서 선택
+            const naiTab = document.getElementById('naiTab');
+            const localTab = document.getElementById('localTab');
+            const isLocalMode = localTab && localTab.classList.contains('active');
+            const parseFunction = isLocalMode ? parseLocalWeights : parseNAIWeights;
+
+            // 텍스트 파싱
+            const parsed = parseFunction(text);
+
+            // HTML 생성
+            let html = '';
+            parsed.forEach(chunk => {
+                const color = levelToColor(chunk.level);
+                const escapedText = chunk.text
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+
+                if (color === 'transparent' || !color) {
+                    html += escapedText;
+                } else {
+                    html += `<span style="background-color: ${color};">${escapedText}</span>`;
+                }
+            });
+
+            overlay.innerHTML = html;
+
+            // overlay 스크롤을 textarea와 동기화
+            overlay.scrollTop = textarea.scrollTop;
+            overlay.scrollLeft = textarea.scrollLeft;
+        }
+
+        /**
+         * textarea에 프롬프트 하이라이팅 적용
+         * @param {HTMLTextAreaElement} textarea - 대상 textarea
+         */
+        function setupPromptHighlighting(textarea) {
+            if (!textarea) {
+                console.warn('[PromptHighlight] setupPromptHighlighting called with null textarea');
+                return;
+            }
+
+            // 이미 설정된 경우 스킵
+            if (textarea.dataset.highlightSetup === 'true') {
+                console.log('[PromptHighlight] Already setup for', textarea.id);
+                return;
+            }
+            textarea.dataset.highlightSetup = 'true';
+
+            console.log('[PromptHighlight] Setting up highlighting for', textarea.id);
+
+            // Wrapper 생성
+            const wrapper = document.createElement('div');
+            wrapper.className = 'prompt-highlight-container';
+
+            // Overlay 생성
+            const overlay = document.createElement('div');
+            overlay.className = 'prompt-highlight-overlay';
+
+            // textarea를 wrapper로 감싸기
+            textarea.parentNode.insertBefore(wrapper, textarea);
+            wrapper.appendChild(overlay);
+            wrapper.appendChild(textarea);
+
+            console.log('[PromptHighlight] Created wrapper and overlay for', textarea.id);
+
+            // 초기 하이라이팅
+            highlightPrompt(textarea, overlay);
+
+            // 이벤트 리스너
+            textarea.addEventListener('input', () => {
+                highlightPrompt(textarea, overlay);
+            });
+
+            textarea.addEventListener('scroll', () => {
+                overlay.scrollTop = textarea.scrollTop;
+                overlay.scrollLeft = textarea.scrollLeft;
+            });
+
+            // 창 크기 변경 시 재렌더링
+            const resizeObserver = new ResizeObserver(() => {
+                highlightPrompt(textarea, overlay);
+            });
+            resizeObserver.observe(textarea);
+        }
+
+        // ============================================================
+        // Tag Autocomplete System
+        // ============================================================
+
+        let ALL_TAGS = [];
+        let TAG_INDEX = {}; // 첫 글자 인덱싱 for O(1) access
+        let tagAutocompleteEnabled = true;
+        let tagsLoaded = false;
+
+        // Load tag data from JSON
+        async function loadTagData() {
+            console.log('[TagAutocomplete] Loading tag data from data/tags.json...');
+            try {
+                const response = await fetch('data/tags.json');
+                console.log('[TagAutocomplete] Fetch response:', response.status, response.statusText);
+
+                if (!response.ok) {
+                    console.warn('[TagAutocomplete] Tag data not found (HTTP ' + response.status + '). Autocomplete disabled.');
+                    tagAutocompleteEnabled = false;
+                    return;
+                }
+
+                const tags = await response.json();
+                ALL_TAGS = tags;
+                console.log('[TagAutocomplete] Parsed', ALL_TAGS.length, 'tags from JSON');
+
+                // Build first-letter index for fast lookup
+                TAG_INDEX = {};
+                tags.forEach(tag => {
+                    const firstChar = tag.label[0].toLowerCase();
+                    if (!TAG_INDEX[firstChar]) {
+                        TAG_INDEX[firstChar] = [];
+                    }
+                    TAG_INDEX[firstChar].push(tag);
+
+                    // Add lowercase cache
+                    tag._lower = tag.label.toLowerCase();
+                });
+
+                tagsLoaded = true;
+                console.log('[TagAutocomplete] Ready! Loaded', ALL_TAGS.length, 'tags, indexed', Object.keys(TAG_INDEX).length, 'letters');
+                console.log('[TagAutocomplete] Enabled:', tagAutocompleteEnabled);
+            } catch (error) {
+                console.error('[TagAutocomplete] Failed to load tag data:', error);
+                tagAutocompleteEnabled = false;
+            }
+        }
+
+        // Get current word at cursor position
+        function getCurrentWord(textarea) {
+            const value = textarea.value;
+            const cursorPos = textarea.selectionStart;
+
+            // 태그에 유효한 문자: 알파벳, 숫자, 언더스코어, 하이픈, 공백
+            const isTagChar = (char) => /[a-zA-Z0-9_\-\s]/.test(char);
+
+            // 커서 위치에서 뒤로 스캔하여 단어 시작점 찾기
+            let start = cursorPos;
+            while (start > 0) {
+                const char = value[start - 1];
+                // 콤마, 개행, 괄호, 콜론은 단어 경계
+                if (char === ',' || char === '\n' || char === '\r' ||
+                    char === '{' || char === '}' || char === '[' || char === ']' ||
+                    char === '(' || char === ')' || char === ':') {
+                    break;
+                }
+                if (!isTagChar(char)) {
+                    break;
+                }
+                start--;
+            }
+
+            // 커서 위치에서 앞으로 스캔하여 단어 끝점 찾기
+            let end = cursorPos;
+            while (end < value.length) {
+                const char = value[end];
+                // 콤마, 개행, 괄호, 콜론은 단어 경계
+                if (char === ',' || char === '\n' || char === '\r' ||
+                    char === '{' || char === '}' || char === '[' || char === ']' ||
+                    char === '(' || char === ')' || char === ':') {
+                    break;
+                }
+                if (!isTagChar(char)) {
+                    break;
+                }
+                end++;
+            }
+
+            // 추출한 단어
+            const beforeTrim = value.substring(start, end);
+            const word = beforeTrim.trim();
+
+            // 공백 제거한 후 실제 단어의 위치 재계산
+            const leadingSpaces = beforeTrim.length - beforeTrim.trimStart().length;
+            const trailingSpaces = beforeTrim.length - beforeTrim.trimEnd().length;
+
+            return {
+                word,
+                rawWord: beforeTrim,  // trim 전 원본 (공백 포함)
+                start: start + leadingSpaces,  // 공백 제외한 단어 시작
+                end: end - trailingSpaces,     // 공백 제외한 단어 끝
+                fullStart: start,              // 공백 포함한 시작
+                fullEnd: end,                  // 공백 포함한 끝
+                cursorPos
+            };
+        }
+
+        // Search tags with 2-stage algorithm
+        function searchTags(query, maxResults = 15) {
+            if (!query || query.length < 2) return [];
+
+            const lowerQuery = query.toLowerCase();
+            const firstChar = lowerQuery[0];
+            const results = [];
+
+            // Stage 1: Search indexed tags (startsWith)
+            if (TAG_INDEX[firstChar]) {
+                for (const tag of TAG_INDEX[firstChar]) {
+                    if (tag._lower.startsWith(lowerQuery)) {
+                        results.push(tag);
+                        if (results.length >= maxResults) return results;
+                    }
+                }
+            }
+
+            // Stage 2: If not enough results, search all tags (includes)
+            if (results.length < maxResults) {
+                for (const tag of ALL_TAGS) {
+                    if (results.includes(tag)) continue;
+                    if (tag._lower.includes(lowerQuery)) {
+                        results.push(tag);
+                        if (results.length >= maxResults) break;
+                    }
+                }
+            }
+
+            return results;
+        }
+
+        // Format number with K/M suffix
+        function formatCount(count) {
+            if (count >= 1000000) return (count / 1000000).toFixed(1) + 'M';
+            if (count >= 1000) return (count / 1000).toFixed(1) + 'K';
+            return count.toString();
+        }
+
+        // Create autocomplete dropdown
+        function createAutocompleteDropdown() {
+            const dropdown = document.createElement('div');
+            dropdown.className = 'tag-autocomplete-dropdown';
+            dropdown.id = 'tagAutocompleteDropdown';
+            document.body.appendChild(dropdown);
+            return dropdown;
+        }
+
+        // Get or create dropdown
+        function getAutocompleteDropdown() {
+            let dropdown = document.getElementById('tagAutocompleteDropdown');
+            if (!dropdown) {
+                dropdown = createAutocompleteDropdown();
+            }
+            return dropdown;
+        }
+
+        // Show autocomplete dropdown
+        function showAutocomplete(textarea, results) {
+            const dropdown = getAutocompleteDropdown();
+            dropdown.innerHTML = '';
+
+            if (results.length === 0) {
+                dropdown.innerHTML = '<div class="tag-autocomplete-empty">No matching tags</div>';
+                dropdown.classList.add('show');
+                return;
+            }
+
+            results.forEach((tag, index) => {
+                const item = document.createElement('div');
+                item.className = 'tag-autocomplete-item';
+                if (index === 0) item.classList.add('selected');
+                item.dataset.index = index;
+                item.dataset.tagValue = tag.value;
+
+                const name = document.createElement('span');
+                name.className = 'tag-autocomplete-item-name';
+                name.textContent = tag.label;
+                name.title = tag.label;  // 마우스 오버 시 전체 태그명 표시
+
+                const badge = document.createElement('span');
+                badge.className = `tag-autocomplete-item-badge ${tag.type}`;
+
+                // 카테고리 한글 표시
+                const categoryNames = {
+                    'general': '일반',
+                    'artist': '작가',
+                    'character': '캐릭터',
+                    'copyright': '작품',
+                    'meta': '기타'
+                };
+                badge.textContent = categoryNames[tag.type] || tag.type;
+
+                const count = document.createElement('span');
+                count.className = 'tag-autocomplete-item-count';
+                count.textContent = formatCount(tag.count);
+
+                item.appendChild(name);
+                item.appendChild(badge);
+                item.appendChild(count);
+
+                // Click to insert
+                item.addEventListener('click', () => {
+                    insertTag(textarea, tag.value);
+                    hideAutocomplete();
+                });
+
+                dropdown.appendChild(item);
+            });
+
+            // Position dropdown near cursor
+            positionDropdown(textarea, dropdown);
+            dropdown.classList.add('show');
+
+            // Store results for keyboard navigation
+            dropdown._currentResults = results;
+            dropdown._selectedIndex = 0;
+            dropdown._textarea = textarea;
+        }
+
+        // Hide autocomplete dropdown
+        function hideAutocomplete() {
+            const dropdown = getAutocompleteDropdown();
+            dropdown.classList.remove('show');
+        }
+
+        // Get accurate cursor pixel position (handles word wrap)
+        function getCursorPixelPosition(textarea) {
+            const cursorPos = textarea.selectionStart;
+
+            // Create a mirror div with exact same styles and content
+            const mirror = document.createElement('div');
+            const computed = window.getComputedStyle(textarea);
+
+            // Copy all text styles
+            mirror.style.position = 'absolute';
+            mirror.style.visibility = 'hidden';
+            mirror.style.whiteSpace = computed.whiteSpace;
+            mirror.style.wordWrap = computed.wordWrap;
+            mirror.style.overflowWrap = computed.overflowWrap;
+            mirror.style.width = textarea.clientWidth + 'px';
+            mirror.style.font = computed.font;
+            mirror.style.fontSize = computed.fontSize;
+            mirror.style.fontFamily = computed.fontFamily;
+            mirror.style.fontWeight = computed.fontWeight;
+            mirror.style.lineHeight = computed.lineHeight;
+            mirror.style.letterSpacing = computed.letterSpacing;
+            mirror.style.padding = computed.padding;
+            mirror.style.border = '0';
+            mirror.style.boxSizing = computed.boxSizing;
+
+            // Add text before cursor
+            const textBefore = textarea.value.substring(0, cursorPos);
+            mirror.textContent = textBefore;
+
+            // Create a marker span at cursor position
+            const marker = document.createElement('span');
+            marker.textContent = '\u200B'; // Zero-width space
+            marker.style.display = 'inline';
+            mirror.appendChild(marker);
+
+            document.body.appendChild(mirror);
+
+            // Get marker position relative to mirror
+            const markerRect = marker.getBoundingClientRect();
+            const mirrorRect = mirror.getBoundingClientRect();
+
+            const x = markerRect.left - mirrorRect.left;
+            const y = markerRect.top - mirrorRect.top;
+
+            document.body.removeChild(mirror);
+
+            return { x, y };
+        }
+
+        // Position dropdown near cursor
+        function positionDropdown(textarea, dropdown) {
+            const textareaRect = textarea.getBoundingClientRect();
+            const cursorPos = getCursorPixelPosition(textarea);
+
+            // Get line height
+            const computed = window.getComputedStyle(textarea);
+            const lineHeight = parseInt(computed.lineHeight) || parseInt(computed.fontSize) * 1.2;
+
+            // Calculate absolute position
+            // Account for textarea scroll
+            const scrollTop = textarea.scrollTop;
+            const scrollLeft = textarea.scrollLeft;
+
+            // Position dropdown below cursor line
+            let left = textareaRect.left + cursorPos.x - scrollLeft;
+            let top = textareaRect.top + cursorPos.y - scrollTop + lineHeight + 4;
+
+            // Dropdown dimensions
+            const dropdownWidth = Math.min(350, Math.max(250, textareaRect.width - 20));
+            const dropdownHeight = 300; // max-height
+
+            // Adjust if goes off-screen horizontally
+            if (left + dropdownWidth > window.innerWidth - 10) {
+                left = window.innerWidth - dropdownWidth - 10;
+            }
+            if (left < 10) {
+                left = 10;
+            }
+
+            // Adjust if goes off-screen vertically
+            if (top + dropdownHeight > window.innerHeight - 10) {
+                // Position above cursor instead
+                top = textareaRect.top + cursorPos.y - scrollTop - dropdownHeight - 4;
+            }
+            if (top < 10) {
+                top = 10;
+            }
+
+            dropdown.style.left = left + 'px';
+            dropdown.style.top = top + 'px';
+            dropdown.style.maxWidth = dropdownWidth + 'px';
+        }
+
+        // Insert tag at cursor position
+        function insertTag(textarea, tagValue) {
+            const { start, end, fullStart, fullEnd, word } = getCurrentWord(textarea);
+            const value = textarea.value;
+
+            // Transform tag based on provider
+            // NAI V4/V4.5: Replace underscores with spaces (except emoticons like ^_^)
+            // Local: Keep underscores (Danbooru format)
+            let finalTag = tagValue;
+            if (currentProvider === 'nai') {
+                // Replace underscores with spaces, but preserve emoticons
+                finalTag = tagValue.replace(/_/g, (match, offset, string) => {
+                    // Check if it's part of an emoticon (preceded/followed by ^ or other emoticon chars)
+                    const before = string[offset - 1];
+                    const after = string[offset + 1];
+                    if ((before === '^' || after === '^') ||
+                        (before && after && /[><;:=]/.test(before + after))) {
+                        return '_'; // Keep underscore in emoticons
+                    }
+                    return ' '; // Replace with space
+                });
+            }
+
+            // Preserve leading spaces between comma and word
+            const leadingSpaces = value.substring(fullStart, start);
+
+            // Determine what comes after the tag
+            let suffix = ', ';
+
+            // Check if there's already a comma after the current word
+            if (fullEnd < value.length && value[fullEnd] === ',') {
+                suffix = ''; // Don't add comma if one already exists
+                // But ensure space after comma
+                if (fullEnd + 1 < value.length && value[fullEnd + 1] !== ' ') {
+                    suffix = ' ';
+                }
+            }
+
+            // Replace: keep everything before fullStart, add leading spaces + tag + suffix, then everything after end
+            const before = value.substring(0, fullStart);
+            const after = value.substring(end);
+            const newValue = before + leadingSpaces + finalTag + suffix + after;
+
+            textarea.value = newValue;
+
+            // Set cursor position after inserted tag and suffix
+            const newCursorPos = fullStart + leadingSpaces.length + finalTag.length + suffix.length;
+            textarea.setSelectionRange(newCursorPos, newCursorPos);
+
+            // Trigger input event for autosave
+            textarea.dispatchEvent(new Event('input', { bubbles: true }));
+            textarea.focus();
+        }
+
+        // Handle keyboard navigation in dropdown
+        function handleAutocompleteKeyboard(e, dropdown) {
+            if (!dropdown.classList.contains('show')) return false;
+
+            const items = dropdown.querySelectorAll('.tag-autocomplete-item');
+            if (items.length === 0) return false;
+
+            let selectedIndex = dropdown._selectedIndex || 0;
+
+            switch(e.key) {
+                case 'ArrowDown':
+                    e.preventDefault();
+                    selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+                    break;
+                case 'ArrowUp':
+                    e.preventDefault();
+                    selectedIndex = Math.max(selectedIndex - 1, 0);
+                    break;
+                case 'Enter':
+                    e.preventDefault();
+                    const selectedItem = items[selectedIndex];
+                    if (selectedItem) {
+                        const tagValue = selectedItem.dataset.tagValue;
+                        insertTag(dropdown._textarea, tagValue);
+                        hideAutocomplete();
+                    }
+                    return true;
+                case 'Escape':
+                    e.preventDefault();
+                    hideAutocomplete();
+                    return true;
+                default:
+                    return false;
+            }
+
+            // Update selection
+            items.forEach((item, i) => {
+                item.classList.toggle('selected', i === selectedIndex);
+            });
+            dropdown._selectedIndex = selectedIndex;
+
+            // Scroll selected item into view
+            items[selectedIndex].scrollIntoView({ block: 'nearest' });
+
+            return true;
+        }
+
+        // Setup tag autocomplete for a textarea
+        function setupTagAutocomplete(textarea) {
+            if (!textarea) {
+                console.warn('[TagAutocomplete] setupTagAutocomplete called with null textarea');
+                return;
+            }
+            if (textarea.dataset.autocompleteSetup) {
+                console.log('[TagAutocomplete] Textarea already has autocomplete setup:', textarea.id || textarea.className);
+                return;
+            }
+            console.log('[TagAutocomplete] Setting up autocomplete for:', textarea.id || textarea.className);
+            textarea.dataset.autocompleteSetup = 'true';
+
+            let inputTimeout = null;
+            let lastValue = textarea.value;
+            let isDeleting = false;
+
+            // Input event - trigger autocomplete
+            textarea.addEventListener('input', (e) => {
+                console.log('[TagAutocomplete] Input event - enabled:', tagAutocompleteEnabled, 'loaded:', tagsLoaded);
+                if (!tagAutocompleteEnabled || !tagsLoaded) return;
+
+                // Detect if user is deleting (backspace/delete)
+                const currentValue = textarea.value;
+                isDeleting = currentValue.length < lastValue.length;
+                lastValue = currentValue;
+
+                // Don't show autocomplete while deleting
+                if (isDeleting) {
+                    hideAutocomplete();
+                    return;
+                }
+
+                // Debounce input
+                if (inputTimeout) clearTimeout(inputTimeout);
+                inputTimeout = setTimeout(() => {
+                    // 연속 스페이스 2개 입력 시 자동완성 종료 체크
+                    // (커서 앞 2글자가 모두 스페이스인지 확인)
+                    const cursorPos = textarea.selectionStart;
+                    if (cursorPos >= 2) {
+                        const beforeCursor = textarea.value.substring(cursorPos - 2, cursorPos);
+                        if (beforeCursor === '  ') {
+                            hideAutocomplete();
+                            return;
+                        }
+                    }
+
+                    const { word } = getCurrentWord(textarea);
+
+                    // 스페이스를 언더바로 치환하여 검색
+                    const searchWord = word.replace(/ /g, '_');
+
+                    if (searchWord.length >= 2) {
+                        const results = searchTags(searchWord);
+                        if (results.length > 0) {
+                            showAutocomplete(textarea, results);
+                        } else {
+                            hideAutocomplete();
+                        }
+                    } else {
+                        hideAutocomplete();
+                    }
+                }, 50);
+            });
+
+            // Keydown event - handle navigation
+            textarea.addEventListener('keydown', (e) => {
+                if (!tagAutocompleteEnabled || !tagsLoaded) return;
+
+                const dropdown = getAutocompleteDropdown();
+                if (handleAutocompleteKeyboard(e, dropdown)) {
+                    // Event was handled by autocomplete
+                    return;
+                }
+            });
+
+            // Focus event - update lastValue
+            textarea.addEventListener('focus', () => {
+                lastValue = textarea.value;
+            });
+
+            // Blur event - hide dropdown
+            textarea.addEventListener('blur', () => {
+                // Delay to allow click on dropdown item
+                setTimeout(() => {
+                    const dropdown = getAutocompleteDropdown();
+                    if (!dropdown.matches(':hover')) {
+                        hideAutocomplete();
+                    }
+                }, 200);
+            });
+        }
+
+        // Initialize tag autocomplete system
+        console.log('[PeroPix] Initializing tag autocomplete system...');
+        console.log('[PeroPix] tagAutocompleteEnabled initial value:', tagAutocompleteEnabled);
+        loadTagData();
+
+        // ============================================================
         // Settings Persistence (localStorage) - NAI/Local 완전 분리
         // ============================================================
         const SETTINGS_KEY = 'peropix_settings_v2';
@@ -7850,6 +9384,12 @@
                 upscaleSteps: document.getElementById('upscaleSteps').value,
                 upscaleCfg: document.getElementById('upscaleCfg').value,
                 upscaleDenoise: document.getElementById('upscaleDenoise').value,
+
+                // Tag Autocomplete
+                tagAutocompleteEnabled: tagAutocompleteEnabled,
+
+                // Prompt Weight Highlighting
+                promptHighlightEnabled: promptHighlightEnabled,
             };
         }
         
@@ -8008,6 +9548,31 @@
                     document.getElementById('upscaleDenoiseValue').textContent = settings.upscaleDenoise;
                 }
             }
+
+            // Tag Autocomplete (기본값 true 유지)
+            console.log('[PeroPix] applyProviderSettings - tagAutocompleteEnabled in settings:', settings.tagAutocompleteEnabled);
+            if (settings.tagAutocompleteEnabled !== undefined) {
+                tagAutocompleteEnabled = settings.tagAutocompleteEnabled;
+                console.log('[PeroPix] applyProviderSettings - set to saved value:', tagAutocompleteEnabled);
+            } else {
+                // 설정이 없으면 기본값 true
+                tagAutocompleteEnabled = true;
+                console.log('[PeroPix] applyProviderSettings - using default value: true');
+            }
+
+            // Prompt Highlight (기본값 true 유지)
+            if (settings.promptHighlightEnabled !== undefined) {
+                promptHighlightEnabled = settings.promptHighlightEnabled;
+            } else {
+                promptHighlightEnabled = true;
+            }
+
+            // UI 토글 상태 업데이트
+            const tagToggle = document.getElementById('tagAutocompleteToggle');
+            if (tagToggle) tagToggle.checked = tagAutocompleteEnabled;
+
+            const highlightToggle = document.getElementById('promptHighlightToggle');
+            if (highlightToggle) highlightToggle.checked = promptHighlightEnabled;
         }
         
         function saveAppSettings() {
@@ -8041,6 +9606,9 @@
         }
         
         function loadAppSettings() {
+            console.log('[PeroPix] loadAppSettings() called');
+            console.log('[PeroPix] tagAutocompleteEnabled before loading:', tagAutocompleteEnabled);
+
             // 새 설정 키로 로드 시도
             let saved = localStorage.getItem(SETTINGS_KEY);
             let isLegacy = false;
@@ -8484,10 +10052,49 @@
             const resizeObserver = new ResizeObserver(() => autoSaveSettings());
             resizeObserver.observe(document.getElementById('basePrompt'));
             resizeObserver.observe(document.getElementById('negativePrompt'));
+
+            // Tag autocomplete toggle
+            const tagAutocompleteToggle = document.getElementById('tagAutocompleteToggle');
+            if (tagAutocompleteToggle) {
+                tagAutocompleteToggle.addEventListener('change', () => {
+                    tagAutocompleteEnabled = tagAutocompleteToggle.checked;
+                    autoSaveSettings();
+                });
+            }
+
+            // Prompt highlight toggle
+            const promptHighlightToggle = document.getElementById('promptHighlightToggle');
+            if (promptHighlightToggle) {
+                promptHighlightToggle.addEventListener('change', () => {
+                    promptHighlightEnabled = promptHighlightToggle.checked;
+                    autoSaveSettings();
+
+                    // 모든 프롬프트 필드 다시 렌더링
+                    document.querySelectorAll('.prompt-highlight-overlay').forEach(overlay => {
+                        const container = overlay.parentElement;
+                        const textarea = container.querySelector('textarea');
+                        if (textarea) {
+                            highlightPrompt(textarea, overlay);
+                        }
+                    });
+                });
+            }
         }
         
         // Init
         loadAppSettings();  // 저장된 설정 먼저 로드
+        console.log('[PeroPix] After loadAppSettings, tagAutocompleteEnabled:', tagAutocompleteEnabled);
+        loadSlotSizePresets();  // 슬롯 사이즈 프리셋 로드
+
+        // Setup tag autocomplete for base prompts
+        console.log('[PeroPix] Setting up tag autocomplete for base prompts...');
+        setupTagAutocomplete(document.getElementById('basePrompt'));
+        setupTagAutocomplete(document.getElementById('negativePrompt'));
+
+        // Setup prompt weight highlighting for base prompts
+        console.log('[PeroPix] Setting up prompt weight highlighting...');
+        setupPromptHighlighting(document.getElementById('basePrompt'));
+        setupPromptHighlighting(document.getElementById('negativePrompt'));
 
         // 현재 provider에 맞게 샘플러/스케줄러 옵션 설정 및 복원
         updateSamplerSchedulerOptions(currentProvider);
@@ -8609,8 +10216,21 @@
             loadGallery(currentGalleryFolder);
         };
 
-        censorModeBtn.onclick = () => {
+        censorModeBtn.onclick = async () => {
             if (currentMode === 'censor') return;
+            
+            // 설치 상태 체크 (censor_ready = ultralytics 설치 여부)
+            try {
+                const statusRes = await fetch(`${API_BASE}/api/local/status`);
+                const status = await statusRes.json();
+                if (!status.censor_ready) {
+                    showLocalInstallModal('censor');
+                    return;
+                }
+            } catch (err) {
+                console.error('Failed to check install status:', err);
+            }
+            
             currentMode = 'censor';
             censorModeBtn.classList.add('active');
             slotModeBtn.classList.remove('active');
@@ -10162,7 +11782,9 @@
             editModalBoxes: [],
             editModalOriginal: null,
             // 검열후 탭 편집 상태
-            afterEditDirty: false  // 편집 변경 여부
+            afterEditDirty: false,  // 편집 변경 여부
+            // 휠 네비게이션 상태
+            wheelDebounceTimer: null  // 휠 디바운스 타이머
         };
         
         // 캔버스 참조
@@ -10663,10 +12285,19 @@
                 t.classList.toggle('active', i === index);
             });
             
-            // 검열후 탭 진행률 업데이트
-            if (censorState.currentTab === 'after') {
-                document.getElementById('censorAfterProgress').textContent = `${index + 1} / ${images.length}`;
-            }
+            // 검열후 탭 진행률 업데이트 (기존 하단 - 제거됨)
+            // if (censorState.currentTab === 'after') {
+            //     document.getElementById('censorAfterProgress').textContent = `${index + 1} / ${images.length}`;
+            // }
+
+            // 이미지 번호 표시 (새로운 위치)
+            document.getElementById('censorImageCounter').textContent = `${index + 1} / ${images.length}`;
+
+            // 화살표 버튼 활성화/비활성화
+            const leftBtn = document.getElementById('censorNavLeft');
+            const rightBtn = document.getElementById('censorNavRight');
+            leftBtn.disabled = index === 0;
+            rightBtn.disabled = index === images.length - 1;
             
             // 프리뷰 캔버스 클리어 (로딩 중 이전 이미지 표시 방지)
             if (censorPreviewCtx) {
@@ -11341,8 +12972,17 @@
                 t.classList.toggle('active', i === index);
             });
             
-            // 진행 상황 표시
-            document.getElementById('censorProcProgress').textContent = `${index + 1} / ${images.length}`;
+            // 진행 상황 표시 (기존 하단 - 제거됨)
+            // document.getElementById('censorProcProgress').textContent = `${index + 1} / ${images.length}`;
+
+            // 이미지 번호 표시 (새로운 위치)
+            document.getElementById('censorImageCounter').textContent = `${index + 1} / ${images.length}`;
+
+            // 화살표 버튼 활성화/비활성화
+            const leftBtn = document.getElementById('censorNavLeft');
+            const rightBtn = document.getElementById('censorNavRight');
+            leftBtn.disabled = index === 0;
+            rightBtn.disabled = index === images.length - 1;
             
             // 전체 이미지 로드
             try {
@@ -11538,19 +13178,40 @@
         function switchCensorTab(tab) {
             censorState.currentTab = tab;
             censorState.currentIndex = 0;
-            
+
+            // 휠 디바운스 타이머 클리어
+            if (censorState.wheelDebounceTimer) {
+                clearTimeout(censorState.wheelDebounceTimer);
+                censorState.wheelDebounceTimer = null;
+            }
+
             // 탭 버튼 활성화 상태
             document.getElementById('censorTabBefore').classList.toggle('active', tab === 'before');
             document.getElementById('censorTabProcessing').classList.toggle('active', tab === 'processing');
             document.getElementById('censorTabAfter').classList.toggle('active', tab === 'after');
-            
+
             // 하단 옵션 패널 표시
             document.getElementById('censorOptionsBefore').style.display = tab === 'before' ? 'flex' : 'none';
             document.getElementById('censorOptionsProcessing').style.display = tab === 'processing' ? 'flex' : 'none';
             document.getElementById('censorOptionsAfter').style.display = tab === 'after' ? 'flex' : 'none';
-            
+
             // 프리뷰 영역 배경 구분 (검열중 탭만 다른 배경)
             document.querySelector('.censor-preview-area')?.classList.toggle('processing', tab === 'processing');
+
+            // 네비게이션 화살표 및 카운터 항상 표시
+            const navLeft = document.getElementById('censorNavLeft');
+            const navRight = document.getElementById('censorNavRight');
+            const imageCounter = document.getElementById('censorImageCounter');
+
+            // 모든 탭에서 표시
+            navLeft.style.display = 'flex';
+            navRight.style.display = 'flex';
+            imageCounter.style.display = 'block';
+
+            // 초기 상태 설정
+            navLeft.disabled = true;
+            navRight.disabled = true;
+            imageCounter.textContent = '0 / 0';
             
             // 탭 전환 시 오버레이 초기화 (깜빡임 방지)
             if (censorOverlayCtx) {
@@ -11769,7 +13430,145 @@
             
             // 전체 검열 실행
             document.getElementById('censorRunAllBtn').onclick = runBatchCensor;
-            
+
+            // === 네비게이션 화살표 버튼 ===
+            document.getElementById('censorNavLeft').onclick = () => {
+                if (censorState.currentIndex > 0) {
+                    if (censorState.currentTab === 'processing') {
+                        selectProcessingImage(censorState.currentIndex - 1);
+                    } else {
+                        // before, after 탭 모두 selectCensorImage 사용
+                        selectCensorImage(censorState.currentIndex - 1);
+                    }
+                }
+            };
+            document.getElementById('censorNavRight').onclick = () => {
+                const maxIndex = censorState.currentTab === 'processing'
+                    ? censorState.processingImages.length - 1
+                    : censorState.currentTab === 'before'
+                    ? censorState.images.length - 1
+                    : censorState.censoredImages.length - 1;
+
+                if (censorState.currentIndex < maxIndex) {
+                    if (censorState.currentTab === 'processing') {
+                        selectProcessingImage(censorState.currentIndex + 1);
+                    } else {
+                        // before, after 탭 모두 selectCensorImage 사용
+                        selectCensorImage(censorState.currentIndex + 1);
+                    }
+                }
+            };
+
+            // === UI 즉시 업데이트 헬퍼 함수 ===
+            function updateCensorNavigationUI(index, maxIndex) {
+                // 썸네일 활성화 표시
+                document.querySelectorAll('.censor-thumbnail').forEach((t, i) => {
+                    t.classList.toggle('active', i === index);
+                });
+
+                // 이미지 번호 표시
+                document.getElementById('censorImageCounter').textContent = `${index + 1} / ${maxIndex + 1}`;
+
+                // 화살표 버튼 활성화/비활성화
+                const leftBtn = document.getElementById('censorNavLeft');
+                const rightBtn = document.getElementById('censorNavRight');
+                leftBtn.disabled = index === 0;
+                rightBtn.disabled = index === maxIndex;
+            }
+
+            // === 마우스 휠로 이미지 전환 (즉시 반응 + 디바운스 로딩) ===
+            const censorPreviewContainer = document.getElementById('censorPreviewContainer');
+
+            censorPreviewContainer.addEventListener('wheel', (e) => {
+                e.preventDefault();
+
+                const delta = e.deltaY;
+
+                // 현재 탭의 최대 인덱스 계산
+                const maxIndex = censorState.currentTab === 'processing'
+                    ? censorState.processingImages.length - 1
+                    : censorState.currentTab === 'before'
+                    ? censorState.images.length - 1
+                    : censorState.censoredImages.length - 1;
+
+                // 새 인덱스 계산
+                let newIndex = censorState.currentIndex;
+                if (delta > 0 && newIndex < maxIndex) {
+                    newIndex++;
+                } else if (delta < 0 && newIndex > 0) {
+                    newIndex--;
+                }
+
+                // 인덱스가 변경된 경우에만 처리
+                if (newIndex !== censorState.currentIndex) {
+                    censorState.currentIndex = newIndex;
+
+                    // 즉시 UI 업데이트 (썸네일, 카운터, 화살표)
+                    updateCensorNavigationUI(newIndex, maxIndex);
+
+                    // 이미지 로드는 디바운스 (200ms)
+                    if (censorState.wheelDebounceTimer) {
+                        clearTimeout(censorState.wheelDebounceTimer);
+                    }
+
+                    censorState.wheelDebounceTimer = setTimeout(() => {
+                        if (censorState.currentTab === 'processing') {
+                            selectProcessingImage(newIndex);
+                        } else {
+                            selectCensorImage(newIndex);
+                        }
+                    }, 200);
+                }
+            }, { passive: false });
+
+            // === 우클릭으로 박스 삭제 ===
+            const censorOverlayCanvas = document.getElementById('censorOverlayCanvas');
+            censorOverlayCanvas.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+
+                if (!censorState.currentImage) return;
+
+                // 클릭 위치 계산
+                const rect = censorOverlayCanvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                // 캔버스 좌표를 이미지 좌표로 변환
+                const canvas = document.getElementById('censorPreviewCanvas');
+                const scaleX = censorState.currentImage.width / canvas.width;
+                const scaleY = censorState.currentImage.height / canvas.height;
+                const imgX = x * scaleX;
+                const imgY = y * scaleY;
+
+                // 클릭 위치의 박스 찾기
+                for (let i = censorState.editBoxes.length - 1; i >= 0; i--) {
+                    const box = censorState.editBoxes[i].box;
+                    const [x1, y1, x2, y2] = box;
+                    if (imgX >= x1 && imgX <= x2 && imgY >= y1 && imgY <= y2) {
+                        // 박스 삭제
+                        censorState.editBoxes.splice(i, 1);
+                        censorState.selectedBoxIndex = -1;
+                        censorState.hoverBoxIndex = -1;
+
+                        // 검열중 탭: processingResults에도 반영
+                        if (censorState.currentTab === 'processing' && censorState.currentImage) {
+                            const path = censorState.currentImage.path;
+                            if (censorState.processingResults[path]) {
+                                censorState.processingResults[path].editBoxes = [...censorState.editBoxes];
+                            }
+                        }
+
+                        // 검열후 탭: dirty 표시
+                        if (censorState.currentTab === 'after') {
+                            markAfterEditDirty();
+                        }
+
+                        redrawCurrentTab();
+                        break;
+                    }
+                }
+            });
+
             // === 검열중 탭 이벤트 ===
             document.getElementById('censorProcPrevBtn').onclick = async () => {
                 if (censorState.currentIndex > 0) {
@@ -11866,22 +13665,46 @@
             // 캔버스 마우스 이벤트
             setupCensorCanvasEvents();
             
-            // 키보드 이벤트 (Delete 키로 선택된 박스 삭제)
+            // 키보드 이벤트 (Delete 키, 숫자키)
             document.addEventListener('keydown', (e) => {
                 // 검열 모드가 활성화되어 있는지 확인
                 if (currentMode !== 'censor') return;
-                
+
                 // 입력 필드에서는 무시
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
-                
+
+                // 숫자키로 모드 전환 (1: 선택, 2: 추가, 3: 삭제)
+                if (e.key === '1' || e.key === '2' || e.key === '3') {
+                    e.preventDefault();
+                    const newTool = e.key === '1' ? 'select' : e.key === '2' ? 'add' : 'delete';
+                    censorState.currentTool = newTool;
+
+                    // 버튼 UI 업데이트
+                    if (censorState.currentTab === 'processing') {
+                        const procToolBtns = ['procToolSelect', 'procToolAdd', 'procToolDelete'];
+                        procToolBtns.forEach(id => document.getElementById(id)?.classList.remove('active'));
+                        const activeBtn = e.key === '1' ? 'procToolSelect' : e.key === '2' ? 'procToolAdd' : 'procToolDelete';
+                        document.getElementById(activeBtn)?.classList.add('active');
+                    } else if (censorState.currentTab === 'after') {
+                        const afterToolBtns = ['afterToolSelect', 'afterToolAdd', 'afterToolDelete'];
+                        afterToolBtns.forEach(id => document.getElementById(id)?.classList.remove('active'));
+                        const activeBtn = e.key === '1' ? 'afterToolSelect' : e.key === '2' ? 'afterToolAdd' : 'afterToolDelete';
+                        document.getElementById(activeBtn)?.classList.add('active');
+                    }
+
+                    redrawCurrentTab();
+                    return;
+                }
+
+                // Delete 키로 선택된 박스 삭제
                 if (e.key === 'Delete' && censorState.selectedBoxIndex >= 0) {
                     e.preventDefault();
-                    
+
                     // 선택된 박스 삭제
                     censorState.editBoxes.splice(censorState.selectedBoxIndex, 1);
                     censorState.selectedBoxIndex = -1;
                     censorState.hoverBoxIndex = -1;
-                    
+
                     // 검열중 탭: processingResults에도 반영
                     if (censorState.currentTab === 'processing' && censorState.currentImage) {
                         const path = censorState.currentImage.path;
@@ -11889,12 +13712,12 @@
                             censorState.processingResults[path].editBoxes = [...censorState.editBoxes];
                         }
                     }
-                    
+
                     // 검열후 탭: dirty 표시
                     if (censorState.currentTab === 'after') {
                         markAfterEditDirty();
                     }
-                    
+
                     redrawCurrentTab();
                 }
             });

@@ -1,27 +1,30 @@
 @echo off
 title PeroPix
+cd /d "%~dp0"
 
 echo Starting PeroPix...
 echo.
 
-:: Embedded Python path (with CUDA torch for Local generation)
-set EMBEDDED_PYTHON=%~dp0python_env\python\python.exe
+:: Python path (same as build)
+set PYTHON_EXE=%~dp0python\python.exe
 
-:: Use embedded Python if exists (CUDA support)
-if exist "%EMBEDDED_PYTHON%" (
-    echo Using embedded Python with CUDA support...
-    "%EMBEDDED_PYTHON%" backend.py
+:: Use python if exists, otherwise use system Python
+if exist "%PYTHON_EXE%" (
+    echo Using python\python.exe (Python 3.11.9^)
+    "%PYTHON_EXE%" backend.py
 ) else (
-    :: Fallback: System Python (NAI only)
+    :: Fallback: System Python (first-run auto-install will create python/)
     echo Using system Python...
-    
+    echo First-run auto-install will set up python environment...
+    echo.
+
     :: Check required packages
     python -c "import piexif" 2>nul
     if errorlevel 1 (
         echo Installing required packages...
         pip install piexif -q
     )
-    
+
     python backend.py
 )
 

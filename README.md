@@ -38,9 +38,15 @@ AI 감지가 완벽하지 않아도 괜찮습니다.
 잘못 분류된 건 버튼 클릭 한 번으로 폴더 이동.
 수백 장 작업해도 5분이면 끝납니다.
 
-### 그 외: NAI 웹 기능 전부 지원
-Character Reference, Vibe Transfer, Inpaint 등 NAI 웹의 모든 기능.
-같은 프롬프트 넣으면 같은 결과 나옵니다.
+### NAI + 로컬, 한 앱에서
+대부분의 툴은 둘 중 하나만 지원합니다.
+PeroPix는 NAI와 로컬(Stable Diffusion) 둘 다 지원하고, 탭 전환으로 즉시 전환.
+
+- **NovelAI**: Character Reference, Vibe Transfer, Inpaint 등 웹과 100% 동일
+- **로컬 생성**: SDXL + LoRA, NVIDIA GPU에서 무제한 생성 (선택 사항)
+
+Anlas 아끼고 싶으면 로컬로, 퀄리티 원하면 NAI로.
+같은 슬롯/검열 워크플로우를 양쪽 다 사용할 수 있습니다.
 
 태그 자동완성(242만 Danbooru DB)도 있습니다.
 

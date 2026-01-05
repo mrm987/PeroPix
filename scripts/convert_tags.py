@@ -127,11 +127,10 @@ def main():
     output_path = Path(args.output)
     save_json(tags, output_path)
 
-    print("\n✅ Conversion complete!")
-    print(f"📁 Output: {output_path}")
-    print(f"📊 Total tags: {len(tags)}")
-    print(f"\n💡 Add this line to .gitignore if not already present:")
-    print(f"   data/tags.json")
+    print("\nConversion complete!")
+    print(f"Output: {output_path}")
+    print(f"Total tags: {len(tags)}")
+    print(f"\nNote: data/tags.json is in .gitignore")
 
 
 if __name__ == "__main__":

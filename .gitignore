@@ -20,7 +20,6 @@ presets/
 prompts/character/*.txt
 *.log
 install_status.json
-data/tags.json
 nul
 
 # 모델 파일 (용량 큼)

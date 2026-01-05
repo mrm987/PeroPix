@@ -37,13 +37,13 @@ jobs:
           Copy-Item -Recurse "prompts" -Destination "dist/PeroPix/"
           Copy-Item -Recurse "assets" -Destination "dist/PeroPix/"
           Copy-Item -Recurse "scripts" -Destination "dist/PeroPix/"
+          Copy-Item -Recurse "data" -Destination "dist/PeroPix/"
           Copy-Item -Recurse "models/censor" -Destination "dist/PeroPix/models/"
           New-Item -ItemType Directory -Force -Path "dist/PeroPix/models/checkpoints"
           New-Item -ItemType Directory -Force -Path "dist/PeroPix/models/loras"
           New-Item -ItemType Directory -Force -Path "dist/PeroPix/models/upscale_models"
           New-Item -ItemType Directory -Force -Path "dist/PeroPix/outputs"
           New-Item -ItemType Directory -Force -Path "dist/PeroPix/presets"
-          New-Item -ItemType Directory -Force -Path "dist/PeroPix/data"
           New-Item -ItemType Directory -Force -Path "dist/PeroPix/censoring/uncensored"
           New-Item -ItemType Directory -Force -Path "dist/PeroPix/censoring/censored"
           Copy-Item "README.md" -Destination "dist/PeroPix/" -ErrorAction SilentlyContinue
@@ -92,13 +92,13 @@ jobs:
           cp -r prompts dist/PeroPix/
           cp -r assets dist/PeroPix/
           cp -r scripts dist/PeroPix/
+          cp -r data dist/PeroPix/
           cp -r models/censor dist/PeroPix/models/
           mkdir -p dist/PeroPix/models/checkpoints
           mkdir -p dist/PeroPix/models/loras
           mkdir -p dist/PeroPix/models/upscale_models
           mkdir -p dist/PeroPix/outputs
           mkdir -p dist/PeroPix/presets
-          mkdir -p dist/PeroPix/data
           mkdir -p dist/PeroPix/censoring/uncensored
           mkdir -p dist/PeroPix/censoring/censored
           cp README.md dist/PeroPix/ 2>/dev/null || true

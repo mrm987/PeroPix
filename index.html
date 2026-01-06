@@ -9343,6 +9343,12 @@
             textarea.addEventListener('input', (e) => {
                 console.log('[TagAutocomplete] Input event - enabled:', tagAutocompleteEnabled, 'loaded:', tagsLoaded);
                 if (!tagAutocompleteEnabled || !tagsLoaded) return;
+                
+                // 포커스가 없거나 프로그래밍적 이벤트면 무시
+                if (document.activeElement !== textarea || !e.isTrusted) {
+                    hideAutocomplete();
+                    return;
+                }
 
                 // Detect if user is deleting (backspace/delete)
                 const currentValue = textarea.value;

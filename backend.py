@@ -3773,7 +3773,7 @@ async def get_local_status():
         "message": install_status["message"],
         "error": install_status["error"],
         "python_env_dir": str(PYTHON_ENV_DIR),
-        "censor_ready": YOLO_AVAILABLE
+        "censor_ready": True  # ultralytics는 초기 설치에 포함됨
     }
 
 
@@ -3878,12 +3878,8 @@ async def restart_server():
 # Auto Censor (YOLO-based)
 # ============================================================
 
-# YOLO 모델 lazy loading
-try:
-    from ultralytics import YOLO
-    YOLO_AVAILABLE = True
-except ImportError:
-    YOLO_AVAILABLE = False
+# YOLO 모델 (ultralytics는 초기 설치에 포함됨)
+from ultralytics import YOLO
 
 # 검열 모델 캐시
 censor_model_cache = {
@@ -3895,9 +3891,6 @@ censor_model_cache = {
 
 def get_censor_model(model_name: str = None):
     """검열 모델 로드 (캐시됨)"""
-    if not YOLO_AVAILABLE:
-        raise RuntimeError("ultralytics 설치 필요: pip install ultralytics")
-    
     # 모델 이름이 없으면 첫 번째 모델 사용
     if not model_name:
         models = list(CENSOR_MODELS_DIR.glob("*.pt"))
@@ -4145,15 +4138,12 @@ async def list_censor_models():
     if CENSOR_MODELS_DIR.exists():
         for f in sorted(CENSOR_MODELS_DIR.glob("*.pt")):
             models.append(f.name)
-    return {"success": True, "models": models, "yolo_available": YOLO_AVAILABLE}
+    return {"success": True, "models": models, "yolo_available": True}
 
 
 @app.get("/api/censor/model-info")
 async def get_censor_model_info(model: str = None):
     """모델의 클래스 정보 조회"""
-    if not YOLO_AVAILABLE:
-        return {"success": False, "error": "ultralytics 미설치"}
-    
     try:
         _, classes = get_censor_model(model)
         return {
@@ -4178,9 +4168,6 @@ class CensorScanRequest(BaseModel):
 @app.post("/api/censor/scan")
 async def scan_image_for_censor(req: CensorScanRequest):
     """이미지 스캔 (감지만, 검열 미적용)"""
-    if not YOLO_AVAILABLE:
-        return {"success": False, "error": "ultralytics 미설치"}
-    
     import tempfile
     temp_file = None
     
@@ -4485,9 +4472,6 @@ async def get_censor_file(source: str, filepath: str):
 @app.post("/api/censor/batch")
 async def batch_censor(request: dict):
     """폴더 내 모든 이미지 일괄 검열"""
-    if not YOLO_AVAILABLE:
-        return {"success": False, "error": "ultralytics 미설치"}
-    
     source_folder = request.get("source_folder", "")
     output_folder = request.get("output_folder", "")
     model = request.get("model")

@@ -12092,11 +12092,6 @@
                 const response = await fetch(`${API_BASE}/api/censor/models`);
                 const result = await response.json();
                 
-                if (!result.yolo_available) {
-                    modelSelect.innerHTML = '<option value="">⚠️ YOLO 미설치</option>';
-                    return;
-                }
-                
                 if (result.models && result.models.length > 0) {
                     // 저장된 모델 또는 기본 모델 선택
                     const defaultModel = 'ntd11_anime_nsfw_segm_v5-variant1.pt';

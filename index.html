@@ -2384,8 +2384,11 @@
             position: absolute;
             top: 0;
             left: 0;
+            width: 100%;
+            height: 100%;
             pointer-events: auto;
             cursor: default;
+            z-index: 10;
         }
         .censor-preview-empty {
             position: absolute;
@@ -4298,8 +4301,9 @@
                             검열 부위 미리보기입니다. 실제 검열은 <strong>전체 검열</strong> 버튼을 눌러주세요.
                         </div>
                         <canvas id="censorPreviewCanvas"></canvas>
-                        <canvas id="censorOverlayCanvas"></canvas>
                     </div>
+                    <!-- 오버레이 캔버스: preview-area 전체를 덮음 (핸들 조작용) -->
+                    <canvas id="censorOverlayCanvas"></canvas>
 
                     <!-- 우측 네비게이션 화살표 -->
                     <button class="censor-nav-arrow censor-nav-right" id="censorNavRight" title="다음 이미지 (휠 아래)">
@@ -12663,35 +12667,33 @@
             // 원본 이미지 객체 저장 (재렌더링용)
             censorState.originalImageObj = img;
             
-            // 핸들 조작을 위한 여백 (상하좌우)
-            const handleMargin = 50;
-            
             // 캔버스 크기 설정 - 부모 영역(censor-preview-area)에서 크기 가져오기
             const previewArea = document.querySelector('.censor-preview-area');
-            const maxW = previewArea.clientWidth - 48 - handleMargin * 2;  // 좌우 여백 고려
-            const maxH = previewArea.clientHeight - 48 - handleMargin * 2;  // 상하 여백 고려
+            const areaW = previewArea.clientWidth;
+            const areaH = previewArea.clientHeight;
+            const maxW = areaW - 80;  // 네비게이션 화살표 공간
+            const maxH = areaH - 80;
             
             let scale = Math.min(maxW / img.width, maxH / img.height, 1);
             const displayW = Math.round(img.width * scale);
             const displayH = Math.round(img.height * scale);
             
+            // 이미지 캔버스
             censorPreviewCanvas.width = displayW;
             censorPreviewCanvas.height = displayH;
-            // 오버레이 캔버스는 상하좌우로 확장 (핸들 조작용)
-            censorOverlayCanvas.width = displayW + handleMargin * 2;
-            censorOverlayCanvas.height = displayH + handleMargin * 2;
-            
             censorPreviewCanvas.style.width = displayW + 'px';
             censorPreviewCanvas.style.height = displayH + 'px';
-            censorOverlayCanvas.style.width = (displayW + handleMargin * 2) + 'px';
-            censorOverlayCanvas.style.height = (displayH + handleMargin * 2) + 'px';
-            // 오버레이를 상하좌우로 확장
-            censorOverlayCanvas.style.top = (-handleMargin) + 'px';
-            censorOverlayCanvas.style.left = (-handleMargin) + 'px';
             
-            // 오프셋 저장 (박스 그릴 때 사용)
-            censorState.overlayOffsetX = handleMargin;
-            censorState.overlayOffsetY = handleMargin;
+            // 오버레이 캔버스는 프리뷰 영역 전체 (CSS에서 100%로 설정됨)
+            censorOverlayCanvas.width = areaW;
+            censorOverlayCanvas.height = areaH;
+            
+            // 이미지 캔버스는 영역 중앙에 위치 (flex center)
+            // 오버레이 좌표(=영역 좌표) → 이미지 좌표 변환용 오프셋
+            const offsetX = (areaW - displayW) / 2;
+            const offsetY = (areaH - displayH) / 2;
+            censorState.overlayOffsetX = offsetX;
+            censorState.overlayOffsetY = offsetY;
             
             // 스케일 저장
             censorState.displayScale = scale;

@@ -4160,6 +4160,9 @@ async def get_censor_model_info(model: str = None):
             "classes": classes
         }
     except Exception as e:
+        import traceback
+        print(f"[Censor] Model info error: {e}")
+        traceback.print_exc()
         return {"success": False, "error": str(e)}
 
 

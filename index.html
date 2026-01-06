@@ -12147,11 +12147,12 @@
                     });
                     renderCensorTargets(savedSettings?.selectedTargets);
                 } else {
-                    targetsContainer.innerHTML = '<div class="censor-target-loading">클래스 로드 실패</div>';
+                    console.error('Model info failed:', result.error);
+                    targetsContainer.innerHTML = `<div class="censor-target-loading">클래스 로드 실패: ${result.error || '알 수 없는 오류'}</div>`;
                 }
             } catch (err) {
                 console.error('Failed to load model classes:', err);
-                targetsContainer.innerHTML = '<div class="censor-target-loading">클래스 로드 실패</div>';
+                targetsContainer.innerHTML = `<div class="censor-target-loading">클래스 로드 실패: ${err.message}</div>`;
             }
         }
         

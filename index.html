@@ -10329,18 +10329,6 @@
         censorModeBtn.onclick = async () => {
             if (currentMode === 'censor') return;
 
-            // 설치 상태 체크 (censor_ready = ultralytics 설치 여부)
-            try {
-                const statusRes = await fetch(`${API_BASE}/api/local/status`);
-                const status = await statusRes.json();
-                if (!status.censor_ready) {
-                    showLocalInstallModal('censor');
-                    return;
-                }
-            } catch (err) {
-                console.error('Failed to check install status:', err);
-            }
-
             currentMode = 'censor';
             censorModeBtn.classList.add('active');
             slotModeBtn.classList.remove('active');

@@ -2362,20 +2362,20 @@
         }
         .censor-preview-hint {
             position: absolute;
-            top: 8px;
+            top: 12px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.75);
-            color: #ffd700;
-            padding: 6px 14px;
-            border-radius: 6px;
-            font-size: 0.85rem;
+            background: rgba(0, 0, 0, 0.6);
+            color: var(--text-dim);
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 0.9rem;
             z-index: 100;
             pointer-events: none;
             white-space: nowrap;
         }
         .censor-preview-hint strong {
-            color: #fff;
+            color: var(--accent-gold);
         }
         #censorPreviewCanvas {
             position: relative;
@@ -11888,7 +11888,8 @@
             hoverBoxIndex: -1,     // 마우스 호버 중인 박스 인덱스
             isScanning: false,
             displayScale: 1,
-            overlayOffsetY: 0,     // 오버레이 캔버스 상단 여백 (회전 핸들용)
+            overlayOffsetX: 0,     // 오버레이 캔버스 좌측 여백 (핸들 조작용)
+            overlayOffsetY: 0,     // 오버레이 캔버스 상단 여백 (핸들 조작용)
             // 폴더 상태
             currentUncensoredFolder: '',  // uncensored 하위 폴더
             currentCensoredFolder: '',    // censored 하위 폴더
@@ -12662,13 +12663,13 @@
             // 원본 이미지 객체 저장 (재렌더링용)
             censorState.originalImageObj = img;
             
-            // 회전 핸들을 위한 상단 여백
-            const handleMargin = 40;
+            // 핸들 조작을 위한 여백 (상하좌우)
+            const handleMargin = 50;
             
             // 캔버스 크기 설정 - 부모 영역(censor-preview-area)에서 크기 가져오기
             const previewArea = document.querySelector('.censor-preview-area');
-            const maxW = previewArea.clientWidth - 48;
-            const maxH = previewArea.clientHeight - 48 - handleMargin;  // 여백 고려
+            const maxW = previewArea.clientWidth - 48 - handleMargin * 2;  // 좌우 여백 고려
+            const maxH = previewArea.clientHeight - 48 - handleMargin * 2;  // 상하 여백 고려
             
             let scale = Math.min(maxW / img.width, maxH / img.height, 1);
             const displayW = Math.round(img.width * scale);
@@ -12676,18 +12677,20 @@
             
             censorPreviewCanvas.width = displayW;
             censorPreviewCanvas.height = displayH;
-            // 오버레이 캔버스는 상단으로 확장 (회전 핸들용)
-            censorOverlayCanvas.width = displayW;
-            censorOverlayCanvas.height = displayH + handleMargin;
+            // 오버레이 캔버스는 상하좌우로 확장 (핸들 조작용)
+            censorOverlayCanvas.width = displayW + handleMargin * 2;
+            censorOverlayCanvas.height = displayH + handleMargin * 2;
             
             censorPreviewCanvas.style.width = displayW + 'px';
             censorPreviewCanvas.style.height = displayH + 'px';
-            censorOverlayCanvas.style.width = displayW + 'px';
-            censorOverlayCanvas.style.height = (displayH + handleMargin) + 'px';
-            // 오버레이를 위로 이동하여 회전 핸들 공간 확보
+            censorOverlayCanvas.style.width = (displayW + handleMargin * 2) + 'px';
+            censorOverlayCanvas.style.height = (displayH + handleMargin * 2) + 'px';
+            // 오버레이를 상하좌우로 확장
             censorOverlayCanvas.style.top = (-handleMargin) + 'px';
+            censorOverlayCanvas.style.left = (-handleMargin) + 'px';
             
             // 오프셋 저장 (박스 그릴 때 사용)
+            censorState.overlayOffsetX = handleMargin;
             censorState.overlayOffsetY = handleMargin;
             
             // 스케일 저장
@@ -12817,7 +12820,8 @@
             if (!censorOverlayCtx) return;
             
             const scale = censorState.displayScale || 1;
-            const offsetY = censorState.overlayOffsetY || 0;  // 상단 여백 오프셋
+            const offsetX = censorState.overlayOffsetX || 0;
+            const offsetY = censorState.overlayOffsetY || 0;
             censorOverlayCtx.clearRect(0, 0, censorOverlayCanvas.width, censorOverlayCanvas.height);
 
             // 검열중 탭에서는 editBoxes만 사용 (모두 삭제한 경우 빈 배열)
@@ -12827,8 +12831,8 @@
             
             boxes.forEach((det, index) => {
                 const [x1, y1, x2, y2] = det.box;
-                const sx = x1 * scale;
-                const sy = y1 * scale + offsetY;  // 오프셋 적용
+                const sx = x1 * scale + offsetX;
+                const sy = y1 * scale + offsetY;
                 const sw = (x2 - x1) * scale;
                 const sh = (y2 - y1) * scale;
                 const rotation = det.rotation || 0;
@@ -12956,7 +12960,8 @@
             if (!censorOverlayCtx) return;
             
             const scale = censorState.displayScale || 1;
-            const offsetY = censorState.overlayOffsetY || 0;  // 상단 여백 오프셋
+            const offsetX = censorState.overlayOffsetX || 0;
+            const offsetY = censorState.overlayOffsetY || 0;
             censorOverlayCtx.clearRect(0, 0, censorOverlayCanvas.width, censorOverlayCanvas.height);
             
             const boxes = censorState.editBoxes;
@@ -12965,8 +12970,8 @@
             
             boxes.forEach((det, index) => {
                 const [x1, y1, x2, y2] = det.box;
-                const sx = x1 * scale;
-                const sy = y1 * scale + offsetY;  // 오프셋 적용
+                const sx = x1 * scale + offsetX;
+                const sy = y1 * scale + offsetY;
                 const sw = (x2 - x1) * scale;
                 const sh = (y2 - y1) * scale;
                 const rotation = det.rotation || 0;
@@ -13609,6 +13614,12 @@
 
             // 프리뷰 영역 배경 구분 (검열중 탭만 다른 배경)
             document.querySelector('.censor-preview-area')?.classList.toggle('processing', tab === 'processing');
+
+            // 검열전 탭 안내 문구: 검열전 탭에서만 표시
+            const previewHint = document.getElementById('censorPreviewHint');
+            if (previewHint) {
+                previewHint.style.display = tab === 'before' ? 'block' : 'none';
+            }
 
             // 네비게이션 화살표 및 카운터 항상 표시
             const navLeft = document.getElementById('censorNavLeft');
@@ -15013,12 +15024,13 @@
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
             const scale = censorState.displayScale || 1;
+            const offsetX = censorState.overlayOffsetX || 0;
             const offsetY = censorState.overlayOffsetY || 0;
             return {
                 canvasX: x,
                 canvasY: y,
-                imageX: x / scale,
-                imageY: (y - offsetY) / scale  // 오프셋 보정
+                imageX: (x - offsetX) / scale,  // X 오프셋 보정
+                imageY: (y - offsetY) / scale   // Y 오프셋 보정
             };
         }
         
@@ -15548,7 +15560,8 @@
             if (!censorOverlayCtx) return;
 
             const scale = censorState.displayScale || 1;
-            const offsetY = censorState.overlayOffsetY || 0;  // 상단 여백 오프셋
+            const offsetX = censorState.overlayOffsetX || 0;
+            const offsetY = censorState.overlayOffsetY || 0;
             censorOverlayCtx.clearRect(0, 0, censorOverlayCanvas.width, censorOverlayCanvas.height);
 
             // 검열전 탭: detections 사용 (스캔 결과 표시용)
@@ -15559,8 +15572,8 @@
             
             boxes.forEach((det, index) => {
                 const [x1, y1, x2, y2] = det.box;
-                const sx1 = x1 * scale;
-                const sy1 = y1 * scale + offsetY;  // 오프셋 적용
+                const sx1 = x1 * scale + offsetX;
+                const sy1 = y1 * scale + offsetY;
                 const sw = (x2 - x1) * scale;
                 const sh = (y2 - y1) * scale;
                 

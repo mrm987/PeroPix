@@ -4733,4 +4733,13 @@ if __name__ == "__main__":
     else:
         print(f"[Environment] torch={status['torch']}, censor={status['censor']}, local={status['local']}")
 
+    # YOLO 모델 미리 로드 (서버 시작 전, API 블로킹 방지)
+    if status.get("censor"):
+        try:
+            print("[Preload] Loading YOLO model...")
+            get_censor_model()
+            print("[Preload] YOLO model ready")
+        except Exception as e:
+            print(f"[Preload] YOLO model failed: {e}")
+
     uvicorn.run(app, host="127.0.0.1", port=8765, log_level="warning")

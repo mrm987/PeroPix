@@ -12178,8 +12178,8 @@
             
             container.innerHTML = censorState.modelClasses.map(cls => {
                 const conf = censorState.labelConf[cls] || 0.3;
-                // 저장된 선택 상태 복원 (없으면 기본 체크)
-                const isChecked = selectedTargets ? selectedTargets.includes(cls) : true;
+                // 저장된 선택 상태 복원 (없거나 빈 배열이면 기본 체크)
+                const isChecked = (selectedTargets && selectedTargets.length > 0) ? selectedTargets.includes(cls) : true;
                 return `
                     <div class="censor-target-item">
                         <input type="checkbox" id="censor-target-${cls}" ${isChecked ? 'checked' : ''} data-class="${cls}">

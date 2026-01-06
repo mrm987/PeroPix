@@ -27,6 +27,9 @@ jobs:
         shell: pwsh
         run: |
           $pythonExe = "dist/PeroPix/python/python.exe"
+          # PyTorch CPU 설치
+          & $pythonExe -m pip install --no-warn-script-location torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cpu
+          # 나머지 의존성 설치
           & $pythonExe -m pip install --no-warn-script-location -r requirements-core.txt
       - name: Prepare Release Package
         shell: pwsh
@@ -85,6 +88,9 @@ jobs:
       - name: Install Dependencies
         run: |
           dist/PeroPix/python/bin/python3 -m pip install --upgrade pip
+          # PyTorch CPU 설치
+          dist/PeroPix/python/bin/python3 -m pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cpu
+          # 나머지 의존성 설치
           dist/PeroPix/python/bin/python3 -m pip install -r requirements-core.txt
       - name: Prepare Release Package
         run: |

@@ -3270,52 +3270,60 @@ install_status = {
     "error": None
 }
 
-# 설치 상태 파일 (영구 저장)
-INSTALL_STATUS_FILE = PYTHON_ENV_DIR / "install_status.json"
+def _get_site_packages_dir():
+    """site-packages 경로 반환"""
+    if platform.system() == "Windows":
+        return PYTHON_ENV_DIR / "Lib" / "site-packages"
+    else:
+        return PYTHON_ENV_DIR / "python" / "lib" / "python3.11" / "site-packages"
 
-def load_install_status():
-    """설치 상태 파일 로드"""
-    default_status = {
-        "python": False,
-        "torch": None,      # "cpu" | "cuda" | None
-        "censor": False,    # ultralytics 설치됨
-        "local": False      # diffusers 등 설치됨
-    }
-    if INSTALL_STATUS_FILE.exists():
-        try:
-            status = json.loads(INSTALL_STATUS_FILE.read_text(encoding='utf-8'))
-            # 기본값과 병합 (새 키 추가 대비)
-            return {**default_status, **status}
-        except:
-            pass
-    return default_status
+def _check_python_installed():
+    """Python 설치 여부 실제 확인"""
+    if platform.system() == "Windows":
+        return (PYTHON_ENV_DIR / "python.exe").exists()
+    else:
+        return (PYTHON_ENV_DIR / "python" / "bin" / "python3").exists()
 
-def save_install_status(status: dict):
-    """설치 상태 파일 저장"""
-    PYTHON_ENV_DIR.mkdir(parents=True, exist_ok=True)
-    INSTALL_STATUS_FILE.write_text(json.dumps(status, indent=2), encoding='utf-8')
+def _check_torch_version():
+    """torch 버전 확인 (None/cpu/cuda)"""
+    torch_dir = _get_site_packages_dir() / "torch"
+    if not torch_dir.exists():
+        return None
+    
+    # CUDA 버전 확인: torch/lib에 cudnn 또는 cublas 파일이 있으면 CUDA
+    torch_lib = torch_dir / "lib"
+    if torch_lib.exists():
+        for f in torch_lib.iterdir():
+            fname = f.name.lower()
+            if "cudnn" in fname or "cublas" in fname or "nvcuda" in fname:
+                return "cuda"
+    return "cpu"
 
 def _check_ultralytics_installed():
     """ultralytics 설치 여부 실제 확인"""
-    if platform.system() == "Windows":
-        ultralytics_check = PYTHON_ENV_DIR / "Lib" / "site-packages" / "ultralytics"
-    else:
-        # python3.11 -> "3.11"
-        ultralytics_check = PYTHON_ENV_DIR / "python" / "lib" / "python3.11" / "site-packages" / "ultralytics"
-    return ultralytics_check.exists()
+    return (_get_site_packages_dir() / "ultralytics").exists()
+
+def _check_diffusers_installed():
+    """diffusers 설치 여부 실제 확인 (로컬 생성용)"""
+    return (_get_site_packages_dir() / "diffusers").exists()
+
+def get_install_status():
+    """설치 상태를 실제 파일 존재 여부로 판단"""
+    return {
+        "python": _check_python_installed(),
+        "torch": _check_torch_version(),
+        "censor": _check_ultralytics_installed(),
+        "local": _check_diffusers_installed()
+    }
 
 def get_env_status():
-    """환경 설치 상태 반환"""
-    status = load_install_status()
-    
-    # install_status.json이 없거나 불완전해도 실제 파일 존재 여부로 판단
-    # (빌드된 배포판에서는 install_status.json이 없을 수 있음)
-    actual_censor_ready = status["censor"] or _check_ultralytics_installed()
+    """환경 설치 상태 반환 (API용)"""
+    status = get_install_status()
     
     return {
         "installed": status["python"],
         "torch_version": status["torch"],
-        "censor_ready": actual_censor_ready,
+        "censor_ready": status["censor"],
         "local_ready": status["local"],
         "installing": install_status["installing"],
         "progress": install_status["progress"],
@@ -3642,13 +3650,7 @@ def _install_base_environment_sync():
         install_status["progress"] = 95
         shutil.rmtree(temp_dir, ignore_errors=True)
         
-        # 설치 상태 저장
-        save_install_status({
-            "python": True,
-            "torch": "cpu",
-            "censor": True,
-            "local": False
-        })
+        # 설치 완료 (실제 파일 존재 여부로 상태 판단하므로 별도 저장 불필요)
         
         install_status["progress"] = 100
         install_status["message"] = "Installation complete!"
@@ -3668,8 +3670,6 @@ def _install_local_environment_sync():
     global install_status
 
     try:
-        status = load_install_status()
-
         # Python과 uv 경로 (_setup_python_and_uv와 동일하게)
         if platform.system() == "Windows":
             # Windows embedded Python: python/python.exe (직접)
@@ -3736,13 +3736,7 @@ def _install_local_environment_sync():
             progress_end=95
         )
         
-        # 설치 상태 저장
-        save_install_status({
-            "python": True,
-            "torch": "cuda",
-            "censor": True,
-            "local": True
-        })
+        # 설치 완료 (실제 파일 존재 여부로 상태 판단하므로 별도 저장 불필요)
         
         install_status["progress"] = 100
         install_status["message"] = "Installation complete!"
@@ -4651,11 +4645,11 @@ async def save_image_set(req: SaveImageSetRequest):
 
 def run_first_install_if_needed():
     """첫 실행 시 기본 환경 설치 (CMD에서 동기식으로 진행)"""
-    status = load_install_status()
+    status = get_install_status()
     
-    if status.get("python"):
+    if status["python"]:
         # 이미 설치됨
-        print(f"[Environment] Ready: torch={status.get('torch')}, censor={status.get('censor')}, local={status.get('local')}")
+        print(f"[Environment] Ready: torch={status['torch']}, censor={status['censor']}, local={status['local']}")
         return True
     
     # 첫 실행 - 설치 시작
@@ -4703,8 +4697,8 @@ if __name__ == "__main__":
     print(banner)
 
     # 첫 실행 감지 및 동기 설치 (서버 시작 전)
-    status = load_install_status()
-    if not status.get("python"):
+    status = get_install_status()
+    if not status["python"]:
         print("\n" + "=" * 50)
         print("  첫 실행 감지 - 기본 환경 설치를 시작합니다")
         print("  (torch CPU + ultralytics, 약 3-5분 소요)")
@@ -4723,6 +4717,6 @@ if __name__ == "__main__":
             print("=" * 50 + "\n")
             # 실패해도 서버는 시작 (NAI 모드는 사용 가능)
     else:
-        print(f"[Environment] torch={status.get('torch')}, censor={status.get('censor')}, local={status.get('local')}")
+        print(f"[Environment] torch={status['torch']}, censor={status['censor']}, local={status['local']}")
 
     uvicorn.run(app, host="127.0.0.1", port=8765, log_level="warning")

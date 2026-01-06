@@ -1383,10 +1383,16 @@ async def call_nai_api(req: GenerateRequest):
         
         import zipfile
         zip_buffer = io.BytesIO(response.content)
-        with zipfile.ZipFile(zip_buffer, 'r') as zf:
-            image_name = zf.namelist()[0]
-            image_data = zf.read(image_name)
-            return Image.open(io.BytesIO(image_data)), int(seed)
+        try:
+            with zipfile.ZipFile(zip_buffer, 'r') as zf:
+                image_name = zf.namelist()[0]
+                image_data = zf.read(image_name)
+                return Image.open(io.BytesIO(image_data)), int(seed)
+        except zipfile.BadZipFile:
+            # ZIP이 아닌 응답 (에러 메시지일 수 있음)
+            content_preview = response.content[:500].decode('utf-8', errors='replace')
+            print(f"[NAI] Unexpected response (not ZIP): {content_preview}")
+            raise HTTPException(status_code=500, detail=f"NAI returned invalid response: {content_preview}")
 
 
 # ============================================================
@@ -3542,7 +3548,7 @@ def _run_uv_install(uv_exe, python_exe, packages, index_url=None, progress_base=
     env = os.environ.copy()
     env["UV_PYTHON"] = str(python_exe)
     
-    cmd = [str(uv_exe), "pip", "install", "--reinstall", "--python", str(python_exe)]
+    cmd = [str(uv_exe), "pip", "install", "--python", str(python_exe)]
     if index_url:
         cmd.extend(["--index-url", index_url])
     cmd.extend(packages)

@@ -1,0 +1,55 @@
+name: Notify Discord
+
+on:
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: '알림할 플랫폼 (windows, macos, both)'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - windows
+          - macos
+          - both
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get Latest Release
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASE=$(gh api repos/${{ github.repository }}/releases/latest)
+          echo "tag=$(echo $RELEASE | jq -r '.tag_name')" >> $GITHUB_OUTPUT
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "$RELEASE" | jq -r '.body // ""' >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Send to Discord
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          TAG_NAME: ${{ steps.release.outputs.tag }}
+          RELEASE_BODY: ${{ steps.release.outputs.body }}
+          PLATFORMS: ${{ inputs.platforms }}
+        run: |
+          WIN_URL="https://github.com/${{ github.repository }}/releases/download/${TAG_NAME}/PeroPix-Windows.zip"
+          MAC_URL="https://github.com/${{ github.repository }}/releases/download/${TAG_NAME}/PeroPix-macOS.zip"
+          
+          # 플랫폼에 따라 다운로드 링크 생성
+          if [ "$PLATFORMS" = "windows" ]; then
+            DOWNLOADS="📥 [Windows](${WIN_URL})"
+          elif [ "$PLATFORMS" = "macos" ]; then
+            DOWNLOADS="📥 [macOS](${MAC_URL})"
+          else
+            DOWNLOADS="📥 [Windows](${WIN_URL}) | [macOS](${MAC_URL})"
+          fi
+          
+          jq -n \
+            --arg tag "$TAG_NAME" \
+            --arg body "$RELEASE_BODY" \
+            --arg downloads "$DOWNLOADS" \
+            '{content: "🚀 **\($tag)** 릴리즈!\n\n\($body)\n\n\($downloads)"}' \
+          | curl -H "Content-Type: application/json" -d @- $DISCORD_WEBHOOK

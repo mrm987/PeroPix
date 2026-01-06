@@ -6562,16 +6562,18 @@
                 const data = await res.json();
 
                 if (res.ok && data.success) {
-                    showToast('토큰 저장됨', 'success');
+                    showToast('토큰 저장됨. Anlas 정보를 불러오는 중...', 'success');
                     naiTokenSet = true;
-                    updateNaiStatus(true);
                     closeNaiTokenModal();
 
                     // Settings 모달의 토큰 필드도 업데이트
                     document.getElementById('naiToken').value = token;
 
-                    // 생성 진행
-                    addToQueue();
+                    // Anlas 정보 갱신 후 UI 업데이트
+                    await fetchAnlas();
+                    updateNaiStatus(true);
+                    
+                    showToast('준비 완료. 다시 Queue를 눌러주세요.', 'info');
                 } else {
                     showToast(data.error || '토큰 저장 실패', 'error');
                 }

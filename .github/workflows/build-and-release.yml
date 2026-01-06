@@ -132,21 +132,4 @@ jobs:
           path: PeroPix-macOS.zip
           retention-days: 7
 
-  notify-discord:
-    needs: [build-windows, build-macos]
-    if: github.event_name == 'release'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Send to Discord
-        env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-          RELEASE_BODY: ${{ github.event.release.body }}
-          TAG_NAME: ${{ github.event.release.tag_name }}
-        run: |
-          jq -n \
-            --arg tag "$TAG_NAME" \
-            --arg body "$RELEASE_BODY" \
-            --arg win "https://github.com/${{ github.repository }}/releases/download/${TAG_NAME}/PeroPix-Windows.zip" \
-            --arg mac "https://github.com/${{ github.repository }}/releases/download/${TAG_NAME}/PeroPix-macOS.zip" \
-            '{content: "🚀 **\($tag)** 릴리즈!\n\n\($body)\n\n📥 [Windows](\($win)) | [macOS](\($mac))"}' \
-          | curl -H "Content-Type: application/json" -d @- $DISCORD_WEBHOOK
+

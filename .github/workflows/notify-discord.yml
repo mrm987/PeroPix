@@ -23,7 +23,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           RELEASE=$(gh api repos/${{ github.repository }}/releases/latest)
-          echo "tag=$(echo $RELEASE | jq -r '.tag_name')" >> $GITHUB_OUTPUT
+          # tag_name에서 순수 태그만 추출 (예: "v1.0.9: some message" -> "v1.0.9")
+          RAW_TAG=$(echo $RELEASE | jq -r '.tag_name')
+          CLEAN_TAG=$(echo "$RAW_TAG" | sed 's/:.*//; s/ .*//')
+          echo "tag=$CLEAN_TAG" >> $GITHUB_OUTPUT
           echo "body<<EOF" >> $GITHUB_OUTPUT
           echo "$RELEASE" | jq -r '.body // ""' >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT

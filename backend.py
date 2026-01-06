@@ -3295,13 +3295,27 @@ def save_install_status(status: dict):
     PYTHON_ENV_DIR.mkdir(parents=True, exist_ok=True)
     INSTALL_STATUS_FILE.write_text(json.dumps(status, indent=2), encoding='utf-8')
 
+def _check_ultralytics_installed():
+    """ultralytics 설치 여부 실제 확인"""
+    if platform.system() == "Windows":
+        ultralytics_check = PYTHON_ENV_DIR / "Lib" / "site-packages" / "ultralytics"
+    else:
+        # python3.11 -> "3.11"
+        ultralytics_check = PYTHON_ENV_DIR / "python" / "lib" / "python3.11" / "site-packages" / "ultralytics"
+    return ultralytics_check.exists()
+
 def get_env_status():
     """환경 설치 상태 반환"""
     status = load_install_status()
+    
+    # install_status.json이 없거나 불완전해도 실제 파일 존재 여부로 판단
+    # (빌드된 배포판에서는 install_status.json이 없을 수 있음)
+    actual_censor_ready = status["censor"] or _check_ultralytics_installed()
+    
     return {
         "installed": status["python"],
         "torch_version": status["torch"],
-        "censor_ready": status["censor"],
+        "censor_ready": actual_censor_ready,
         "local_ready": status["local"],
         "installing": install_status["installing"],
         "progress": install_status["progress"],

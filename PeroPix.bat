@@ -2,7 +2,11 @@
 title PeroPix
 cd /d "%~dp0"
 
-echo Starting PeroPix...
+echo.
+echo  ============================================
+echo   PeroPix - Starting...
+echo   (First run may take a few minutes to setup)
+echo  ============================================
 echo.
 
 :: Python path (same as build)

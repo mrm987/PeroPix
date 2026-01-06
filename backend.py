@@ -4407,7 +4407,7 @@ async def list_censored_images(folder: str = ""):
 
 @app.get("/api/censor/image")
 async def get_censor_image(path: str, source: str = "uncensored"):
-    """검열용 이미지 조회 (전체 크기)"""
+    """검열용 이미지 조회 (전체 크기) - base64 버전 (하위 호환)"""
     if source == "uncensored" or source == "outputs":
         filepath = UNCENSORED_DIR / path
     elif source == "censored":
@@ -4433,6 +4433,39 @@ async def get_censor_image(path: str, source: str = "uncensored"):
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+@app.get("/api/censor/file/{source}/{filepath:path}")
+async def get_censor_file(source: str, filepath: str):
+    """검열용 이미지 파일 직접 서빙 (FileResponse) - Canvas CORS용"""
+    if source == "uncensored":
+        file_path = UNCENSORED_DIR / filepath
+    elif source == "censored":
+        file_path = CENSORED_DIR / filepath
+    else:
+        return {"success": False, "error": "Invalid source"}
+    
+    if not file_path.exists() or not file_path.is_file():
+        return {"success": False, "error": "File not found"}
+    
+    # 확장자에 따른 미디어 타입 결정
+    suffix = file_path.suffix.lower()
+    media_types = {
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.webp': 'image/webp'
+    }
+    media_type = media_types.get(suffix, 'image/png')
+    
+    return FileResponse(
+        file_path,
+        media_type=media_type,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Cache-Control": "public, max-age=3600"  # 1시간 브라우저 캐시
+        }
+    )
 
 
 @app.post("/api/censor/batch")

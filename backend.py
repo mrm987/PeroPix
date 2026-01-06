@@ -3242,6 +3242,9 @@ def _get_site_packages_dir():
     else:
         return PYTHON_ENV_DIR / "python" / "lib" / "python3.11" / "site-packages"
 
+# 설치 상태 파일 (영구 저장 - 매번 파일시스템 체크 방지)
+INSTALL_STATUS_FILE = PYTHON_ENV_DIR / "install_status.json"
+
 def _check_python_installed():
     """Python 설치 여부 실제 확인"""
     if platform.system() == "Windows":
@@ -3258,9 +3261,10 @@ def _check_torch_version():
     # CUDA 버전 확인: torch/lib에 cudnn 또는 cublas 파일이 있으면 CUDA
     torch_lib = torch_dir / "lib"
     if torch_lib.exists():
-        for f in torch_lib.iterdir():
-            fname = f.name.lower()
-            if "cudnn" in fname or "cublas" in fname or "nvcuda" in fname:
+        # 전체 순회 대신 glob으로 빠르게 확인
+        cuda_patterns = ["*cudnn*", "*cublas*", "*nvcuda*"]
+        for pattern in cuda_patterns:
+            if list(torch_lib.glob(pattern)):
                 return "cuda"
     return "cpu"
 
@@ -3272,14 +3276,49 @@ def _check_diffusers_installed():
     """diffusers 설치 여부 실제 확인 (로컬 생성용)"""
     return (_get_site_packages_dir() / "diffusers").exists()
 
-def get_install_status():
-    """설치 상태를 실제 파일 존재 여부로 판단"""
+def _detect_install_status():
+    """실제 파일 시스템을 스캔하여 설치 상태 감지 (느림)"""
     return {
         "python": _check_python_installed(),
         "torch": _check_torch_version(),
         "censor": _check_ultralytics_installed(),
         "local": _check_diffusers_installed()
     }
+
+def load_install_status():
+    """설치 상태 파일 로드 (없으면 실제 감지 후 저장)"""
+    default_status = {
+        "python": False,
+        "torch": None,
+        "censor": False,
+        "local": False
+    }
+    
+    # 파일이 있으면 로드
+    if INSTALL_STATUS_FILE.exists():
+        try:
+            status = json.loads(INSTALL_STATUS_FILE.read_text(encoding='utf-8'))
+            return {**default_status, **status}
+        except:
+            pass
+    
+    # 파일이 없으면 실제 감지 (배포판 첫 실행)
+    # Python이 있으면 배포판이므로 실제 상태 감지 후 저장
+    if _check_python_installed():
+        status = _detect_install_status()
+        save_install_status(status)
+        return status
+    
+    return default_status
+
+def save_install_status(status: dict):
+    """설치 상태 파일 저장"""
+    PYTHON_ENV_DIR.mkdir(parents=True, exist_ok=True)
+    INSTALL_STATUS_FILE.write_text(json.dumps(status, indent=2), encoding='utf-8')
+
+def get_install_status():
+    """설치 상태 반환 (캐시된 파일에서 로드)"""
+    return load_install_status()
 
 def get_env_status():
     """환경 설치 상태 반환 (API용)"""
@@ -3615,7 +3654,13 @@ def _install_base_environment_sync():
         install_status["progress"] = 95
         shutil.rmtree(temp_dir, ignore_errors=True)
         
-        # 설치 완료 (실제 파일 존재 여부로 상태 판단하므로 별도 저장 불필요)
+        # 설치 완료 - 상태 저장
+        save_install_status({
+            "python": True,
+            "torch": "cpu",
+            "censor": True,
+            "local": False
+        })
         
         install_status["progress"] = 100
         install_status["message"] = "Installation complete!"
@@ -3701,7 +3746,13 @@ def _install_local_environment_sync():
             progress_end=95
         )
         
-        # 설치 완료 (실제 파일 존재 여부로 상태 판단하므로 별도 저장 불필요)
+        # 설치 완료 - 상태 저장
+        save_install_status({
+            "python": True,
+            "torch": "cuda",
+            "censor": True,
+            "local": True
+        })
         
         install_status["progress"] = 100
         install_status["message"] = "Installation complete!"

@@ -6559,7 +6559,19 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ nai_token: token })
                 });
-                const data = await res.json();
+                
+                console.log('[Token Save] Response status:', res.status);
+                const text = await res.text();
+                console.log('[Token Save] Response body:', text);
+                
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (parseErr) {
+                    console.error('[Token Save] JSON parse error:', parseErr);
+                    showToast('서버 응답 파싱 실패', 'error');
+                    return;
+                }
 
                 if (res.ok && data.success) {
                     showToast('토큰 저장됨. Anlas 정보를 불러오는 중...', 'success');
@@ -6575,10 +6587,12 @@
                     
                     showToast('준비 완료. 다시 Queue를 눌러주세요.', 'info');
                 } else {
+                    console.error('[Token Save] Failed:', data);
                     showToast(data.error || '토큰 저장 실패', 'error');
                 }
             } catch (e) {
-                showToast('토큰 저장 실패', 'error');
+                console.error('[Token Save Error]', e);
+                showToast(`토큰 저장 실패: ${e.message}`, 'error');
             }
             
             btn.textContent = '💾 Save & Continue';

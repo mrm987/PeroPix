@@ -3878,8 +3878,16 @@ async def restart_server():
 # Auto Censor (YOLO-based)
 # ============================================================
 
-# YOLO 모델 (ultralytics는 초기 설치에 포함됨)
-from ultralytics import YOLO
+# YOLO 모델 (ultralytics는 초기 설치에 포함됨, lazy import)
+YOLO = None
+
+def _get_yolo():
+    """YOLO 클래스 lazy import"""
+    global YOLO
+    if YOLO is None:
+        from ultralytics import YOLO as _YOLO
+        YOLO = _YOLO
+    return YOLO
 
 # 검열 모델 캐시
 censor_model_cache = {
@@ -3908,7 +3916,7 @@ def get_censor_model(model_name: str = None):
     
     # 새 모델 로드
     print(f"[Censor] Loading model: {model_name}")
-    model = YOLO(str(model_path))
+    model = _get_yolo()(str(model_path))
     classes = list(model.names.values()) if hasattr(model, 'names') else []
     
     censor_model_cache["model"] = model

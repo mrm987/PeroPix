@@ -4693,9 +4693,12 @@ if __name__ == "__main__":
 
     # 첫 실행 감지 및 동기 설치 (서버 시작 전)
     status = get_install_status()
-    if not status["python"]:
+    # Python은 있지만 torch/ultralytics가 없으면 설치 필요 (배포판 첫 실행)
+    needs_install = not status["python"] or not status["torch"] or not status["censor"]
+    
+    if needs_install:
         print("\n" + "=" * 50)
-        print("  첫 실행 감지 - 기본 환경 설치를 시작합니다")
+        print("  기본 환경 설치를 시작합니다")
         print("  (torch CPU + ultralytics, 약 3-5분 소요)")
         print("=" * 50 + "\n")
         

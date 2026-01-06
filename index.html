@@ -4692,26 +4692,26 @@
     <div class="modal" id="naiTokenModal">
         <div class="modal-content" style="max-width: 450px;">
             <div class="modal-header">
-                <h2>🔑 NovelAI API Token</h2>
+                <h2>🔑 NovelAI API 토큰</h2>
                 <button class="modal-close" onclick="closeNaiTokenModal()">&times;</button>
             </div>
             
             <p style="color: var(--text-dim); margin-bottom: 16px;">
-                Enter your NovelAI API token to use NAI generation.
+                NAI 생성을 사용하려면 API 토큰이 필요합니다.
             </p>
             
             <div class="input-group">
-                <label>API Token</label>
-                <input type="password" id="naiTokenModalInput" placeholder="NAI 토큰 입력">
-                <small>Get from <a href="https://novelai.net/settings" target="_blank" style="color: var(--primary);">novelai.net</a> → Account Settings → Get Persistent API Token</small>
+                <label>API 토큰</label>
+                <input type="password" id="naiTokenModalInput" placeholder="토큰 붙여넣기">
+                <small><a href="https://novelai.net/settings" target="_blank" style="color: var(--primary);">novelai.net</a> → Account Settings → Get Persistent API Token</small>
             </div>
             
             <div style="display: flex; gap: 8px; margin-top: 16px;">
-                <button class="btn" id="naiTokenModalBtn" onclick="saveNaiTokenFromModal()" style="flex: 1;">
-                    💾 Save & Continue
+                <button class="btn" id="naiTokenModalBtn" onclick="saveNaiTokenFromModal()" style="flex: 2;">
+                    💾 저장
                 </button>
-                <button class="btn" onclick="closeNaiTokenModal()" style="background: var(--surface-light);">
-                    Cancel
+                <button class="btn" onclick="closeNaiTokenModal()" style="flex: 1; background: var(--surface-light);">
+                    취소
                 </button>
             </div>
         </div>
@@ -6550,7 +6550,7 @@
             }
             
             const btn = document.getElementById('naiTokenModalBtn');
-            btn.textContent = '⏳ Saving...';
+            btn.textContent = '⏳ 저장 중...';
             btn.disabled = true;
             
             try {
@@ -6595,7 +6595,7 @@
                 showToast(`토큰 저장 실패: ${e.message}`, 'error');
             }
             
-            btn.textContent = '💾 Save & Continue';
+            btn.textContent = '💾 저장';
             btn.disabled = false;
         }
         

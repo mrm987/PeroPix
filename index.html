@@ -12068,9 +12068,11 @@
                 censorState.labelConf = savedSettings.labelConf || {};
             }
 
-            // 폴더 먼저 로드 (빠름), 모델은 병렬로 로드 (느릴 수 있음)
-            await loadCensorFolders();
-            loadCensorModels(savedSettings);  // await 제거 - 백그라운드로 로드
+            // 폴더와 모델 병렬 로드 (둘 다 완료 대기)
+            await Promise.all([
+                loadCensorFolders(),
+                loadCensorModels(savedSettings)
+            ]);
 
             // 폴더 이름 표시 업데이트
             if (censorState.currentUncensoredFolder) {

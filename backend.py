@@ -39,9 +39,9 @@ DATA_DIR = APP_DIR / "data"  # 데이터 파일 (tags.json 등)
 CONFIG_FILE = APP_DIR / "config.json"
 PYTHON_ENV_DIR = APP_DIR / "python"  # Python 환경 (빌드와 동일 경로)
 CENSOR_MODELS_DIR = MODELS_DIR / "censor"  # 검열 모델 (YOLO)
-CENSORING_DIR = APP_DIR / "censoring"  # 검열 작업 폴더
-UNCENSORED_DIR = CENSORING_DIR / "uncensored"  # 검열 전 이미지
-CENSORED_DIR = CENSORING_DIR / "censored"  # 검열 후 이미지
+CENSORING_DIR = APP_DIR / "censoring"  # 검열 작업 폴더 (레거시, 더 이상 사용 안함)
+UNCENSORED_DIR = CENSORING_DIR / "uncensored"  # 검열 전 이미지 (레거시, 더 이상 사용 안함)
+CENSORED_DIR = OUTPUT_DIR / "censored"  # 검열 후 이미지 (새 경로: outputs/censored)
 
 # 카테고리별 이미지 순번 - 매번 실제 폴더 스캔
 def get_next_image_number(category: str, save_dir: Path = None, ext: str = 'png') -> int:
@@ -68,7 +68,7 @@ def get_next_image_number(category: str, save_dir: Path = None, ext: str = 'png'
     return max_num + 1
 
 # 디렉토리 생성
-for d in [CHECKPOINTS_DIR, LORA_DIR, UPSCALE_DIR, OUTPUT_DIR, PRESETS_DIR, DATA_DIR, CENSOR_MODELS_DIR, UNCENSORED_DIR, CENSORED_DIR]:
+for d in [CHECKPOINTS_DIR, LORA_DIR, UPSCALE_DIR, OUTPUT_DIR, PRESETS_DIR, DATA_DIR, CENSOR_MODELS_DIR, CENSORED_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
 # Prompts 하위 폴더 생성
@@ -4184,6 +4184,7 @@ async def get_censor_model_info(model: str = None):
 
 class CensorScanRequest(BaseModel):
     image_path: str = None  # outputs 폴더 기준 상대 경로
+    absolute_path: str = None  # 절대 경로 (드롭된 외부 이미지용)
     image_base64: str = None  # 또는 base64 이미지
     model: str = None
     target_labels: List[str] = None
@@ -4199,8 +4200,13 @@ async def scan_image_for_censor(req: CensorScanRequest):
     temp_file = None
     
     try:
-        # 이미지 경로 결정
-        if req.image_path:
+        # 이미지 경로 결정 (우선순위: absolute_path > image_path > image_base64)
+        if req.absolute_path:
+            # 절대 경로 (외부 이미지)
+            image_path = Path(req.absolute_path)
+            if not image_path.exists():
+                return {"success": False, "error": f"이미지 없음: {req.absolute_path}"}
+        elif req.image_path:
             # censoring/uncensored 폴더 기준 상대 경로
             image_path = UNCENSORED_DIR / req.image_path
             if not image_path.exists():
@@ -4236,6 +4242,7 @@ async def scan_image_for_censor(req: CensorScanRequest):
 
 class CensorApplyRequest(BaseModel):
     image_path: str = None
+    absolute_path: str = None  # 절대 경로 (드롭된 외부 이미지용)
     image_base64: str = None
     boxes: List[dict]  # [{"box": [x1,y1,x2,y2], "method": "black", "color": "#000000"}]
     method: str = "black"  # 기본 검열 방식
@@ -4249,8 +4256,12 @@ async def apply_censor(req: CensorApplyRequest):
     temp_file = None
     
     try:
-        # 이미지 경로 결정
-        if req.image_path:
+        # 이미지 경로 결정 (우선순위: absolute_path > image_path > image_base64)
+        if req.absolute_path:
+            image_path = Path(req.absolute_path)
+            if not image_path.exists():
+                return {"success": False, "error": f"이미지 없음: {req.absolute_path}"}
+        elif req.image_path:
             image_path = UNCENSORED_DIR / req.image_path
             if not image_path.exists():
                 return {"success": False, "error": f"이미지 없음: {req.image_path}"}
@@ -4282,13 +4293,14 @@ async def apply_censor(req: CensorApplyRequest):
 
 class CensorSaveRequest(BaseModel):
     image_path: str = None
+    absolute_path: str = None  # 절대 경로 (드롭된 외부 이미지용)
     image_base64: str = None
     boxes: List[dict]
     method: str = "black"
     color: str = None
     output_folder: str = ""  # censored 하위 폴더
     filename: str = None  # 저장 파일명 (없으면 원본명 사용)
-    source: str = "uncensored"  # uncensored 또는 censored
+    source: str = "uncensored"  # uncensored 또는 censored (absolute_path 사용 시 무시됨)
 
 
 @app.post("/api/censor/save")
@@ -4298,14 +4310,20 @@ async def save_censored_image(req: CensorSaveRequest):
     temp_file = None
     
     # 디버깅: 받은 박스 데이터 로깅
-    print(f"[DEBUG] save_censored_image - image_path: {req.image_path}")
+    print(f"[DEBUG] save_censored_image - image_path: {req.image_path}, absolute_path: {req.absolute_path}")
     print(f"[DEBUG] save_censored_image - boxes count: {len(req.boxes)}")
     for i, box in enumerate(req.boxes):
         print(f"[DEBUG] Box {i}: {box}")
     
     try:
-        # 이미지 경로 결정 (source에 따라 uncensored 또는 censored 폴더)
-        if req.image_path:
+        # 이미지 경로 결정 (우선순위: absolute_path > image_path > image_base64)
+        if req.absolute_path:
+            # 절대 경로 (외부 이미지)
+            image_path = Path(req.absolute_path)
+            if not image_path.exists():
+                return {"success": False, "error": f"이미지 없음: {req.absolute_path}"}
+            original_filename = image_path.name
+        elif req.image_path:
             source_dir = CENSORED_DIR if req.source == "censored" else UNCENSORED_DIR
             image_path = source_dir / req.image_path
             if not image_path.exists():
@@ -4319,7 +4337,7 @@ async def save_censored_image(req: CensorSaveRequest):
             image_path = Path(temp_file.name)
             original_filename = "censored.png"
         else:
-            return {"success": False, "error": "image_path 또는 image_base64 필요"}
+            return {"success": False, "error": "image_path, absolute_path 또는 image_base64 필요"}
         
         # 저장 경로 결정 (censoring/censored)
         output_folder = CENSORED_DIR / req.output_folder if req.output_folder else CENSORED_DIR
@@ -4725,6 +4743,8 @@ if __name__ == "__main__":
             print("  ✅ 기본 환경 설치 완료!")
             print("  서버를 시작합니다...")
             print("=" * 50 + "\n")
+            # 설치 후 status 갱신
+            status = get_install_status()
         else:
             print("\n" + "=" * 50)
             print("  ❌ 설치 실패. 로그를 확인해주세요.")

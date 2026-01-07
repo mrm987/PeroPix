@@ -329,6 +329,7 @@
         .prompt-highlight-container {
             position: relative;
             width: 100%;
+            display: flex;
         }
 
         .prompt-highlight-overlay {
@@ -641,20 +642,21 @@
             color: var(--text-dim);
         }
 
-        /* 캐릭터 드래그 핸들 */
+        /* 캐릭터 드래그 핸들 (슬롯 드래그와 동일 스타일) */
         .char-drag {
+            background: none;
+            border: none;
             color: var(--text-dim);
             cursor: grab;
-            padding: var(--space-xs);
-            font-size: 0.85rem;
-            opacity: 0.3;
-            transition: var(--transition-fast);
-            border-radius: var(--radius-sm);
+            padding: 2px 4px;
+            font-size: 0.9rem;
+            line-height: 1;
+            border-radius: 4px;
         }
 
         .char-drag:hover {
-            opacity: 0.8;
-            background: var(--bg-lighter);
+            background: var(--bg);
+            color: var(--text);
         }
 
         .char-drag:active {
@@ -2282,6 +2284,7 @@
 
         /* Censor Mode Container - New Design */
         .censor-container {
+            position: relative;
             display: flex;
             flex-direction: column;
             height: 100%;
@@ -2303,6 +2306,7 @@
             scroll-behavior: smooth;
         }
         .censor-thumbnail {
+            position: relative;
             flex-shrink: 0;
             width: 80px;
             height: 80px;
@@ -2321,6 +2325,62 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
+        }
+        /* 썸네일 삭제 버튼 (검열 전 탭에서만) */
+        .censor-thumbnail .thumb-delete-btn {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.7);
+            border: none;
+            color: #fff;
+            font-size: 12px;
+            line-height: 1;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.15s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 5;
+        }
+        .censor-thumbnail:hover .thumb-delete-btn {
+            opacity: 1;
+        }
+        .censor-thumbnail .thumb-delete-btn:hover {
+            background: var(--error);
+        }
+        /* 추가 버튼 (썸네일 리스트 끝) */
+        .censor-add-btn {
+            flex-shrink: 0;
+            width: 80px;
+            height: 80px;
+            border-radius: 6px;
+            border: 2px dashed var(--border);
+            background: var(--bg-lighter);
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            transition: all 0.2s;
+            color: var(--text-dim);
+        }
+        .censor-add-btn:hover {
+            border-color: var(--accent-gold);
+            background: rgba(245, 185, 66, 0.1);
+            color: var(--accent-gold);
+        }
+        .censor-add-btn .add-icon {
+            font-size: 24px;
+            line-height: 1;
+        }
+        .censor-add-btn .add-text {
+            font-size: 10px;
         }
         .censor-loading {
             display: flex;
@@ -2392,7 +2452,7 @@
         }
         .censor-preview-empty {
             position: absolute;
-            top: 50%;
+            top: 55%;
             left: 50%;
             transform: translate(-50%, -50%);
             display: flex;
@@ -2404,8 +2464,71 @@
             padding: 40px;
             pointer-events: none;
         }
-        .censor-preview-empty .icon { font-size: 4rem; margin-bottom: 16px; opacity: 0.5; }
-        .censor-preview-empty p { font-size: 1.1rem; }
+        .censor-preview-empty .icon { font-size: 3rem; margin-bottom: 12px; opacity: 0.5; }
+        .censor-preview-empty p { font-size: 1rem; }
+        
+        /* 드롭존 스타일 */
+        .censor-dropzone {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius-md);
+            padding: 40px 20px;
+            margin: 0 16px 16px 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all var(--transition-normal);
+            background: var(--bg-lighter);
+        }
+        .censor-dropzone:hover,
+        .censor-dropzone.drag-over {
+            border-color: var(--accent-gold);
+            background: rgba(245, 185, 66, 0.1);
+        }
+        .censor-dropzone .dropzone-content {
+            pointer-events: none;
+        }
+        .censor-dropzone .dropzone-icon {
+            font-size: 3rem;
+            margin-bottom: 12px;
+            opacity: 0.7;
+        }
+        .censor-dropzone p {
+            color: var(--text);
+            font-size: 1rem;
+            margin-bottom: 4px;
+        }
+        .censor-dropzone small {
+            color: var(--text-dim);
+            font-size: 0.85rem;
+        }
+        
+        /* 드롭 오버레이 (전체 영역 드래그 시) */
+        .censor-container.drag-over::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(245, 185, 66, 0.1);
+            border: 3px dashed var(--accent-gold);
+            border-radius: var(--radius-md);
+            z-index: 1000;
+            pointer-events: none;
+        }
+        .censor-container.drag-over::after {
+            content: '이미지를 여기에 드롭하세요';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: var(--accent-gold);
+            padding: 16px 32px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            z-index: 1001;
+            pointer-events: none;
+        }
         
         /* 스캔 로딩 인디케이터 */
         .censor-scan-loading {
@@ -4243,22 +4366,10 @@
                         <button type="button" class="header-btn" id="censorTabAfter">📤 검열 후</button>
                     </div>
                     <div class="toolbar-right">
-                        <!-- 검열 전 폴더 드롭다운 -->
-                        <div class="folder-dropdown" id="censorFolderBefore">
-                            <button type="button" class="header-btn folder-btn" id="censorUncensoredFolderBtn">
-                                <span class="folder-icon">📁</span>
-                                <span class="folder-name" id="censorUncensoredFolderName">uncensored</span>
-                                <span class="dropdown-arrow">▼</span>
-                            </button>
-                            <div class="folder-menu" id="censorUncensoredFolderMenu">
-                                <div class="folder-list" id="censorUncensoredFolderList">
-                                    <!-- 폴더 목록 -->
-                                </div>
-                                <div class="folder-actions">
-                                    <button type="button" class="folder-action-btn" id="censorAddUncensoredBtn">+ 새 폴더</button>
-                                </div>
-                            </div>
-                        </div>
+                        <!-- 검열 전: 이미지 초기화 버튼 -->
+                        <button type="button" class="header-btn" id="censorClearImagesBtn" style="display: none;" title="드롭된 이미지 초기화">
+                            🗑️ 초기화
+                        </button>
                         <!-- 검열 후 폴더 드롭다운 -->
                         <div class="folder-dropdown" id="censorFolderAfter" style="display: none;">
                             <button type="button" class="header-btn folder-btn" id="censorCensoredFolderBtn">
@@ -4280,7 +4391,17 @@
                 </div>
                 
                 <!-- 썸네일 가로 슬라이드 -->
-                <div class="censor-thumbnails-wrapper">
+                <!-- 드롭존 (이미지 없을 때 표시) -->
+                <div class="censor-dropzone" id="censorDropzone">
+                    <div class="dropzone-content">
+                        <div class="dropzone-icon">📁</div>
+                        <p>검열할 이미지를 여기에 드롭하세요</p>
+                        <small>또는 클릭하여 파일 선택</small>
+                    </div>
+                    <input type="file" id="censorFileInput" multiple accept="image/*" style="display: none;">
+                </div>
+                
+                <div class="censor-thumbnails-wrapper" id="censorThumbnailsWrapper" style="display: none;">
                     <div class="censor-thumbnails" id="censorThumbnails">
                         <!-- 썸네일들이 여기에 렌더링됨 -->
                     </div>
@@ -4316,8 +4437,8 @@
                     <div class="censor-image-counter" id="censorImageCounter">0 / 0</div>
 
                     <div class="censor-preview-empty" id="censorPreviewEmpty">
-                        <div class="icon">🔍</div>
-                        <p>이미지를 선택하세요</p>
+                        <div class="icon">📁</div>
+                        <p>이미지를 드롭하여 시작하세요</p>
                     </div>
                     <div class="censor-scan-loading" id="censorScanLoading">
                         <div class="scan-spinner"></div>
@@ -6192,7 +6313,7 @@
             const dragHandle = document.createElement('button');
             dragHandle.type = 'button';
             dragHandle.className = 'char-drag';
-            dragHandle.innerHTML = '⋮⋮';
+            dragHandle.innerHTML = '☰';
             dragHandle.title = '드래그하여 순서 변경';
 
             // 접기 버튼
@@ -8901,12 +9022,20 @@
 
             console.log('[PromptHighlight] Created wrapper and overlay for', textarea.id);
 
+            // 스크롤바 유무에 따라 overlay right 조정
+            function adjustOverlayForScrollbar() {
+                const hasScrollbar = textarea.scrollHeight > textarea.clientHeight;
+                overlay.style.right = hasScrollbar ? '9px' : '1px';
+            }
+
             // 초기 하이라이팅
             highlightPrompt(textarea, overlay);
+            adjustOverlayForScrollbar();
 
             // 이벤트 리스너
             textarea.addEventListener('input', () => {
                 highlightPrompt(textarea, overlay);
+                adjustOverlayForScrollbar();
             });
 
             textarea.addEventListener('scroll', () => {
@@ -8917,6 +9046,7 @@
             // 창 크기 변경 시 재렌더링
             const resizeObserver = new ResizeObserver(() => {
                 highlightPrompt(textarea, overlay);
+                adjustOverlayForScrollbar();
             });
             resizeObserver.observe(textarea);
         }
@@ -10974,10 +11104,18 @@
 
         // 드래그 이벤트 처리
         let dragCounter = 0;
+        
+        // 자동검열 모드인지 확인하는 헬퍼
+        function isInCensorMode() {
+            const censorContainer = document.getElementById('censorContainer');
+            return censorContainer && censorContainer.style.display !== 'none';
+        }
+        
         document.addEventListener('dragenter', (e) => {
             e.preventDefault();
             dragCounter++;
-            if (e.dataTransfer.types.includes('Files')) {
+            // 자동검열 모드에서는 전역 드롭 오버레이 표시 안 함
+            if (e.dataTransfer.types.includes('Files') && !isInCensorMode()) {
                 dropOverlay.classList.add('active');
             }
         });
@@ -10998,6 +11136,9 @@
             e.preventDefault();
             dragCounter = 0;
             dropOverlay.classList.remove('active');
+            
+            // 자동검열 모드에서는 전역 드롭 처리 안 함 (검열용 드롭 핸들러에서 처리)
+            if (isInCensorMode()) return;
 
             const files = e.dataTransfer.files;
             if (files.length === 0) return;
@@ -11872,8 +12013,10 @@
         // 검열 모드 상태
         const censorState = {
             currentTab: 'before',  // 'before' | 'processing' | 'after'
-            images: [],            // 검열 전 이미지 목록
+            images: [],            // 검열 전 이미지 목록 (드롭된 이미지들)
             censoredImages: [],    // 검열 후 이미지 목록
+            // 드롭된 이미지 정보: [{path: '절대경로', filename: '파일명', thumbnail: 'base64', imgObj: Image}]
+            droppedMode: true,     // 드롭 모드 활성화 (폴더 스캔 대신 드롭된 이미지 사용)
             currentIndex: 0,
             beforeIndex: 0,        // 검열전 탭 인덱스
             afterIndex: 0,         // 검열후 탭 인덱스 (항상 0으로 리셋)
@@ -11953,6 +12096,272 @@
                 const oldestKey = censorState.imgCache.keys().next().value;
                 censorState.imgCache.delete(oldestKey);
             }
+        }
+        
+        // ========== 드롭존 관련 함수 ==========
+        
+        // 드롭존 UI 업데이트
+        function updateCensorDropzoneUI() {
+            const dropzone = document.getElementById('censorDropzone');
+            const thumbnailsWrapper = document.getElementById('censorThumbnailsWrapper');
+            const clearBtn = document.getElementById('censorClearImagesBtn');
+            const hasImages = censorState.images.length > 0;
+            
+            if (censorState.currentTab === 'before') {
+                dropzone.style.display = hasImages ? 'none' : 'block';
+                thumbnailsWrapper.style.display = hasImages ? 'flex' : 'none';
+                clearBtn.style.display = hasImages ? 'inline-flex' : 'none';
+            } else {
+                // 검열 후 탭에서는 드롭존 숨김
+                dropzone.style.display = 'none';
+                thumbnailsWrapper.style.display = 'flex';
+                clearBtn.style.display = 'none';
+            }
+        }
+        
+        // 드롭존 이벤트 설정
+        function setupDropzoneEvents() {
+            const dropzone = document.getElementById('censorDropzone');
+            const fileInput = document.getElementById('censorFileInput');
+            const clearBtn = document.getElementById('censorClearImagesBtn');
+            const censorContainer = document.getElementById('censorContainer');
+            
+            if (!dropzone || !fileInput || !censorContainer) {
+                console.warn('Dropzone elements not found');
+                return;
+            }
+            
+            // 클릭하여 파일 선택 (드롭존 클릭 시)
+            dropzone.addEventListener('click', () => {
+                fileInput.click();
+            });
+            
+            // 파일 선택 시
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files.length > 0) {
+                    handleDroppedFiles(Array.from(e.target.files));
+                    fileInput.value = ''; // 리셋
+                }
+            });
+            
+            // ====== 전체 컨테이너에서 드래그 앤 드롭 (검열 전 탭 + 자동검열 모드일 때만) ======
+            
+            // 자동검열 모드이고 검열 전 탭인지 확인하는 헬퍼
+            function canAcceptDrop() {
+                // censorContainer가 보이는지 확인 (자동검열 모드)
+                const isVisible = censorContainer.style.display !== 'none';
+                // 검열 전 탭인지 확인
+                const isBeforeTab = censorState.currentTab === 'before';
+                return isVisible && isBeforeTab;
+            }
+            
+            censorContainer.addEventListener('dragenter', (e) => {
+                // 드롭 불가 상태면 완전히 무시
+                if (!canAcceptDrop()) return;
+                
+                e.preventDefault();
+                censorContainer.classList.add('drag-over');
+            });
+            
+            censorContainer.addEventListener('dragover', (e) => {
+                // 드롭 불가 상태면 완전히 무시
+                if (!canAcceptDrop()) return;
+                
+                e.preventDefault();
+            });
+            
+            censorContainer.addEventListener('dragleave', (e) => {
+                // 컨테이너 밖으로 나갔는지 확인 (자식 요소로의 이동 무시)
+                if (!e.relatedTarget || !censorContainer.contains(e.relatedTarget)) {
+                    censorContainer.classList.remove('drag-over');
+                }
+            });
+            
+            censorContainer.addEventListener('drop', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // 항상 드롭 UI 제거
+                censorContainer.classList.remove('drag-over');
+                
+                // 드롭 불가 상태면 파일 처리 안 함
+                if (!canAcceptDrop()) return;
+                
+                const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+                if (files.length > 0) {
+                    handleDroppedFiles(files);
+                }
+            });
+            
+            // 초기화 버튼
+            if (clearBtn) {
+                clearBtn.addEventListener('click', () => {
+                    clearDroppedImages();
+                });
+            }
+        }
+        
+        // 드롭된 파일 처리
+        async function handleDroppedFiles(files) {
+            if (!files || files.length === 0) {
+                console.warn('No files to process');
+                return;
+            }
+            
+            // 파일명 기준 정렬
+            files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+            
+            const newImages = [];
+            let skippedCount = 0;
+            
+            for (const file of files) {
+                try {
+                    // base64로 변환 (서버 전송용)
+                    const base64Data = await fileToBase64(file);
+                    
+                    // 썸네일 생성 (미리보기용)
+                    const thumbnail = await createThumbnailFromFile(file);
+                    
+                    // Image 객체 생성
+                    const imgObj = await loadImageFromFile(file);
+                    
+                    // 고유 ID 생성 (파일명 + 타임스탬프)
+                    const uniqueId = `dropped_${Date.now()}_${file.name}`;
+                    
+                    newImages.push({
+                        id: uniqueId,                 // 고유 식별자
+                        filename: file.name,
+                        base64: base64Data,           // base64 데이터 (서버 전송용)
+                        thumbnail: thumbnail,         // 썸네일 base64
+                        imgObj: imgObj,
+                        width: imgObj.naturalWidth,
+                        height: imgObj.naturalHeight,
+                        isDropped: true               // 드롭된 이미지 표시
+                    });
+                } catch (err) {
+                    console.error('이미지 로드 실패:', file.name, err);
+                    skippedCount++;
+                }
+            }
+            
+            if (newImages.length === 0) {
+                showToast('이미지를 로드할 수 없습니다.', 'error');
+                return;
+            }
+            
+            // 기존 이미지에 추가 (파일명 기준 중복 제거) - 실제로 추가된 이미지 추적
+            const actuallyAdded = [];
+            for (const img of newImages) {
+                const exists = censorState.images.some(i => i.filename === img.filename);
+                if (!exists) {
+                    censorState.images.push(img);
+                    actuallyAdded.push(img);
+                }
+            }
+            
+            // 추가된 이미지가 없으면 (모두 중복)
+            if (actuallyAdded.length === 0) {
+                showToast('모든 이미지가 이미 추가되어 있습니다.', 'info');
+                return;
+            }
+            
+            // 새로 추가된 첫 번째 이미지 기억
+            const firstNewImage = actuallyAdded[0];
+            
+            // 이름순 재정렬
+            censorState.images.sort((a, b) => 
+                a.filename.localeCompare(b.filename, undefined, { numeric: true, sensitivity: 'base' })
+            );
+            
+            // 새로 추가된 첫 번째 이미지의 정렬 후 인덱스 찾기
+            const firstNewIndex = censorState.images.findIndex(img => img.id === firstNewImage.id);
+            
+            // UI 업데이트
+            updateCensorDropzoneUI();
+            renderCensorThumbnails(censorState.images);
+            
+            // 새로 추가된 첫 번째 이미지 선택
+            if (firstNewIndex >= 0) {
+                selectCensorImage(firstNewIndex);
+            } else if (censorState.images.length > 0) {
+                // fallback: 첫 번째 이미지 선택
+                selectCensorImage(0);
+            }
+            
+            showToast(`${actuallyAdded.length}개 이미지 추가됨 (총 ${censorState.images.length}개)`, 'success');
+        }
+        
+        // File에서 썸네일 생성
+        function createThumbnailFromFile(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        const maxSize = 80;
+                        let w = img.width, h = img.height;
+                        if (w > h) {
+                            if (w > maxSize) { h = h * maxSize / w; w = maxSize; }
+                        } else {
+                            if (h > maxSize) { w = w * maxSize / h; h = maxSize; }
+                        }
+                        canvas.width = w;
+                        canvas.height = h;
+                        ctx.drawImage(img, 0, 0, w, h);
+                        resolve(canvas.toDataURL('image/jpeg', 0.6));
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+        
+        // File에서 Image 객체 생성
+        function loadImageFromFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => resolve(img);
+                    img.onerror = reject;
+                    img.src = e.target.result;
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+        
+        // File을 base64로 변환 (data:image/... 프리픽스 제거)
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    // data:image/png;base64,xxxxx 형식에서 base64 부분만 추출
+                    const dataUrl = e.target.result;
+                    const base64 = dataUrl.split(',')[1];
+                    resolve(base64);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+        
+        // 드롭된 이미지 초기화
+        function clearDroppedImages() {
+            censorState.images = [];
+            censorState.currentIndex = -1;
+            censorState.currentImage = null;
+            censorState.detections = [];
+            censorState.editBoxes = [];
+            censorState.processingResults = {};
+            
+            // UI 업데이트
+            updateCensorDropzoneUI();
+            document.getElementById('censorThumbnails').innerHTML = '';
+            clearCensorPreview();
+            document.getElementById('censorImageCounter').textContent = '0 / 0';
         }
         
         // 이미지 로드 함수 (FileResponse URL + crossOrigin)
@@ -12088,6 +12497,10 @@
             document.getElementById('censorNavRight').style.display = 'flex';
             document.getElementById('censorImageCounter').style.display = 'block';
             
+            // 폴더 열기 버튼: 검열 전 탭에서는 숨김
+            document.getElementById('censorOpenFolderBtn').style.display = 
+                censorState.currentTab === 'before' ? 'none' : 'inline-flex';
+            
             // 이미 초기화되어 있으면 현재 이미지만 다시 표시하고 스킵
             if (censorState.eventsInitialized &&
                 (censorState.images.length > 0 || censorState.censoredImages.length > 0)) {
@@ -12107,22 +12520,11 @@
                 censorState.labelConf = savedSettings.labelConf || {};
             }
 
-            // 폴더와 모델 병렬 로드 (둘 다 완료 대기)
-            await Promise.all([
-                loadCensorFolders(),
-                loadCensorModels(savedSettings)
-            ]);
+            // 모델만 로드 (폴더 로드 제거 - 드롭 모드 사용)
+            await loadCensorModels(savedSettings);
 
-            // 폴더 이름 표시 업데이트
-            if (censorState.currentUncensoredFolder) {
-                document.getElementById('censorUncensoredFolderName').textContent = censorState.currentUncensoredFolder;
-            }
-            if (censorState.currentCensoredFolder) {
-                document.getElementById('censorCensoredFolderName').textContent = censorState.currentCensoredFolder;
-            }
-
-            // 이미지 로드 (저장된 폴더 또는 루트 폴더)
-            await loadCensorImages();
+            // 드롭존 UI 초기화 (검열 전 탭용)
+            updateCensorDropzoneUI();
 
             // 이벤트는 최초 1회만 등록
             if (!censorState.eventsInitialized) {
@@ -12503,20 +12905,67 @@
         // 썸네일 렌더링
         function renderCensorThumbnails(images) {
             const container = document.getElementById('censorThumbnails');
+            const isBeforeTab = censorState.currentTab === 'before';
+            
             if (images.length === 0) {
                 container.innerHTML = '<div class="censor-loading">이미지가 없습니다</div>';
                 return;
             }
-            container.innerHTML = images.map((img, index) => `
-                <div class="censor-thumbnail ${index === censorState.currentIndex ? 'active' : ''}" 
-                     data-index="${index}" data-path="${img.path}">
-                    <img src="data:image/jpeg;base64,${img.thumbnail}" alt="${img.filename}">
-                </div>
-            `).join('');
             
-            // 클릭 이벤트
+            // 썸네일 HTML 생성
+            const thumbnailsHtml = images.map((img, index) => {
+                // 드롭된 이미지는 thumbnail이 이미 dataURL, 서버 이미지는 base64만
+                const thumbSrc = img.thumbnail.startsWith('data:') 
+                    ? img.thumbnail 
+                    : `data:image/jpeg;base64,${img.thumbnail}`;
+                // 검열 전 탭에서만 삭제 버튼 표시
+                const deleteBtn = isBeforeTab 
+                    ? `<button class="thumb-delete-btn" data-index="${index}" title="삭제">×</button>`
+                    : '';
+                return `
+                <div class="censor-thumbnail ${index === censorState.currentIndex ? 'active' : ''}" 
+                     data-index="${index}" data-id="${img.id || ''}">
+                    ${deleteBtn}
+                    <img src="${thumbSrc}" alt="${img.filename}">
+                </div>
+                `;
+            }).join('');
+            
+            // 검열 전 탭에서만 추가 버튼 표시
+            const addBtnHtml = isBeforeTab 
+                ? `<div class="censor-add-btn" id="censorAddImageBtn" title="이미지 추가">
+                       <span class="add-icon">+</span>
+                       <span class="add-text">추가</span>
+                   </div>`
+                : '';
+            
+            container.innerHTML = thumbnailsHtml + addBtnHtml;
+            
+            // 추가 버튼 클릭 이벤트 (검열 전 탭에서만)
+            if (isBeforeTab) {
+                const addBtn = document.getElementById('censorAddImageBtn');
+                if (addBtn) {
+                    addBtn.onclick = () => {
+                        document.getElementById('censorFileInput').click();
+                    };
+                }
+                
+                // 삭제 버튼 클릭 이벤트
+                container.querySelectorAll('.thumb-delete-btn').forEach(btn => {
+                    btn.onclick = (e) => {
+                        e.stopPropagation();  // 썸네일 클릭 이벤트 방지
+                        const index = parseInt(btn.dataset.index);
+                        removeCensorImage(index);
+                    };
+                });
+            }
+            
+            // 썸네일 클릭 이벤트
             container.querySelectorAll('.censor-thumbnail').forEach(thumb => {
-                thumb.onclick = async () => {
+                thumb.onclick = async (e) => {
+                    // 삭제 버튼 클릭은 무시 (이미 처리됨)
+                    if (e.target.classList.contains('thumb-delete-btn')) return;
+                    
                     const index = parseInt(thumb.dataset.index);
                     
                     // 배치 모드에서는 현재 이미지의 editBoxes를 저장하고 배치 모드용 선택 함수 사용
@@ -12531,6 +12980,44 @@
                     }
                 };
             });
+        }
+        
+        // 개별 이미지 삭제 (검열 전 탭에서만)
+        function removeCensorImage(index) {
+            if (censorState.currentTab !== 'before') return;
+            if (index < 0 || index >= censorState.images.length) return;
+            
+            // 이미지 배열에서 삭제
+            const removedImage = censorState.images.splice(index, 1)[0];
+            
+            // 현재 인덱스 조정
+            if (censorState.images.length === 0) {
+                // 모든 이미지가 삭제됨
+                censorState.currentIndex = -1;
+                censorState.currentImage = null;
+                censorState.detections = [];
+                censorState.editBoxes = [];
+                clearCensorPreview();
+                document.getElementById('censorImageCounter').textContent = '0 / 0';
+            } else {
+                // 삭제 후 인덱스 조정
+                if (censorState.currentIndex >= censorState.images.length) {
+                    censorState.currentIndex = censorState.images.length - 1;
+                } else if (censorState.currentIndex > index) {
+                    censorState.currentIndex--;
+                }
+                
+                // 현재 선택된 이미지가 삭제된 경우 다른 이미지 선택
+                if (censorState.currentImage?.id === removedImage.id) {
+                    selectCensorImage(censorState.currentIndex);
+                }
+            }
+            
+            // UI 업데이트
+            updateCensorDropzoneUI();
+            renderCensorThumbnails(censorState.images);
+            
+            showToast(`검열 대상에서 제외됨 (남은 ${censorState.images.length}개)`, 'info');
         }
         
         // 이미지 선택 (skipScan: 휠 네비게이션에서 스캔 스킵용)
@@ -12595,25 +13082,39 @@
                 showCensorScanLoading(true);
             }
             
-            // 이미지 로드 (LRU 캐시 우선, FileResponse 사용)
+            // 이미지 로드 (드롭된 이미지면 imgObj 직접 사용, 아니면 서버에서 로드)
             try {
-                const source = censorState.currentTab === 'before' ? 'uncensored' : 'censored';
-                const cacheKey = `${source}:${imgInfo.path}`;
-                let cached = censorCacheGet(cacheKey);
+                let imgObj, width, height;
+                
+                // 검열 전 탭 + 드롭된 이미지면 이미 imgObj가 있음
+                if (censorState.currentTab === 'before' && imgInfo.imgObj) {
+                    imgObj = imgInfo.imgObj;
+                    width = imgInfo.width;
+                    height = imgInfo.height;
+                } else {
+                    // 기존 로직: 서버에서 로드 (검열 후 탭 등)
+                    const source = censorState.currentTab === 'before' ? 'uncensored' : 'censored';
+                    const cacheKey = `${source}:${imgInfo.path}`;
+                    let cached = censorCacheGet(cacheKey);
 
-                // 캐시에 없으면 FileResponse로 로드
-                if (!cached) {
-                    const img = await loadCensorImageFile(source, imgInfo.path);
-                    // 로드 중 다른 이미지로 넘어갔으면 무시
-                    if (requestId !== censorState.wheelRequestId) return;
+                    // 캐시에 없으면 FileResponse로 로드
+                    if (!cached) {
+                        const img = await loadCensorImageFile(source, imgInfo.path);
+                        // 로드 중 다른 이미지로 넘어갔으면 무시
+                        if (requestId !== censorState.wheelRequestId) return;
+                        
+                        cached = {
+                            img,
+                            width: img.naturalWidth,
+                            height: img.naturalHeight,
+                            filename: imgInfo.filename
+                        };
+                        censorCacheSet(cacheKey, cached);
+                    }
                     
-                    cached = {
-                        img,
-                        width: img.naturalWidth,
-                        height: img.naturalHeight,
-                        filename: imgInfo.filename
-                    };
-                    censorCacheSet(cacheKey, cached);
+                    imgObj = cached.img;
+                    width = cached.width;
+                    height = cached.height;
                 }
 
                 // 다른 이미지로 넘어갔으면 무시
@@ -12621,11 +13122,13 @@
 
                 // currentImage 설정 (Image 객체 직접 저장)
                 censorState.currentImage = {
+                    id: imgInfo.id,               // 드롭된 이미지 고유 ID
                     path: imgInfo.path,
-                    filename: cached.filename,
-                    width: cached.width,
-                    height: cached.height,
-                    imgObj: cached.img  // Image 객체 직접 참조
+                    filename: imgInfo.filename,
+                    width: width,
+                    height: height,
+                    imgObj: imgObj,               // Image 객체 직접 참조
+                    isDropped: imgInfo.isDropped  // 드롭된 이미지 여부
                 };
                 
                 // 프리페치: 좌우 이미지 백그라운드 로드
@@ -13142,16 +13645,30 @@
             
             try {
                 const model = document.getElementById('censorModel').value;
+                
+                // 드롭된 이미지인지 확인
+                const droppedImg = censorState.images.find(img => 
+                    img.id === censorState.currentImage?.id && img.isDropped
+                );
+                
+                const scanBody = {
+                    model: model,
+                    target_labels: targetLabels,
+                    label_conf: labelConf,
+                    return_all: true  // 모든 감지 반환 (threshold 이하 포함)
+                };
+                
+                // 드롭된 이미지면 image_base64 사용, 아니면 image_path 사용
+                if (droppedImg && droppedImg.base64) {
+                    scanBody.image_base64 = droppedImg.base64;
+                } else {
+                    scanBody.image_path = scanImagePath;
+                }
+                
                 const response = await fetch(`${API_BASE}/api/censor/scan`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        image_path: scanImagePath,
-                        model: model,
-                        target_labels: targetLabels,
-                        label_conf: labelConf,
-                        return_all: true  // 모든 감지 반환 (threshold 이하 포함)
-                    })
+                    body: JSON.stringify(scanBody)
                 });
                 
                 const result = await response.json();
@@ -13230,30 +13747,43 @@
             
             for (const imgInfo of censorState.images) {
                 try {
+                    const scanBody = {
+                        model: model,
+                        target_labels: targetLabels,
+                        label_conf: labelConf
+                    };
+                    
+                    // 드롭된 이미지면 image_base64 사용
+                    if (imgInfo.isDropped && imgInfo.base64) {
+                        scanBody.image_base64 = imgInfo.base64;
+                    } else {
+                        scanBody.image_path = imgInfo.path;
+                    }
+                    
                     const response = await fetch(`${API_BASE}/api/censor/scan`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            image_path: imgInfo.path,
-                            model: model,
-                            target_labels: targetLabels,
-                            label_conf: labelConf
-                        })
+                        body: JSON.stringify(scanBody)
                     });
                     
                     const result = await response.json();
                     // 감지 여부와 관계없이 모든 이미지를 processingImages에 추가
                     const detections = (result.success && result.detections) ? result.detections : [];
-                    censorState.processingResults[imgInfo.path] = {
+                    
+                    // id를 키로 사용 (드롭된 이미지는 path가 없으므로)
+                    const imageKey = imgInfo.id || imgInfo.path;
+                    censorState.processingResults[imageKey] = {
                         detections: detections,
                         editBoxes: detections.map(d => ({
                             box: Array.isArray(d.box) ? [d.box[0], d.box[1], d.box[2], d.box[3]] : d.box,
                             label: d.label,
                             confidence: d.confidence,
                             method: method
-                        }))
+                        })),
+                        // 드롭된 이미지 정보 저장 (저장 시 필요)
+                        imgInfo: imgInfo
                     };
-                    censorState.processingImages.push(imgInfo.path);
+                    censorState.processingImages.push(imageKey);
                     if (detections.length > 0) {
                         detectedCount++;
                     }
@@ -13263,7 +13793,7 @@
                     const percent = Math.round((scannedCount / totalCount) * 100);
                     showToast(`스캔 중... ${scannedCount}/${totalCount} (${percent}%)`, 'info', 0);
                 } catch (err) {
-                    console.error('Scan failed for:', imgInfo.path, err);
+                    console.error('Scan failed for:', imgInfo.filename, err);
                     scannedCount++;
                     // 실패해도 토스트 업데이트
                     const percent = Math.round((scannedCount / totalCount) * 100);
@@ -13303,19 +13833,20 @@
         
         // 검열중 모드에서 이미지 선택
         async function selectProcessingImage(index) {
-            const images = censorState.processingImages;
-            if (index < 0 || index >= images.length) return;
+            const imageKeys = censorState.processingImages;
+            if (index < 0 || index >= imageKeys.length) return;
             
             // 현재 이미지의 editBoxes를 저장 (이미 검열중 탭에 있을 때만)
+            const currentKey = censorState.currentImage?.id || censorState.currentImage?.path;
             if (censorState.currentTab === 'processing' && 
-                censorState.currentImage && 
-                images.includes(censorState.currentImage.path) &&
-                censorState.processingResults[censorState.currentImage.path]) {
-                censorState.processingResults[censorState.currentImage.path].editBoxes = censorState.editBoxes.map(b => ({...b, box: [...b.box]}));
+                currentKey && 
+                censorState.processingResults[currentKey]) {
+                censorState.processingResults[currentKey].editBoxes = censorState.editBoxes.map(b => ({...b, box: [...b.box]}));
             }
             
             censorState.currentIndex = index;
-            const imagePath = images[index];
+            const imageKey = imageKeys[index];
+            const processingResult = censorState.processingResults[imageKey];
             
             // 썸네일 활성화 표시 및 자동 스크롤
             const thumbnails = document.querySelectorAll('.censor-thumbnail');
@@ -13327,46 +13858,64 @@
                 thumbnails[index].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
             }
 
-            // 진행 상황 표시 (기존 하단 - 제거됨)
-            // document.getElementById('censorProcProgress').textContent = `${index + 1} / ${images.length}`;
-
-            // 이미지 번호 표시 (새로운 위치)
-            document.getElementById('censorImageCounter').textContent = `${index + 1} / ${images.length}`;
+            // 이미지 번호 표시
+            document.getElementById('censorImageCounter').textContent = `${index + 1} / ${imageKeys.length}`;
 
             // 화살표 버튼 활성화/비활성화
             const leftBtn = document.getElementById('censorNavLeft');
             const rightBtn = document.getElementById('censorNavRight');
             leftBtn.disabled = index === 0;
-            rightBtn.disabled = index === images.length - 1;
+            rightBtn.disabled = index === imageKeys.length - 1;
             
-            // 이미지 로드 (LRU 캐시 우선, FileResponse 사용)
+            // 이미지 로드
             try {
-                const cacheKey = `uncensored:${imagePath}`;
-                let cached = censorCacheGet(cacheKey);
+                let imgObj, width, height, filename;
+                
+                // processingResult에서 imgInfo 가져오기
+                const imgInfo = processingResult?.imgInfo;
+                
+                if (imgInfo && imgInfo.isDropped && imgInfo.imgObj) {
+                    // 드롭된 이미지면 이미 imgObj가 있음
+                    imgObj = imgInfo.imgObj;
+                    width = imgInfo.width;
+                    height = imgInfo.height;
+                    filename = imgInfo.filename;
+                } else {
+                    // 기존 로직: 서버에서 로드
+                    const cacheKey = `uncensored:${imageKey}`;
+                    let cached = censorCacheGet(cacheKey);
 
-                // 캐시에 없으면 FileResponse로 로드
-                if (!cached) {
-                    const img = await loadCensorImageFile('uncensored', imagePath);
-                    cached = {
-                        img,
-                        width: img.naturalWidth,
-                        height: img.naturalHeight,
-                        filename: imagePath.split('/').pop()
-                    };
-                    censorCacheSet(cacheKey, cached);
+                    // 캐시에 없으면 FileResponse로 로드
+                    if (!cached) {
+                        const img = await loadCensorImageFile('uncensored', imageKey);
+                        cached = {
+                            img,
+                            width: img.naturalWidth,
+                            height: img.naturalHeight,
+                            filename: imageKey.split('/').pop()
+                        };
+                        censorCacheSet(cacheKey, cached);
+                    }
+                    
+                    imgObj = cached.img;
+                    width = cached.width;
+                    height = cached.height;
+                    filename = cached.filename;
                 }
 
                 // currentImage 설정 (Image 객체 직접 저장)
                 censorState.currentImage = {
-                    path: imagePath,
-                    filename: cached.filename,
-                    width: cached.width,
-                    height: cached.height,
-                    imgObj: cached.img
+                    id: imgInfo?.id || imageKey,
+                    path: imgInfo?.path || imageKey,
+                    filename: filename,
+                    width: width,
+                    height: height,
+                    imgObj: imgObj,
+                    isDropped: imgInfo?.isDropped
                 };
 
                 // 저장된 결과에서 editBoxes 로드
-                const procResult = censorState.processingResults[imagePath];
+                const procResult = censorState.processingResults[imageKey];
                 if (procResult) {
                     censorState.detections = procResult.detections || [];
                     censorState.editBoxes = (procResult.editBoxes || []).map(b => ({
@@ -13394,7 +13943,8 @@
             }
             
             // 현재 이미지의 editBoxes를 저장 (검증 포함)
-            if (censorState.currentImage && censorState.processingResults[censorState.currentImage.path]) {
+            const currentKey = censorState.currentImage?.id || censorState.currentImage?.path;
+            if (currentKey && censorState.processingResults[currentKey]) {
                 const validBoxes = censorState.editBoxes.filter(b => {
                     if (!b.box || !Array.isArray(b.box) || b.box.length !== 4) {
                         console.error('Invalid box in current editBoxes:', b);
@@ -13402,31 +13952,37 @@
                     }
                     return true;
                 });
-                censorState.processingResults[censorState.currentImage.path].editBoxes = validBoxes.map(b => ({
+                censorState.processingResults[currentKey].editBoxes = validBoxes.map(b => ({
                     ...b,
                     box: [b.box[0], b.box[1], b.box[2], b.box[3]]
                 }));
             }
             
             const method = document.getElementById('censorProcMethod')?.value || censorState.processingMethod;
-            const outputFolder = censorState.currentUncensoredFolder || '';
+            // 검열후 탭에서 선택된 폴더 사용 (없으면 루트)
+            const outputFolder = censorState.currentCensoredFolder || '';
             let savedCount = 0;
             let failedCount = 0;
             const totalCount = censorState.processingImages.length;
             
             showToast(`저장 중... 0/${totalCount} (0%)`, 'info', 0);
             
+            console.log('=== completeCensoring START ===');
+            console.log('processingImages:', censorState.processingImages);
+            console.log('processingResults keys:', Object.keys(censorState.processingResults));
+            
             for (let i = 0; i < censorState.processingImages.length; i++) {
-                const imagePath = censorState.processingImages[i];
-                const result = censorState.processingResults[imagePath];
+                const imageKey = censorState.processingImages[i];
+                const result = censorState.processingResults[imageKey];
+                const imgInfo = result?.imgInfo;
                 
                 try {
                     // 원본 데이터 로깅 (상세)
-                    console.log('=== Saving image:', imagePath, '===');
+                    console.log('=== Saving image:', imgInfo?.filename || imageKey, '===');
+                    console.log('imageKey:', imageKey);
+                    console.log('result:', result);
+                    console.log('imgInfo:', imgInfo);
                     console.log('Raw editBoxes count:', result?.editBoxes?.length || 0);
-                    result?.editBoxes?.forEach((d, idx) => {
-                        console.log(`  Box ${idx}: box=${JSON.stringify(d.box)}, method=${d.method}, label=${d.label}`);
-                    });
                     
                     // 박스 데이터 검증 및 변환 (박스 없으면 빈 배열 - 원본 복사됨)
                     const boxes = (result?.editBoxes || [])
@@ -13444,9 +14000,9 @@
                                 return false;
                             }
                             // 각 좌표가 숫자인지 확인
-                            for (let i = 0; i < 4; i++) {
-                                if (typeof d.box[i] !== 'number' || isNaN(d.box[i])) {
-                                    console.error(`Invalid box (bad coordinate at index ${i}): box=`, d.box);
+                            for (let j = 0; j < 4; j++) {
+                                if (typeof d.box[j] !== 'number' || isNaN(d.box[j])) {
+                                    console.error(`Invalid box (bad coordinate at index ${j}): box=`, d.box);
                                     return false;
                                 }
                             }
@@ -13459,19 +14015,39 @@
                         }));
                     
                     // 박스 없어도 저장 (원본 이미지가 그대로 복사됨)
-                    console.log('Saving:', imagePath, 'boxes:', boxes.length, '(empty = copy original)');
+                    console.log('Saving:', imgInfo?.filename || imageKey, 'boxes:', boxes.length);
                     
-                    console.log('Saving details:', imagePath, 'boxes:', JSON.stringify(boxes), 'outputFolder:', outputFolder);
+                    const saveBody = {
+                        boxes: boxes,
+                        method: method,
+                        output_folder: outputFolder,  // 검열후 탭에서 선택된 폴더
+                        filename: imgInfo?.filename  // 원본 파일명 유지
+                    };
+                    
+                    // 드롭된 이미지면 image_base64 사용, 아니면 path 사용
+                    if (imgInfo?.isDropped && imgInfo?.base64) {
+                        saveBody.image_base64 = imgInfo.base64;
+                        console.log('Using image_base64 for dropped image');
+                    } else if (imgInfo?.path) {
+                        saveBody.image_path = imgInfo.path;
+                        console.log('Using image_path:', imgInfo.path);
+                    } else {
+                        // fallback: imageKey가 경로일 수 있음
+                        saveBody.image_path = imageKey;
+                        console.log('Using imageKey as path:', imageKey);
+                    }
+                    
+                    // 이미지 소스가 없으면 건너뛰기
+                    if (!saveBody.image_base64 && !saveBody.image_path) {
+                        console.error('No image source for:', imageKey);
+                        failedCount++;
+                        continue;
+                    }
                     
                     const response = await fetch(`${API_BASE}/api/censor/save`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            image_path: imagePath,
-                            boxes: boxes,
-                            method: method,
-                            output_folder: outputFolder
-                        })
+                        body: JSON.stringify(saveBody)
                     });
                     
                     const saveResult = await response.json();
@@ -13645,8 +14221,21 @@
             if (censorOverlayCtx) {
                 censorOverlayCtx.clearRect(0, 0, censorOverlayCanvas.width, censorOverlayCanvas.height);
             }
-            // 빈 상태 표시
-            document.getElementById('censorPreviewEmpty').style.display = 'flex';
+            // 빈 상태 표시 (탭에 따라 메시지 변경)
+            const emptyEl = document.getElementById('censorPreviewEmpty');
+            emptyEl.style.display = 'flex';
+            const emptyIcon = emptyEl.querySelector('.icon');
+            const emptyText = emptyEl.querySelector('p');
+            if (tab === 'before') {
+                emptyIcon.textContent = '📁';
+                emptyText.textContent = '이미지를 드롭하여 시작하세요';
+            } else if (tab === 'after') {
+                emptyIcon.textContent = '📭';
+                emptyText.textContent = '검열된 이미지가 없습니다';
+            } else {
+                emptyIcon.textContent = '⏳';
+                emptyText.textContent = '검열 중인 이미지가 없습니다';
+            }
 
             // 이전 탭의 detections/editBoxes 상태 초기화
             censorState.detections = [];
@@ -13656,9 +14245,14 @@
             censorState.currentImage = null;
             censorState.originalImageObj = null;
             
-            // 폴더 드롭다운 표시/숨김
-            document.getElementById('censorFolderBefore').style.display = tab === 'before' ? 'flex' : 'none';
+            // 드롭존/썸네일 UI 업데이트 (검열 전 탭용)
+            updateCensorDropzoneUI();
+            
+            // 검열 후 탭 폴더 드롭다운 표시/숨김
             document.getElementById('censorFolderAfter').style.display = tab === 'after' ? 'flex' : 'none';
+            
+            // 폴더 열기 버튼: 검열 전 탭에서는 숨김 (드롭 모드이므로 불필요)
+            document.getElementById('censorOpenFolderBtn').style.display = tab === 'before' ? 'none' : 'inline-flex';
             
             // 검열중 탭이면 processingImages 기반 썸네일 렌더링
             if (tab === 'processing') {
@@ -13709,16 +14303,18 @@
                     selectCensorImage(validIndex);
                 }
             } else {
-                // 이미 로드된 이미지가 있으면 다시 로드하지 않음
+                // 검열 전 탭: 드롭 모드 (서버 로드 안 함)
                 const currentImages = censorState.images;
-                if (currentImages.length === 0) {
-                    loadCensorImages();
-                } else {
+                updateCensorDropzoneUI();
+                
+                if (currentImages.length > 0) {
                     // 기존 이미지로 썸네일만 렌더링
                     renderCensorThumbnails(currentImages);
                     // 저장된 인덱스의 이미지 선택
                     const validIndex = Math.min(censorState.currentIndex, currentImages.length - 1);
-                    selectCensorImage(validIndex);
+                    if (validIndex >= 0) {
+                        selectCensorImage(validIndex);
+                    }
                 }
             }
         }
@@ -13726,21 +14322,24 @@
         // 검열중 탭 썸네일 렌더링
         function renderProcessingThumbnails() {
             const container = document.getElementById('censorThumbnails');
-            const images = censorState.processingImages;
+            const imageKeys = censorState.processingImages;
             
-            if (images.length === 0) {
+            if (imageKeys.length === 0) {
                 container.innerHTML = '<div class="censor-loading">검열 대상이 없습니다</div>';
                 return;
             }
             
-            // 원본 images에서 해당 경로의 썸네일 찾기
-            container.innerHTML = images.map((path, index) => {
-                const imgInfo = censorState.images.find(img => img.path === path);
+            // processingResults에서 이미지 정보 찾기
+            container.innerHTML = imageKeys.map((key, index) => {
+                const result = censorState.processingResults[key];
+                const imgInfo = result?.imgInfo;
                 const thumb = imgInfo?.thumbnail || '';
+                // 드롭된 이미지는 thumbnail이 이미 dataURL
+                const thumbSrc = thumb.startsWith('data:') ? thumb : `data:image/jpeg;base64,${thumb}`;
                 return `
                     <div class="censor-thumbnail ${index === 0 ? 'active' : ''}" 
-                         data-index="${index}" data-path="${path}">
-                        <img src="data:image/jpeg;base64,${thumb}" alt="">
+                         data-index="${index}" data-key="${key}">
+                        <img src="${thumbSrc}" alt="${imgInfo?.filename || ''}">
                     </div>
                 `;
             }).join('');
@@ -13756,6 +14355,9 @@
         
         // 이벤트 설정
         function setupCensorEvents() {
+            // 드롭존 이벤트 설정
+            setupDropzoneEvents();
+            
             // 탭 전환
             document.getElementById('censorTabBefore').onclick = () => {
                 if (censorState.processingMode) {
@@ -13792,25 +14394,17 @@
                 saveCensorSettings();
             };
             
-            // 폴더 드롭다운 버튼 클릭 이벤트
-            document.getElementById('censorUncensoredFolderBtn').onclick = (e) => toggleCensorFolderMenu('uncensored', e);
-            document.getElementById('censorCensoredFolderBtn').onclick = (e) => toggleCensorFolderMenu('censored', e);
+            // 검열 후 탭 폴더 드롭다운 버튼 클릭 이벤트 (검열 전 폴더 드롭다운은 제거됨)
+            const censoredFolderBtn = document.getElementById('censorCensoredFolderBtn');
+            if (censoredFolderBtn) {
+                censoredFolderBtn.onclick = (e) => toggleCensorFolderMenu('censored', e);
+            }
             
-            // 외부 클릭 시 폴더 메뉴 닫기
+            // 외부 클릭 시 폴더 메뉴 닫기 (검열 후 탭용)
             document.addEventListener('click', (e) => {
-                const folderBefore = document.getElementById('censorFolderBefore');
                 const folderAfter = document.getElementById('censorFolderAfter');
-                const menuBefore = document.getElementById('censorUncensoredFolderMenu');
                 const menuAfter = document.getElementById('censorCensoredFolderMenu');
                 
-                if (folderBefore && !folderBefore.contains(e.target) && menuBefore && !menuBefore.contains(e.target)) {
-                    if (menuBefore.classList.contains('show')) {
-                        menuBefore.classList.remove('show');
-                        if (menuBefore.parentElement === document.body) {
-                            folderBefore.appendChild(menuBefore);
-                        }
-                    }
-                }
                 if (folderAfter && !folderAfter.contains(e.target) && menuAfter && !menuAfter.contains(e.target)) {
                     if (menuAfter.classList.contains('show')) {
                         menuAfter.classList.remove('show');
@@ -13821,73 +14415,45 @@
                 }
             });
             
-            // 폴더 추가 버튼
-            document.getElementById('censorAddUncensoredBtn').onclick = () => {
-                closeCensorFolderMenus();
-                showInputModal('📁 새 폴더', '폴더 이름을 입력하세요', async (folderName) => {
-                    if (!folderName) return;
-                    try {
-                        const response = await fetch(`${API_BASE}/api/censor/folders`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ type: 'uncensored', name: folderName })
-                        });
-                        const result = await response.json();
-                        if (result.success) {
-                            showToast(`폴더 생성: ${folderName}`, 'success');
-                            selectCensorFolder('uncensored', folderName);
-                        } else {
-                            showToast(result.error || '폴더 생성 실패', 'error');
+            // 검열 후 폴더 추가 버튼
+            const addCensoredBtn = document.getElementById('censorAddCensoredBtn');
+            if (addCensoredBtn) {
+                addCensoredBtn.onclick = () => {
+                    closeCensorFolderMenus();
+                    showInputModal('📁 새 폴더', '폴더 이름을 입력하세요', async (folderName) => {
+                        if (!folderName) return;
+                        try {
+                            const response = await fetch(`${API_BASE}/api/censor/folders`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ type: 'censored', name: folderName })
+                            });
+                            const result = await response.json();
+                            if (result.success) {
+                                showToast(`폴더 생성: ${folderName}`, 'success');
+                                selectCensorFolder('censored', folderName);
+                            } else {
+                                showToast(result.error || '폴더 생성 실패', 'error');
+                            }
+                        } catch (err) {
+                            showToast('폴더 생성 오류', 'error');
                         }
-                    } catch (err) {
-                        showToast('폴더 생성 오류', 'error');
-                    }
-                });
-            };
-            
-            document.getElementById('censorAddCensoredBtn').onclick = () => {
-                closeCensorFolderMenus();
-                showInputModal('📁 새 폴더', '폴더 이름을 입력하세요', async (folderName) => {
-                    if (!folderName) return;
-                    try {
-                        const response = await fetch(`${API_BASE}/api/censor/folders`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ type: 'censored', name: folderName })
-                        });
-                        const result = await response.json();
-                        if (result.success) {
-                            showToast(`폴더 생성: ${folderName}`, 'success');
-                            selectCensorFolder('censored', folderName);
-                        } else {
-                            showToast(result.error || '폴더 생성 실패', 'error');
-                        }
-                    } catch (err) {
-                        showToast('폴더 생성 오류', 'error');
-                    }
-                });
-            };
-            
-            // 폴더 열기 버튼 (현재 탭에 따라 다른 폴더 열기)
-            document.getElementById('censorOpenFolderBtn').onclick = async () => {
-                const folder = censorState.currentTab === 'before' ? 'uncensored' : 'censored';
-                const subfolder = censorState.currentTab === 'before' 
-                    ? censorState.currentUncensoredFolder 
-                    : censorState.currentCensoredFolder;
-                try {
-                    const response = await fetch(`${API_BASE}/api/open-folder`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ folder: folder, subfolder: subfolder })
                     });
-                    const result = await response.json();
-                    if (result.error) {
-                        showToast('폴더 열기 실패', 'error');
-                    }
-                } catch (err) {
-                    showToast('폴더 열기 실패', 'error');
-                }
-            };
+                };
+            }
+            
+            // 폴더 열기 버튼 (검열 후/검열중 탭용: outputs/censored 폴더 열기)
+            const openFolderBtn = document.getElementById('censorOpenFolderBtn');
+            if (openFolderBtn) {
+                openFolderBtn.onclick = () => {
+                    // 검열 전 탭에서는 버튼이 숨겨져 있으므로 여기에 올 수 없지만, 안전하게 체크
+                    if (censorState.currentTab === 'before') return;
+                    
+                    // openFolder 함수 사용 (통일)
+                    const subfolder = censorState.currentCensoredFolder || '';
+                    openFolder('censored', subfolder);
+                };
+            }
             
             // 전체 검열 실행
             document.getElementById('censorRunAllBtn').onclick = runBatchCensor;
@@ -14028,17 +14594,10 @@
                 // 편집 불가능한 탭(검열전)에서는 삭제 비활성화
                 if (!isEditableTab()) return;
 
-                // 클릭 위치 계산
-                const rect = censorOverlayCanvas.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-
-                // 캔버스 좌표를 이미지 좌표로 변환
-                const canvas = document.getElementById('censorPreviewCanvas');
-                const scaleX = censorState.currentImage.width / canvas.width;
-                const scaleY = censorState.currentImage.height / canvas.height;
-                const imgX = x * scaleX;
-                const imgY = y * scaleY;
+                // 클릭 위치 계산 (canvasToImageCoords 사용)
+                const coords = canvasToImageCoords(e);
+                const imgX = coords.imageX;
+                const imgY = coords.imageY;
 
                 // 클릭 위치의 박스 찾기
                 for (let i = censorState.editBoxes.length - 1; i >= 0; i--) {
@@ -15023,16 +15582,23 @@
         // 마우스 좌표 → 이미지 좌표 변환
         function canvasToImageCoords(e) {
             const rect = censorOverlayCanvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            
+            // CSS 크기와 캔버스 픽셀 크기의 비율 계산
+            const scaleX = censorOverlayCanvas.width / rect.width;
+            const scaleY = censorOverlayCanvas.height / rect.height;
+            
+            // 마우스 좌표를 캔버스 픽셀 좌표로 변환
+            const canvasX = (e.clientX - rect.left) * scaleX;
+            const canvasY = (e.clientY - rect.top) * scaleY;
+            
             const scale = censorState.displayScale || 1;
             const offsetX = censorState.overlayOffsetX || 0;
             const offsetY = censorState.overlayOffsetY || 0;
             return {
-                canvasX: x,
-                canvasY: y,
-                imageX: (x - offsetX) / scale,  // X 오프셋 보정
-                imageY: (y - offsetY) / scale   // Y 오프셋 보정
+                canvasX: canvasX,
+                canvasY: canvasY,
+                imageX: (canvasX - offsetX) / scale,  // X 오프셋 보정
+                imageY: (canvasY - offsetY) / scale   // Y 오프셋 보정
             };
         }
         
@@ -15483,8 +16049,10 @@
                 drawEditBoxes();
                 // 임시 박스 그리기
                 const scale = censorState.displayScale || 1;
-                const sx = censorState.newBoxStart.x * scale;
-                const sy = censorState.newBoxStart.y * scale;
+                const offsetX = censorState.overlayOffsetX || 0;
+                const offsetY = censorState.overlayOffsetY || 0;
+                const sx = censorState.newBoxStart.x * scale + offsetX;
+                const sy = censorState.newBoxStart.y * scale + offsetY;
                 const sw = (coords.imageX - censorState.newBoxStart.x) * scale;
                 const sh = (coords.imageY - censorState.newBoxStart.y) * scale;
                 

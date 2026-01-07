@@ -194,6 +194,13 @@ OUTPUT_DIR  = APP_DIR / "outputs"
 - `dynamic_thresholding` - 항상 False
 - `uncond_scale` - 항상 1.0
 
+### 6. 프롬프트 입력란 하이라이트 overlay 불일치
+**원인 1**: 스크롤바 유무에 따라 textarea 내부 너비 변경
+**해결**: JS에서 `scrollHeight > clientHeight` 감지하여 overlay right 동적 조정 (1px/9px)
+
+**원인 2**: `prompt-highlight-container`가 textarea보다 4px 더 큼
+**해결**: container에 `display: flex` 적용하여 자식 크기에 맞춤
+
 ---
 
 ## 디버깅

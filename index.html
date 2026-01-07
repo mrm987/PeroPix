@@ -324,6 +324,111 @@
             overflow-x: hidden;
         }
 
+        /* Range Slider with Fill */
+        .range-wrap {
+            position: relative;
+            width: 100%;
+            height: 16px;
+            margin: 8px 0;
+            display: flex;
+            align-items: center;
+        }
+        .range-wrap .range-bg {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 6px;
+            background: #243044;
+            border-radius: 3px;
+            pointer-events: none;
+        }
+        .range-wrap .range-fill {
+            position: absolute;
+            left: 0;
+            height: 6px;
+            background: #4A7AB8;
+            border-radius: 3px;
+            pointer-events: none;
+            width: 0%;
+        }
+        .range-wrap input[type="range"] {
+            position: relative;
+            width: 100%;
+            height: 16px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent !important;
+            cursor: pointer;
+            padding: 0;
+            margin: 0;
+            border: none;
+            z-index: 2;
+        }
+        .range-wrap input[type="range"]::-webkit-slider-runnable-track {
+            background: transparent;
+            height: 6px;
+        }
+        .range-wrap input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #4A7AB8;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            margin-top: -5px;
+        }
+        .range-wrap input[type="range"]::-moz-range-track {
+            background: transparent;
+            height: 6px;
+        }
+        .range-wrap input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #4A7AB8;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        .range-wrap input[type="range"]:focus {
+            outline: none;
+        }
+        /* 래퍼 없는 기존 슬라이더용 */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            background: #243044;
+            border-radius: 3px;
+            cursor: pointer;
+            padding: 0;
+            margin: 8px 0;
+            border: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #4A7AB8;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            margin-top: -5px;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #4A7AB8;
+            cursor: pointer;
+            border: none;
+        }
+        input[type="range"]:focus {
+            outline: none;
+        }
 
         /* Prompt Weight Highlighting */
         .prompt-highlight-container {
@@ -334,21 +439,22 @@
 
         .prompt-highlight-overlay {
             position: absolute;
-            top: 1px;
-            left: 1px;
-            right: 1px;
-            bottom: 1px;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
             padding: var(--space-md) var(--space-md);
             margin: 0;
-            border: none;
+            border: 1px solid transparent;
             border-radius: var(--radius-sm);
             font-size: 0.875rem;
-            font-family: inherit;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             line-height: 1.5;
             letter-spacing: normal;
             white-space: pre-wrap;
             word-wrap: break-word;
             overflow-wrap: break-word;
+            word-break: break-word;
             overflow: hidden;
             pointer-events: none;
             z-index: 1;
@@ -364,6 +470,7 @@
         .prompt-highlight-container textarea {
             position: relative;
             z-index: 2;
+            width: 100%;
             background: transparent !important;
             color: var(--text) !important;
             caret-color: var(--text);
@@ -372,8 +479,13 @@
             border: 1px solid var(--border) !important;
             border-radius: var(--radius-sm) !important;
             font-size: 0.875rem;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             line-height: 1.5;
             letter-spacing: normal;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            word-break: break-word;
             -webkit-text-fill-color: transparent;
             text-fill-color: transparent;
             box-sizing: border-box;
@@ -1422,6 +1534,8 @@
             background: var(--bg);
             flex-shrink: 0;
             gap: var(--space-md);
+            min-height: 48px;
+            box-sizing: border-box;
         }
 
         .toolbar-left {
@@ -1434,6 +1548,7 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            min-height: 32px;
         }
 
         .toolbar-label {
@@ -1986,9 +2101,23 @@
             font-size: 0.85rem;
             color: var(--text);
         }
-        
+
         .slot-prompt textarea:focus {
             outline: none;
+        }
+
+        /* 슬롯 내 프롬프트 하이라이팅 동기화 */
+        .slot-prompt .prompt-highlight-container textarea {
+            padding: 10px;
+            font-size: 0.85rem;
+            border: none !important;
+        }
+
+        .slot-prompt .prompt-highlight-overlay {
+            padding: 10px;
+            font-size: 0.85rem;
+            border: none;
+            background: var(--bg-light);
         }
         
         .slot-images {
@@ -2394,6 +2523,15 @@
         }
         
         /* 큰 프리뷰 영역 */
+        /* 메인 영역: 프리뷰 + 우측 패널 */
+        .censor-main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: row;
+            overflow: hidden;
+            min-height: 0;
+        }
+
         .censor-preview-area {
             flex: 1;
             display: flex;
@@ -2409,6 +2547,201 @@
         .censor-preview-area.processing {
             background: color-mix(in srgb, var(--bg) 75%, var(--accent-gold-dim) 25%);
             border: 1px solid var(--accent-gold-dim);
+        }
+
+        /* 우측 사이드 패널 */
+        .censor-side-panel {
+            width: 200px;
+            flex-shrink: 0;
+            background: var(--bg-light);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        .censor-side-section {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .censor-side-section:last-child {
+            border-bottom: none;
+        }
+        .side-section-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-dim);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* 모델 선택 */
+        .censor-side-model select {
+            width: 100%;
+            height: 32px;
+            padding: 0 8px;
+            border-radius: 4px;
+            background: var(--bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+            font-size: 0.85rem;
+        }
+
+        /* 감지 대상 - 세로 리스트 */
+        .censor-side-targets .censor-targets {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 252px;
+            overflow-y: auto;
+        }
+        .censor-side-targets .censor-target-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0 8px;
+            height: 30px;
+            background: var(--bg);
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            font-size: 0.8rem;
+            box-sizing: border-box;
+        }
+        .censor-side-targets .censor-target-item input[type="checkbox"] {
+            width: 14px;
+            height: 14px;
+            margin: 0;
+            flex-shrink: 0;
+        }
+        .censor-side-targets .censor-target-item label {
+            flex: 1;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .censor-side-targets .censor-target-item .censor-conf-input {
+            width: 50px;
+            height: 22px;
+            padding: 0 4px;
+            font-size: 0.75rem;
+            text-align: center;
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            background: var(--bg);
+            color: var(--text);
+            flex-shrink: 0;
+            box-sizing: border-box;
+            position: relative;
+            top: 1px;
+        }
+        .censor-side-targets .censor-target-item .censor-conf-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        /* 검열 설정 */
+        .censor-side-settings .side-setting-row {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 10px;
+        }
+        .censor-side-settings .side-setting-row:last-child {
+            margin-bottom: 0;
+        }
+        .censor-side-settings .side-setting-row label {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+        }
+        .censor-side-settings .side-setting-row label span {
+            color: var(--primary);
+            font-weight: 500;
+        }
+        .censor-side-settings select {
+            width: 100%;
+            height: 28px;
+            padding: 0 8px;
+            border-radius: 4px;
+            background: var(--bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+            font-size: 0.8rem;
+        }
+        /* 도구 버튼 */
+        .side-tools-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .side-tool-btn {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            text-align: left;
+            transition: all 0.15s;
+        }
+        .side-tool-btn:hover {
+            border-color: var(--primary);
+            background: var(--bg-light);
+        }
+        .side-tool-btn.active {
+            border-color: var(--primary);
+            background: var(--primary);
+            color: white;
+        }
+
+        /* 단축키 가이드 */
+        .side-shortcuts-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .shortcut-row {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .shortcut-row kbd {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            padding: 1px 4px;
+            font-size: 0.7rem;
+            font-family: monospace;
+        }
+
+        /* 액션 버튼 영역 */
+        .censor-side-actions {
+            padding: 12px;
+            margin-top: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            border-top: 1px solid var(--border);
+        }
+        .censor-side-actions .btn {
+            width: 100%;
+            padding: 10px 12px;
+            font-size: 0.85rem;
+            border-radius: 6px;
+        }
+        .censor-side-actions .btn-secondary {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+        .censor-side-actions .btn-secondary:hover {
+            background: var(--bg-light);
         }
         .censor-preview-container {
             position: relative;
@@ -2467,16 +2800,22 @@
         .censor-preview-empty .icon { font-size: 3rem; margin-bottom: 12px; opacity: 0.5; }
         .censor-preview-empty p { font-size: 1rem; }
         
-        /* 드롭존 스타일 */
+        /* 드롭존 스타일 (프리뷰 영역 내부) */
         .censor-dropzone {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            max-width: 400px;
             border: 2px dashed var(--border);
             border-radius: var(--radius-md);
-            padding: 40px 20px;
-            margin: 0 16px 16px 16px;
+            padding: 60px 40px;
             text-align: center;
             cursor: pointer;
             transition: all var(--transition-normal);
             background: var(--bg-lighter);
+            z-index: 10;
         }
         .censor-dropzone:hover,
         .censor-dropzone.drag-over {
@@ -2741,122 +3080,6 @@
             line-height: 28px;
         }
         
-        /* 검열 대상 (동적 클래스) - 가로 플렉스 */
-        .censor-targets {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            align-items: center;
-            align-content: flex-start;
-            flex: 1;
-        }
-        .censor-target-item {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            background: var(--bg);
-            padding: 4px 10px;
-            border-radius: 4px;
-            border: 1px solid var(--border);
-            font-size: 0.8rem;
-            height: 28px;
-            transition: border-color 0.15s;
-        }
-        .censor-target-item:hover {
-            border-color: var(--text-dim);
-        }
-        .censor-target-item input[type="checkbox"] {
-            width: 14px;
-            height: 14px;
-            margin: 0;
-            flex-shrink: 0;
-            cursor: pointer;
-        }
-        .censor-target-item label {
-            font-size: 0.8rem;
-            cursor: pointer;
-            white-space: nowrap;
-        }
-        .censor-target-item input[type="range"] {
-            --slider-percent: 30%;
-            width: 100px;
-            height: 14px;
-            margin: 4px 0;
-            cursor: pointer;
-            -webkit-appearance: none;
-            appearance: none;
-            background: transparent;
-            transition: opacity 0.2s;
-        }
-        .censor-target-item input[type="range"]:hover {
-            opacity: 0.9;
-        }
-        /* 검열 대상 슬라이더 - 트랙 (Chrome, Safari, Edge) */
-        .censor-target-item input[type="range"]::-webkit-slider-runnable-track {
-            width: 100%;
-            height: 4px;
-            background: linear-gradient(to right, 
-                var(--accent-gold, #d4a853) 0%, 
-                var(--accent-gold, #d4a853) var(--slider-percent, 30%), 
-                var(--bg-darker, #1a1a1a) var(--slider-percent, 30%), 
-                var(--bg-darker, #1a1a1a) 100%);
-            border-radius: 2px;
-            border: none;
-        }
-        /* 검열 대상 슬라이더 - 썸 (Chrome, Safari, Edge) */
-        .censor-target-item input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 14px;
-            height: 14px;
-            background: var(--text, #fff);
-            border-radius: 50%;
-            border: 2px solid var(--accent-gold, #d4a853);
-            cursor: pointer;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-            margin-top: -5px;
-        }
-        .censor-target-item input[type="range"]::-webkit-slider-thumb:hover {
-            background: var(--accent-gold, #d4a853);
-            border-color: var(--accent-gold-bright, #e6b85a);
-            transform: scale(1.1);
-        }
-        /* 검열 대상 슬라이더 - 트랙 (Firefox) */
-        .censor-target-item input[type="range"]::-moz-range-track {
-            width: 100%;
-            height: 4px;
-            background: var(--bg-darker, #1a1a1a);
-            border-radius: 2px;
-            border: none;
-        }
-        /* 검열 대상 슬라이더 - 썸 (Firefox) */
-        .censor-target-item input[type="range"]::-moz-range-thumb {
-            width: 14px;
-            height: 14px;
-            background: var(--text, #fff);
-            border-radius: 50%;
-            border: 2px solid var(--accent-gold, #d4a853);
-            cursor: pointer;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-        }
-        .censor-target-item input[type="range"]::-moz-range-thumb:hover {
-            background: var(--accent-gold, #d4a853);
-            border-color: var(--accent-gold-bright, #e6b85a);
-            transform: scale(1.1);
-        }
-        /* Firefox 진행 바 채움 */
-        .censor-target-item input[type="range"]::-moz-range-progress {
-            background: var(--accent-gold, #d4a853);
-            height: 4px;
-            border-radius: 2px;
-        }
-        .censor-target-item .conf-value {
-            font-size: 0.75rem;
-            color: var(--text-dim);
-            min-width: 22px;
-            text-align: right;
-            font-family: monospace;
-        }
         .censor-target-loading {
             color: var(--text-dim);
             font-size: 0.85rem;
@@ -2889,16 +3112,7 @@
             width: 100%;
             line-height: 30px;
         }
-        
-        /* 검열중/검열후 탭 - 컨텐츠 레이아웃 */
-        .censor-proc-content,
-        .censor-after-content {
-            display: flex;
-            align-items: center;
-            gap: 24px;
-            height: 100%;
-        }
-        
+
         /* 이미지 네비게이션 */
         .censor-nav-info {
             display: flex;
@@ -4370,8 +4584,8 @@
                         <button type="button" class="header-btn" id="censorClearImagesBtn" style="display: none;" title="드롭된 이미지 초기화">
                             🗑️ 초기화
                         </button>
-                        <!-- 검열 후 폴더 드롭다운 -->
-                        <div class="folder-dropdown" id="censorFolderAfter" style="display: none;">
+                        <!-- 저장 폴더 드롭다운 (모든 탭에서 표시) -->
+                        <div class="folder-dropdown" id="censorFolderAfter">
                             <button type="button" class="header-btn folder-btn" id="censorCensoredFolderBtn">
                                 <span class="folder-icon">📁</span>
                                 <span class="folder-name" id="censorCensoredFolderName">censored</span>
@@ -4391,169 +4605,156 @@
                 </div>
                 
                 <!-- 썸네일 가로 슬라이드 -->
-                <!-- 드롭존 (이미지 없을 때 표시) -->
-                <div class="censor-dropzone" id="censorDropzone">
-                    <div class="dropzone-content">
-                        <div class="dropzone-icon">📁</div>
-                        <p>검열할 이미지를 여기에 드롭하세요</p>
-                        <small>또는 클릭하여 파일 선택</small>
-                    </div>
-                    <input type="file" id="censorFileInput" multiple accept="image/*" style="display: none;">
-                </div>
-                
-                <div class="censor-thumbnails-wrapper" id="censorThumbnailsWrapper" style="display: none;">
+                <div class="censor-thumbnails-wrapper" id="censorThumbnailsWrapper">
                     <div class="censor-thumbnails" id="censorThumbnails">
                         <!-- 썸네일들이 여기에 렌더링됨 -->
                     </div>
                 </div>
                 
-                <!-- 큰 프리뷰 + 편집 영역 -->
-                <div class="censor-preview-area">
-                    <!-- 좌측 네비게이션 화살표 -->
-                    <button class="censor-nav-arrow censor-nav-left" id="censorNavLeft" title="이전 이미지 (휠 위)">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="15 18 9 12 15 6"></polyline>
-                        </svg>
-                    </button>
+                <!-- 메인 영역 (프리뷰 + 우측 패널) -->
+                <div class="censor-main-area">
+                    <!-- 좌측: 프리뷰 영역 -->
+                    <div class="censor-preview-area">
+                        <!-- 좌측 네비게이션 화살표 -->
+                        <button class="censor-nav-arrow censor-nav-left" id="censorNavLeft" title="이전 이미지 (휠 위)">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="15 18 9 12 15 6"></polyline>
+                            </svg>
+                        </button>
 
-                    <div class="censor-preview-container" id="censorPreviewContainer">
-                        <!-- 검열전 탭 안내 문구 -->
-                        <div class="censor-preview-hint" id="censorPreviewHint" style="display: none;">
-                            검열 부위 미리보기입니다. 실제 검열은 <strong>전체 검열</strong> 버튼을 눌러주세요.
+                        <div class="censor-preview-container" id="censorPreviewContainer">
+                            <!-- 검열전 탭 안내 문구 -->
+                            <div class="censor-preview-hint" id="censorPreviewHint" style="display: none;">
+                                검열 부위 미리보기입니다. 실제 검열은 <strong>전체 검열</strong> 버튼을 눌러주세요.
+                            </div>
+                            <canvas id="censorPreviewCanvas"></canvas>
                         </div>
-                        <canvas id="censorPreviewCanvas"></canvas>
+                        <!-- 오버레이 캔버스: preview-area 전체를 덮음 (핸들 조작용) -->
+                        <canvas id="censorOverlayCanvas"></canvas>
+
+                        <!-- 우측 네비게이션 화살표 -->
+                        <button class="censor-nav-arrow censor-nav-right" id="censorNavRight" title="다음 이미지 (휠 아래)">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </button>
+
+                        <!-- 이미지 번호 표시 -->
+                        <div class="censor-image-counter" id="censorImageCounter">0 / 0</div>
+
+                        <!-- 드롭존 (이미지 없을 때 프리뷰 영역에 표시) -->
+                        <div class="censor-dropzone" id="censorDropzone">
+                            <div class="dropzone-content">
+                                <div class="dropzone-icon">📁</div>
+                                <p>검열할 이미지를 여기에 드롭하세요</p>
+                                <small>또는 클릭하여 파일 선택</small>
+                            </div>
+                            <input type="file" id="censorFileInput" multiple accept="image/*" style="display: none;">
+                        </div>
+                        <!-- 검열중/후 탭 이미지 없음 표시 -->
+                        <div class="censor-preview-empty" id="censorPreviewEmpty" style="display: none;">
+                            <div class="icon">🖼️</div>
+                            <p>표시할 이미지가 없습니다</p>
+                        </div>
+                        <div class="censor-scan-loading" id="censorScanLoading">
+                            <div class="scan-spinner"></div>
+                            <span>검열 영역 스캔 중...</span>
+                        </div>
                     </div>
-                    <!-- 오버레이 캔버스: preview-area 전체를 덮음 (핸들 조작용) -->
-                    <canvas id="censorOverlayCanvas"></canvas>
 
-                    <!-- 우측 네비게이션 화살표 -->
-                    <button class="censor-nav-arrow censor-nav-right" id="censorNavRight" title="다음 이미지 (휠 아래)">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="9 18 15 12 9 6"></polyline>
-                        </svg>
-                    </button>
+                    <!-- 우측 패널 -->
+                    <div class="censor-side-panel" id="censorSidePanel">
+                        <!-- 검열전 탭: 모델/감지대상 섹션 -->
+                        <div class="censor-side-section censor-side-model" id="censorSideModel">
+                            <div class="side-section-title">📦 모델</div>
+                            <select id="censorModel">
+                                <option value="">모델 선택...</option>
+                            </select>
+                        </div>
 
-                    <!-- 이미지 번호 표시 -->
-                    <div class="censor-image-counter" id="censorImageCounter">0 / 0</div>
+                        <div class="censor-side-section censor-side-targets" id="censorSideTargets">
+                            <div class="side-section-title">🎯 감지 대상</div>
+                            <div class="censor-targets" id="censorTargets">
+                                <div class="censor-target-loading">모델을 선택하세요</div>
+                            </div>
+                        </div>
 
-                    <div class="censor-preview-empty" id="censorPreviewEmpty">
-                        <div class="icon">📁</div>
-                        <p>이미지를 드롭하여 시작하세요</p>
-                    </div>
-                    <div class="censor-scan-loading" id="censorScanLoading">
-                        <div class="scan-spinner"></div>
-                        <span>검열 영역 스캔 중...</span>
+                        <!-- 공통: 검열 설정 -->
+                        <div class="censor-side-section censor-side-settings">
+                            <div class="side-section-title">⚙️ 검열 설정</div>
+                            <div class="side-setting-row">
+                                <label>방식</label>
+                                <select id="censorMethod">
+                                    <option value="black">검정</option>
+                                    <option value="white">흰색</option>
+                                    <option value="mosaic">모자이크</option>
+                                    <option value="blur">블러</option>
+                                </select>
+                            </div>
+                            <div class="side-setting-row">
+                                <label style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span>확장</span>
+                                    <span id="censorExpandValue" style="font-weight: 500;">0</span>
+                                </label>
+                                <input type="range" id="censorExpandPixels" min="0" max="50" value="0" style="width: 100%;">
+                            </div>
+                            <div class="side-setting-row">
+                                <label style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span>부드럽게</span>
+                                    <span id="censorFeatherValue" style="font-weight: 500;">0</span>
+                                </label>
+                                <input type="range" id="censorFeather" min="0" max="50" value="0" style="width: 100%;">
+                            </div>
+                        </div>
+
+                        <!-- 검열중/후 탭: 도구 섹션 -->
+                        <div class="censor-side-section censor-side-tools" id="censorSideTools" style="display: none;">
+                            <div class="side-section-title">🔧 도구</div>
+                            <div class="side-tools-grid">
+                                <button type="button" class="side-tool-btn active" id="procToolSelect">↔ 선택</button>
+                                <button type="button" class="side-tool-btn" id="procToolAdd">+ 추가</button>
+                                <button type="button" class="side-tool-btn" id="procToolDelete">🗑️ 삭제</button>
+                            </div>
+                        </div>
+
+                        <!-- 검열후 탭: 도구 섹션 (별도 ID) -->
+                        <div class="censor-side-section censor-side-tools-after" id="censorSideToolsAfter" style="display: none;">
+                            <div class="side-section-title">🔧 도구</div>
+                            <div class="side-tools-grid">
+                                <button type="button" class="side-tool-btn active" id="afterToolSelect">↔ 선택</button>
+                                <button type="button" class="side-tool-btn" id="afterToolAdd">+ 추가</button>
+                                <button type="button" class="side-tool-btn" id="afterToolDelete">🗑️ 삭제</button>
+                            </div>
+                        </div>
+
+                        <!-- 단축키 가이드 (검열중/후) -->
+                        <div class="censor-side-section censor-side-shortcuts" id="censorSideShortcuts" style="display: none;">
+                            <div class="side-section-title">📋 단축키</div>
+                            <div class="side-shortcuts-list">
+                                <div class="shortcut-row"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 모드</div>
+                                <div class="shortcut-row"><kbd>휠</kbd> 이미지 전환</div>
+                                <div class="shortcut-row"><kbd>우클릭</kbd> 삭제</div>
+                            </div>
+                        </div>
+
+                        <!-- 액션 버튼 -->
+                        <div class="censor-side-actions">
+                            <!-- 검열전: 전체 검열 -->
+                            <button type="button" class="btn btn-primary" id="censorRunAllBtn">🔍 전체 검열</button>
+                            <!-- 검열중: 완료/취소 -->
+                            <button type="button" class="btn btn-success" id="censorCompleteBtn" style="display: none;">✓ 검열 완료</button>
+                            <button type="button" class="btn btn-secondary" id="censorCancelBtn" style="display: none;">취소</button>
+                            <!-- 검열후: 저장 -->
+                            <button type="button" class="btn btn-success" id="censorAfterSaveBtn" style="display: none;" disabled>💾 저장</button>
+                        </div>
                     </div>
                 </div>
-                
-                <!-- 하단 옵션 패널 (고정 높이) -->
-                <div class="censor-options-panel" id="censorOptionsPanel">
-                    <!-- 검열 전 탭 옵션 -->
-                    <div class="censor-options-before" id="censorOptionsBefore">
-                        <div class="censor-panel-left">
-                            <div class="censor-model-row">
-                                <label>모델</label>
-                                <select id="censorModel">
-                                    <option value="">모델 선택...</option>
-                                </select>
-                            </div>
-                            <div class="censor-targets-row">
-                                <label>감지 대상</label>
-                                <div class="censor-targets" id="censorTargets">
-                                    <!-- 동적으로 클래스 체크박스 생성됨 -->
-                                    <div class="censor-target-loading">모델을 선택하세요</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="censor-panel-divider"></div>
-                        <div class="censor-panel-right">
-                            <div class="censor-method-select">
-                                <label>검열 방식</label>
-                                <select id="censorMethod">
-                                    <option value="black">□ 검정</option>
-                                    <option value="white">■ 흰색</option>
-                                    <option value="mosaic">▦ 모자이크</option>
-                                    <option value="blur">◐ 블러</option>
-                                </select>
-                            </div>
-                            <button type="button" class="btn btn-primary btn-lg" id="censorRunAllBtn">🔍 전체 검열</button>
-                        </div>
-                    </div>
-                    
-                    <!-- 검열중 탭 옵션 -->
-                    <div class="censor-options-processing" id="censorOptionsProcessing" style="display: none;">
-                        <div class="censor-panel-left">
-                            <div class="censor-proc-content">
-                                <div class="censor-shortcuts-guide">
-                                    <span class="shortcut-item">
-                                        <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> 모드 전환
-                                    </span>
-                                    <span class="shortcut-item">
-                                        <kbd>휠</kbd> 이미지 전환
-                                    </span>
-                                    <span class="shortcut-item">
-                                        <kbd>우클릭</kbd> 박스 삭제
-                                    </span>
-                                </div>
-                                <div class="censor-proc-tools">
-                                    <button type="button" class="tool-btn active" id="procToolSelect">↔ 선택</button>
-                                    <button type="button" class="tool-btn" id="procToolAdd">+ 추가</button>
-                                    <button type="button" class="tool-btn" id="procToolDelete">🗑️ 삭제</button>
-                                </div>
-                                <div class="censor-proc-method">
-                                    <span class="method-label">검열 방식</span>
-                                    <select id="censorProcMethod">
-                                        <option value="black">□ 검정</option>
-                                        <option value="white">■ 흰색</option>
-                                        <option value="mosaic">▦ 모자이크</option>
-                                        <option value="blur">◐ 블러</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="censor-panel-divider"></div>
-                        <div class="censor-panel-right">
-                            <button type="button" class="btn btn-success btn-lg" id="censorCompleteBtn">✓ 검열 완료</button>
-                            <button type="button" class="btn" id="censorCancelBtn">취소</button>
-                        </div>
-                    </div>
-                    
-                    <!-- 검열 후 탭 옵션 -->
-                    <div class="censor-options-after" id="censorOptionsAfter" style="display: none;">
-                        <div class="censor-panel-left">
-                            <div class="censor-after-content">
-                                <div class="censor-shortcuts-guide">
-                                    <span class="shortcut-item">
-                                        <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> 모드 전환
-                                    </span>
-                                    <span class="shortcut-item">
-                                        <kbd>휠</kbd> 이미지 전환
-                                    </span>
-                                    <span class="shortcut-item">
-                                        <kbd>우클릭</kbd> 박스 삭제
-                                    </span>
-                                </div>
-                                <div class="censor-proc-tools">
-                                    <button type="button" class="tool-btn active" id="afterToolSelect">↔ 선택</button>
-                                    <button type="button" class="tool-btn" id="afterToolAdd">+ 추가</button>
-                                    <button type="button" class="tool-btn" id="afterToolDelete">🗑️ 삭제</button>
-                                </div>
-                                <div class="censor-proc-method">
-                                    <span class="method-label">검열 방식</span>
-                                    <select id="censorAfterMethod">
-                                        <option value="black">□ 검정</option>
-                                        <option value="white">■ 흰색</option>
-                                        <option value="mosaic">▦ 모자이크</option>
-                                        <option value="blur">◐ 블러</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="censor-panel-divider"></div>
-                        <div class="censor-panel-right">
-                            <button type="button" class="btn btn-success btn-lg" id="censorAfterSaveBtn" disabled>💾 저장</button>
-                        </div>
-                    </div>
+
+                <!-- 하단 옵션 패널 (숨김 - 기존 호환용, 추후 제거) -->
+                <div class="censor-options-panel" id="censorOptionsPanel" style="display: none;">
+                    <div class="censor-options-before" id="censorOptionsBefore"></div>
+                    <div class="censor-options-processing" id="censorOptionsProcessing" style="display: none;"></div>
+                    <div class="censor-options-after" id="censorOptionsAfter" style="display: none;"></div>
                 </div>
             </div>
             
@@ -4869,6 +5070,56 @@
     
     <script>
         console.log('[PeroPix] Script initialized');
+
+        // Range 슬라이더 채움 업데이트
+        function updateSliderFill(slider) {
+            const min = parseFloat(slider.min) || 0;
+            const max = parseFloat(slider.max) || 100;
+            const val = parseFloat(slider.value) || 0;
+            const percent = ((val - min) / (max - min)) * 100;
+
+            // 래퍼 안의 fill 요소 업데이트
+            const wrapper = slider.closest('.range-wrap');
+            if (wrapper) {
+                const fill = wrapper.querySelector('.range-fill');
+                if (fill) {
+                    fill.style.width = percent + '%';
+                }
+            }
+        }
+
+        // 슬라이더를 래퍼로 감싸기
+        function wrapSlider(slider) {
+            // 이미 래핑되어 있으면 스킵
+            if (slider.closest('.range-wrap')) return;
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'range-wrap';
+
+            const bg = document.createElement('div');
+            bg.className = 'range-bg';
+
+            const fill = document.createElement('div');
+            fill.className = 'range-fill';
+
+            slider.parentNode.insertBefore(wrapper, slider);
+            wrapper.appendChild(bg);
+            wrapper.appendChild(fill);
+            wrapper.appendChild(slider);
+
+            // 초기 채움 설정
+            updateSliderFill(slider);
+
+            // input 이벤트 리스너
+            slider.addEventListener('input', () => updateSliderFill(slider));
+        }
+
+        // 모든 range 슬라이더에 자동 채움 적용
+        function initAllSliders() {
+            document.querySelectorAll('input[type="range"]').forEach(slider => {
+                wrapSlider(slider);
+            });
+        }
 
         const API_BASE = 'http://127.0.0.1:8765';
 
@@ -8042,8 +8293,10 @@
             if (metadata.uc_preset) document.getElementById('ucPreset').value = metadata.uc_preset;
             if (metadata.quality_tags !== undefined) document.getElementById('qualityTags').checked = metadata.quality_tags;
             if (metadata.cfg_rescale !== undefined) {
-                document.getElementById('cfgRescale').value = metadata.cfg_rescale;
+                const cfgRescaleEl = document.getElementById('cfgRescale');
+                cfgRescaleEl.value = metadata.cfg_rescale;
                 document.getElementById('cfgRescaleValue').textContent = metadata.cfg_rescale;
+                updateSliderFill(cfgRescaleEl);
             }
             if (metadata.variety_plus !== undefined) document.getElementById('varietyPlus').checked = metadata.variety_plus;
             if (metadata.furry_mode !== undefined) setFurryMode(metadata.furry_mode);
@@ -8443,7 +8696,9 @@
                 slider.oninput = function() {
                     const idx = parseInt(this.dataset.idx);
                     vibeList[idx].strength = parseFloat(this.value);
-                    this.nextElementSibling.textContent = this.value;
+                    // 래핑된 경우 부모의 부모에서 .value 찾기
+                    const row = this.closest('.vibe-slider-row');
+                    if (row) row.querySelector('.value').textContent = this.value;
                     saveAppSettings();
                 };
             });
@@ -8451,10 +8706,17 @@
                 slider.oninput = function() {
                     const idx = parseInt(this.dataset.idx);
                     vibeList[idx].info_extracted = parseFloat(this.value);
-                    this.nextElementSibling.textContent = this.value;
+                    // 래핑된 경우 부모의 부모에서 .value 찾기
+                    const row = this.closest('.vibe-slider-row');
+                    if (row) row.querySelector('.value').textContent = this.value;
                     saveAppSettings();
                     updateAnlasCost();  // info_extracted 변경시 캐시 상태 재확인
                 };
+            });
+
+            // 동적 생성된 슬라이더 래핑 및 채움 초기화
+            container.querySelectorAll('input[type="range"]').forEach(slider => {
+                wrapSlider(slider);
             });
         }
 
@@ -8566,6 +8828,7 @@
 
         document.getElementById('charRefFidelity').oninput = function() {
             document.getElementById('charRefFidelityValue').textContent = this.value;
+            updateSliderFill(this);
             if (charRefData) {
                 charRefData.fidelity = parseFloat(this.value);
                 saveAppSettings();
@@ -8942,12 +9205,16 @@
 
             // 하이라이트가 꺼져있으면 일반 텍스트만 표시
             if (!promptHighlightEnabled) {
-                const escapedText = text
+                let escapedText = text
                     .replace(/&/g, '&amp;')
                     .replace(/</g, '&lt;')
                     .replace(/>/g, '&gt;')
                     .replace(/"/g, '&quot;')
                     .replace(/'/g, '&#039;');
+                // 텍스트가 줄바꿈으로 끝나면 추가 공간 확보
+                if (text.endsWith('\n')) {
+                    escapedText += '\u00A0';
+                }
                 overlay.innerHTML = escapedText;
                 overlay.scrollTop = textarea.scrollTop;
                 overlay.scrollLeft = textarea.scrollLeft;
@@ -8980,6 +9247,11 @@
                     html += `<span style="background-color: ${color};">${escapedText}</span>`;
                 }
             });
+
+            // 텍스트가 줄바꿈으로 끝나면 추가 공간 확보 (커서 위치 동기화)
+            if (text.endsWith('\n')) {
+                html += '\u00A0'; // non-breaking space
+            }
 
             overlay.innerHTML = html;
 
@@ -9022,20 +9294,31 @@
 
             console.log('[PromptHighlight] Created wrapper and overlay for', textarea.id);
 
-            // 스크롤바 유무에 따라 overlay right 조정
-            function adjustOverlayForScrollbar() {
+            // textarea의 계산된 스타일을 overlay에 복사 (폰트 관련)
+            function syncStyles() {
+                const computed = window.getComputedStyle(textarea);
+                overlay.style.padding = computed.padding;
+                overlay.style.fontSize = computed.fontSize;
+                overlay.style.fontFamily = computed.fontFamily;
+                overlay.style.lineHeight = computed.lineHeight;
+                overlay.style.letterSpacing = computed.letterSpacing;
+                overlay.style.wordSpacing = computed.wordSpacing;
+                // 스크롤바 영역 보정: textarea에 스크롤바가 있으면 overlay의 padding-right 증가
                 const hasScrollbar = textarea.scrollHeight > textarea.clientHeight;
-                overlay.style.right = hasScrollbar ? '9px' : '1px';
+                if (hasScrollbar) {
+                    const paddingRight = parseFloat(computed.paddingRight) || 0;
+                    overlay.style.paddingRight = (paddingRight + 8) + 'px';
+                }
             }
 
             // 초기 하이라이팅
+            syncStyles();
             highlightPrompt(textarea, overlay);
-            adjustOverlayForScrollbar();
 
             // 이벤트 리스너
             textarea.addEventListener('input', () => {
+                syncStyles();
                 highlightPrompt(textarea, overlay);
-                adjustOverlayForScrollbar();
             });
 
             textarea.addEventListener('scroll', () => {
@@ -9045,8 +9328,8 @@
 
             // 창 크기 변경 시 재렌더링
             const resizeObserver = new ResizeObserver(() => {
+                syncStyles();
                 highlightPrompt(textarea, overlay);
-                adjustOverlayForScrollbar();
             });
             resizeObserver.observe(textarea);
         }
@@ -9761,8 +10044,10 @@
                     }
                 }
                 if (settings.cfgRescale !== undefined) {
-                    document.getElementById('cfgRescale').value = settings.cfgRescale;
+                    const cfgRescaleEl = document.getElementById('cfgRescale');
+                    cfgRescaleEl.value = settings.cfgRescale;
                     document.getElementById('cfgRescaleValue').textContent = settings.cfgRescale;
+                    updateSliderFill(cfgRescaleEl);
                 }
                 if (settings.varietyPlus !== undefined) document.getElementById('varietyPlus').checked = settings.varietyPlus;
                 if (settings.enableVibeTransfer !== undefined) {
@@ -9784,8 +10069,10 @@
                     document.getElementById('uploadCharRefBtn').textContent = '이미지 변경';
                 }
                 if (settings.charRefFidelity !== undefined) {
-                    document.getElementById('charRefFidelity').value = settings.charRefFidelity;
+                    const charRefFidelityEl = document.getElementById('charRefFidelity');
+                    charRefFidelityEl.value = settings.charRefFidelity;
                     document.getElementById('charRefFidelityValue').textContent = settings.charRefFidelity;
+                    updateSliderFill(charRefFidelityEl);
                 }
                 if (settings.charRefStyleAware !== undefined) {
                     document.getElementById('charRefStyleAware').checked = settings.charRefStyleAware;
@@ -9811,8 +10098,10 @@
                 if (settings.upscaleSteps) document.getElementById('upscaleSteps').value = settings.upscaleSteps;
                 if (settings.upscaleCfg) document.getElementById('upscaleCfg').value = settings.upscaleCfg;
                 if (settings.upscaleDenoise !== undefined) {
-                    document.getElementById('upscaleDenoise').value = settings.upscaleDenoise;
+                    const upscaleDenoiseEl = document.getElementById('upscaleDenoise');
+                    upscaleDenoiseEl.value = settings.upscaleDenoise;
                     document.getElementById('upscaleDenoiseValue').textContent = settings.upscaleDenoise;
+                    updateSliderFill(upscaleDenoiseEl);
                 }
             }
 
@@ -10012,8 +10301,10 @@
                             modeToggle.classList.add('furry');
                         }
                         if (naiSettings.cfgRescale !== undefined) {
-                            document.getElementById('cfgRescale').value = naiSettings.cfgRescale;
+                            const cfgRescaleEl = document.getElementById('cfgRescale');
+                            cfgRescaleEl.value = naiSettings.cfgRescale;
                             document.getElementById('cfgRescaleValue').textContent = naiSettings.cfgRescale;
+                            updateSliderFill(cfgRescaleEl);
                         }
                         if (naiSettings.varietyPlus !== undefined) document.getElementById('varietyPlus').checked = naiSettings.varietyPlus;
                         if (naiSettings.enableVibeTransfer !== undefined) {
@@ -10035,8 +10326,10 @@
                             document.getElementById('uploadCharRefBtn').textContent = '이미지 변경';
                         }
                         if (naiSettings.charRefFidelity !== undefined) {
-                            document.getElementById('charRefFidelity').value = naiSettings.charRefFidelity;
+                            const charRefFidelityEl = document.getElementById('charRefFidelity');
+                            charRefFidelityEl.value = naiSettings.charRefFidelity;
                             document.getElementById('charRefFidelityValue').textContent = naiSettings.charRefFidelity;
+                            updateSliderFill(charRefFidelityEl);
                         }
                         if (naiSettings.charRefStyleAware !== undefined) {
                             document.getElementById('charRefStyleAware').checked = naiSettings.charRefStyleAware;
@@ -10059,8 +10352,10 @@
                         if (localSettings.upscaleSteps) document.getElementById('upscaleSteps').value = localSettings.upscaleSteps;
                         if (localSettings.upscaleCfg) document.getElementById('upscaleCfg').value = localSettings.upscaleCfg;
                         if (localSettings.upscaleDenoise !== undefined) {
-                            document.getElementById('upscaleDenoise').value = localSettings.upscaleDenoise;
+                            const upscaleDenoiseEl = document.getElementById('upscaleDenoise');
+                            upscaleDenoiseEl.value = localSettings.upscaleDenoise;
                             document.getElementById('upscaleDenoiseValue').textContent = localSettings.upscaleDenoise;
+                            updateSliderFill(upscaleDenoiseEl);
                         }
                     }
                     
@@ -10214,8 +10509,10 @@
                     modeToggle.title = '퍼리 모드';
                     modeToggle.classList.add('furry');
                 }
-                document.getElementById('cfgRescale').value = naiSettings.cfgRescale;
+                const cfgRescaleEl = document.getElementById('cfgRescale');
+                cfgRescaleEl.value = naiSettings.cfgRescale;
                 document.getElementById('cfgRescaleValue').textContent = naiSettings.cfgRescale;
+                updateSliderFill(cfgRescaleEl);
                 document.getElementById('varietyPlus').checked = naiSettings.varietyPlus;
                 document.getElementById('enableVibeTransfer').checked = naiSettings.enableVibeTransfer;
                 document.getElementById('vibeTransferSettings').style.display = naiSettings.enableVibeTransfer ? 'block' : 'none';
@@ -10247,9 +10544,11 @@
                 document.getElementById('sizeAlignment').value = localSettings.sizeAlignment;
                 document.getElementById('upscaleSteps').value = localSettings.upscaleSteps;
                 document.getElementById('upscaleCfg').value = localSettings.upscaleCfg;
-                document.getElementById('upscaleDenoise').value = localSettings.upscaleDenoise;
+                const upscaleDenoiseEl = document.getElementById('upscaleDenoise');
+                upscaleDenoiseEl.value = localSettings.upscaleDenoise;
                 document.getElementById('upscaleDenoiseValue').textContent = localSettings.upscaleDenoise;
-                
+                updateSliderFill(upscaleDenoiseEl);
+
                 // UI 레이아웃 (공유)
                 if (settings.slotWidth) setSlotWidth(settings.slotWidth);
                 if (settings.sidebarWidth) setSidebarWidth(settings.sidebarWidth);
@@ -10350,6 +10649,7 @@
         
         // Init
         loadAppSettings();  // 저장된 설정 먼저 로드
+        initAllSliders();   // 모든 range 슬라이더 채움 초기화
         console.log('[PeroPix] After loadAppSettings, tagAutocompleteEnabled:', tagAutocompleteEnabled);
         loadSlotSizePresets();  // 슬롯 사이즈 프리셋 로드
 
@@ -12069,6 +12369,9 @@
             // 휠 네비게이션 상태
             wheelDebounceTimer: null,  // 휠 디바운스 타이머
             wheelRequestId: 0,         // 휠 요청 ID (취소용)
+            // 확장/그라데이션 옵션
+            expandPixels: 0,           // 박스 확장 픽셀
+            feather: 0,                // 그라데이션 테두리 픽셀
             // 초기화 플래그
             eventsInitialized: false  // 이벤트 리스너 초기화 여부
         };
@@ -12105,17 +12408,22 @@
             const dropzone = document.getElementById('censorDropzone');
             const thumbnailsWrapper = document.getElementById('censorThumbnailsWrapper');
             const clearBtn = document.getElementById('censorClearImagesBtn');
+            const previewEmpty = document.getElementById('censorPreviewEmpty');
             const hasImages = censorState.images.length > 0;
-            
+
+            // 썸네일 래퍼는 항상 표시
+            thumbnailsWrapper.style.display = 'flex';
+
             if (censorState.currentTab === 'before') {
+                // 검열전 탭: 이미지 없으면 드롭존 표시 (프리뷰 영역 내부)
                 dropzone.style.display = hasImages ? 'none' : 'block';
-                thumbnailsWrapper.style.display = hasImages ? 'flex' : 'none';
+                previewEmpty.style.display = 'none';
                 clearBtn.style.display = hasImages ? 'inline-flex' : 'none';
             } else {
-                // 검열 후 탭에서는 드롭존 숨김
+                // 검열중/후 탭: 드롭존 숨기고, 이미지 없으면 empty 표시
                 dropzone.style.display = 'none';
-                thumbnailsWrapper.style.display = 'flex';
                 clearBtn.style.display = 'none';
+                // previewEmpty는 다른 곳에서 관리 (selectProcessingImage, selectAfterImage 등)
             }
         }
         
@@ -12350,18 +12658,30 @@
         
         // 드롭된 이미지 초기화
         function clearDroppedImages() {
+            // 진행 중인 스캔 즉시 중단
+            censorState.wheelRequestId++;
+            showCensorScanLoading(false);
+            if (scanDebounceTimer) {
+                clearTimeout(scanDebounceTimer);
+                scanDebounceTimer = null;
+            }
+
             censorState.images = [];
             censorState.currentIndex = -1;
             censorState.currentImage = null;
             censorState.detections = [];
             censorState.editBoxes = [];
             censorState.processingResults = {};
-            
+
             // UI 업데이트
             updateCensorDropzoneUI();
-            document.getElementById('censorThumbnails').innerHTML = '';
+            renderCensorThumbnails(censorState.images);
             clearCensorPreview();
             document.getElementById('censorImageCounter').textContent = '0 / 0';
+
+            // 안내 문구 숨김
+            const previewHint = document.getElementById('censorPreviewHint');
+            if (previewHint) previewHint.style.display = 'none';
         }
         
         // 이미지 로드 함수 (FileResponse URL + crossOrigin)
@@ -12433,20 +12753,18 @@
         const censorOverlayCtx = censorOverlayCanvas?.getContext('2d');
         
         // 현재 탭에 맞는 재렌더링 함수
-        function redrawCurrentTab() {
+        function redrawCurrentTab(overlayOnly = false) {
             if (censorState.currentTab === 'processing') {
-                redrawProcessingPreview();
+                redrawProcessingPreview(overlayOnly);
             } else if (censorState.currentTab === 'after') {
-                redrawAfterPreview();
+                redrawAfterPreview(overlayOnly);
             } else {
                 drawEditBoxes();
             }
         }
         
-        // 현재 탭의 검열 방식 선택자 ID 반환
+        // 현재 탭의 검열 방식 선택자 ID 반환 (모든 탭에서 공통 censorMethod 사용)
         function getCurrentMethodSelector() {
-            if (censorState.currentTab === 'processing') return 'censorProcMethod';
-            if (censorState.currentTab === 'after') return 'censorAfterMethod';
             return 'censorMethod';
         }
         
@@ -12464,7 +12782,9 @@
                 censorMethod: document.getElementById('censorMethod')?.value || 'black',
                 labelConf: censorState.labelConf,
                 selectedTargets: Array.from(document.querySelectorAll('#censorTargets input[type="checkbox"]:checked'))
-                    .map(cb => cb.dataset.class)
+                    .map(cb => cb.dataset.class),
+                expandPixels: censorState.expandPixels,
+                feather: censorState.feather
             };
             localStorage.setItem('censorSettings', JSON.stringify(settings));
         }
@@ -12486,10 +12806,10 @@
             // 스캔 로딩 숨기기 (다른 모드에서 돌아왔을 때)
             showCensorScanLoading(false);
             
-            // 검열전 탭 안내 문구 표시 (초기 진입 시 기본 탭이 before이므로)
+            // 검열전 탭 안내 문구 표시 (이미지가 1개 이상 있을 때만)
             const previewHint = document.getElementById('censorPreviewHint');
-            if (previewHint && censorState.currentTab === 'before') {
-                previewHint.style.display = 'block';
+            if (previewHint) {
+                previewHint.style.display = (censorState.currentTab === 'before' && censorState.images.length > 0) ? 'block' : 'none';
             }
             
             // 네비게이션 UI 표시 (초기 진입 시)
@@ -12497,9 +12817,6 @@
             document.getElementById('censorNavRight').style.display = 'flex';
             document.getElementById('censorImageCounter').style.display = 'block';
             
-            // 폴더 열기 버튼: 검열 전 탭에서는 숨김
-            document.getElementById('censorOpenFolderBtn').style.display = 
-                censorState.currentTab === 'before' ? 'none' : 'inline-flex';
             
             // 이미 초기화되어 있으면 현재 이미지만 다시 표시하고 스킵
             if (censorState.eventsInitialized &&
@@ -12525,6 +12842,9 @@
 
             // 드롭존 UI 초기화 (검열 전 탭용)
             updateCensorDropzoneUI();
+
+            // 썸네일 리스트 초기화 (이미지가 없으면 "이미지가 없습니다" 표시)
+            renderCensorThumbnails(censorState.images);
 
             // 이벤트는 최초 1회만 등록
             if (!censorState.eventsInitialized) {
@@ -12562,7 +12882,23 @@
                     if (savedSettings?.censorMethod && methodSelect) {
                         methodSelect.value = savedSettings.censorMethod;
                     }
-                    
+
+                    // 저장된 확장/부드럽게 값 복원
+                    if (savedSettings?.expandPixels !== undefined) {
+                        censorState.expandPixels = savedSettings.expandPixels;
+                        const expandEl = document.getElementById('censorExpandPixels');
+                        expandEl.value = savedSettings.expandPixels;
+                        document.getElementById('censorExpandValue').textContent = savedSettings.expandPixels;
+                        updateSliderFill(expandEl);
+                    }
+                    if (savedSettings?.feather !== undefined) {
+                        censorState.feather = savedSettings.feather;
+                        const featherEl = document.getElementById('censorFeather');
+                        featherEl.value = savedSettings.feather;
+                        document.getElementById('censorFeatherValue').textContent = savedSettings.feather;
+                        updateSliderFill(featherEl);
+                    }
+
                     // 선택된 모델의 클래스 로드
                     await loadModelClasses(selectedModel, savedSettings);
                 } else {
@@ -12599,16 +12935,7 @@
                 targetsContainer.innerHTML = `<div class="censor-target-loading">클래스 로드 실패: ${err.message}</div>`;
             }
         }
-        
-        // 슬라이더 채움 배경 업데이트 (Chrome/Safari용 - CSS 변수 활용)
-        function updateSliderFill(slider) {
-            const min = parseFloat(slider.min) || 0;
-            const max = parseFloat(slider.max) || 1;
-            const val = parseFloat(slider.value) || 0;
-            const percent = ((val - min) / (max - min)) * 100;
-            slider.style.setProperty('--slider-percent', `${percent}%`);
-        }
-        
+
         // 검열 대상 UI 렌더링
         function renderCensorTargets(selectedTargets = null) {
             const container = document.getElementById('censorTargets');
@@ -12625,24 +12952,23 @@
                     <div class="censor-target-item">
                         <input type="checkbox" id="censor-target-${cls}" ${isChecked ? 'checked' : ''} data-class="${cls}">
                         <label for="censor-target-${cls}">${cls}</label>
-                        <input type="range" min="0" max="1" step="0.01" value="${conf}" 
-                               data-class="${cls}" class="censor-conf-slider">
-                        <span class="conf-value">${conf.toFixed(2)}</span>
+                        <input type="number" min="0" max="1" step="0.01" value="${conf.toFixed(2)}"
+                               data-class="${cls}" class="censor-conf-input">
                     </div>
                 `;
             }).join('');
-            
-            // 슬라이더 이벤트 및 초기 채움 설정
-            container.querySelectorAll('.censor-conf-slider').forEach(slider => {
-                // 초기 채움 설정
-                updateSliderFill(slider);
-                
-                slider.oninput = function() {
+
+            // 수치 입력 이벤트
+            container.querySelectorAll('.censor-conf-input').forEach(input => {
+                input.onchange = function() {
+                    let val = parseFloat(this.value);
+                    // 범위 제한
+                    if (isNaN(val)) val = 0.3;
+                    if (val < 0) val = 0;
+                    if (val > 1) val = 1;
+                    this.value = val.toFixed(2);
                     const cls = this.dataset.class;
-                    censorState.labelConf[cls] = parseFloat(this.value);
-                    this.nextElementSibling.textContent = parseFloat(this.value).toFixed(2);
-                    // 채움 업데이트
-                    updateSliderFill(this);
+                    censorState.labelConf[cls] = val;
                     // 실시간 재스캔
                     if (censorState.currentImage) {
                         debouncedScan();
@@ -12906,7 +13232,13 @@
         function renderCensorThumbnails(images) {
             const container = document.getElementById('censorThumbnails');
             const isBeforeTab = censorState.currentTab === 'before';
-            
+
+            // 검열전 탭 안내 문구 갱신 (이미지 수에 따라)
+            const previewHint = document.getElementById('censorPreviewHint');
+            if (previewHint) {
+                previewHint.style.display = (isBeforeTab && censorState.images.length > 0) ? 'block' : 'none';
+            }
+
             if (images.length === 0) {
                 container.innerHTML = '<div class="censor-loading">이미지가 없습니다</div>';
                 return;
@@ -12986,10 +13318,18 @@
         function removeCensorImage(index) {
             if (censorState.currentTab !== 'before') return;
             if (index < 0 || index >= censorState.images.length) return;
-            
+
+            // 진행 중인 스캔 즉시 중단
+            censorState.wheelRequestId++;
+            showCensorScanLoading(false);
+            if (scanDebounceTimer) {
+                clearTimeout(scanDebounceTimer);
+                scanDebounceTimer = null;
+            }
+
             // 이미지 배열에서 삭제
             const removedImage = censorState.images.splice(index, 1)[0];
-            
+
             // 현재 인덱스 조정
             if (censorState.images.length === 0) {
                 // 모든 이미지가 삭제됨
@@ -12999,6 +13339,9 @@
                 censorState.editBoxes = [];
                 clearCensorPreview();
                 document.getElementById('censorImageCounter').textContent = '0 / 0';
+                // 안내 문구 숨김
+                const previewHint = document.getElementById('censorPreviewHint');
+                if (previewHint) previewHint.style.display = 'none';
             } else {
                 // 삭제 후 인덱스 조정
                 if (censorState.currentIndex >= censorState.images.length) {
@@ -13023,7 +13366,16 @@
         // 이미지 선택 (skipScan: 휠 네비게이션에서 스캔 스킵용)
         async function selectCensorImage(index, { skipScan = false } = {}) {
             const requestId = ++censorState.wheelRequestId;  // 요청 ID 증가
-            
+
+            // API 프리뷰 캐시 무효화 및 진행 중인 요청 취소
+            cachedApiPreviewImage = null;
+            cachedApiPreviewKey = null;
+            censorPreviewRequestId++;  // 진행 중인 API 요청 무효화
+            if (censorPreviewDebounceTimer) {
+                clearTimeout(censorPreviewDebounceTimer);
+                censorPreviewDebounceTimer = null;
+            }
+
             const images = censorState.currentTab === 'before'
                 ? censorState.images
                 : censorState.censoredImages;
@@ -13205,26 +13557,35 @@
             if (censorState.currentTab === 'processing') {
                 // 검열중: 원본 + 검열 효과 적용
                 drawCensoredImage(img, displayW, displayH);
+                // 확장/그라데이션이 있으면 API 프리뷰 요청
+                if ((censorState.expandPixels > 0 || censorState.feather > 0) && censorState.editBoxes.length > 0) {
+                    requestCensorPreviewUpdate();
+                }
             } else if (censorState.currentTab === 'after') {
                 // 검열후: 이미 검열된 이미지 + 추가 편집 오버레이
                 censorPreviewCtx.drawImage(img, 0, 0, displayW, displayH);
                 drawAfterTabOverlay(img, displayW, displayH);
+                // 확장/그라데이션이 있으면 API 프리뷰 요청
+                if ((censorState.expandPixels > 0 || censorState.feather > 0) && censorState.editBoxes.length > 0) {
+                    requestCensorPreviewUpdate();
+                }
             } else {
                 // 검열전: 원본 + 감지 박스 표시
                 censorPreviewCtx.drawImage(img, 0, 0, displayW, displayH);
                 drawDetectionBoxes();
             }
             
-            // 빈 상태 숨기기
+            // 빈 상태/드롭존 숨기기
             document.getElementById('censorPreviewEmpty').style.display = 'none';
+            document.getElementById('censorDropzone').style.display = 'none';
         }
-        
+
         // 검열 적용된 이미지 그리기 (검열중 탭용)
         function drawCensoredImage(img, displayW, displayH) {
             if (!img || !censorPreviewCtx) return;
             
             const scale = censorState.displayScale;
-            const method = document.getElementById('censorProcMethod')?.value || censorState.processingMethod;
+            const method = document.getElementById('censorMethod')?.value || censorState.processingMethod;
             
             // 원본 이미지 먼저 그리기
             censorPreviewCtx.drawImage(img, 0, 0, displayW, displayH);
@@ -13314,12 +13675,157 @@
                 }
             }
             ctx.restore();
-            
+
             // 반투명 오버레이
             ctx.fillStyle = 'rgba(128, 128, 128, 0.5)';
             ctx.fillRect(x, y, w, h);
         }
-        
+
+        // === 하이브리드 프리뷰: 확장/그라데이션 적용 시 백엔드 API로 정확한 프리뷰 ===
+        let censorPreviewDebounceTimer = null;
+        let censorPreviewRequestId = 0;
+        let cachedApiPreviewImage = null;  // API 프리뷰 결과 캐시
+        let cachedApiPreviewKey = null;    // 캐시 키 (박스+설정 해시)
+
+        // 캐시 키 생성 (박스, 확장, 그라데이션, 메서드 기반)
+        function getPreviewCacheKey() {
+            const methodSelector = 'censorMethod';
+            const method = document.getElementById(methodSelector)?.value || 'black';
+            return JSON.stringify({
+                boxes: censorState.editBoxes.map(b => ({ box: b.box, method: b.method, rotation: b.rotation })),
+                expand: censorState.expandPixels,
+                feather: censorState.feather,
+                method: method,
+                imagePath: censorState.currentImage?.path
+            });
+        }
+
+        function requestCensorPreviewUpdate() {
+            // 디바운스: 슬라이더 조작 중 너무 잦은 호출 방지
+            if (censorPreviewDebounceTimer) {
+                clearTimeout(censorPreviewDebounceTimer);
+            }
+            censorPreviewDebounceTimer = setTimeout(() => {
+                updateCensorPreviewFromAPI();
+            }, 300);
+        }
+
+        // 캐시된 프리뷰 이미지가 있으면 바로 그리기
+        function drawCachedApiPreview() {
+            const currentKey = getPreviewCacheKey();
+            if (cachedApiPreviewImage && cachedApiPreviewKey === currentKey) {
+                const displayW = censorPreviewCanvas.width;
+                const displayH = censorPreviewCanvas.height;
+                censorPreviewCtx.drawImage(cachedApiPreviewImage, 0, 0, displayW, displayH);
+                return true;
+            }
+            return false;
+        }
+
+        async function updateCensorPreviewFromAPI() {
+            if (!censorState.currentImage) return;
+            if (censorState.editBoxes.length === 0) {
+                // 박스가 없으면 원본 이미지 그리기
+                if (censorState.currentTab === 'after') {
+                    redrawAfterPreviewBase();
+                } else {
+                    drawCensorPreview();
+                }
+                return;
+            }
+
+            const requestId = ++censorPreviewRequestId;
+            const requestImagePath = censorState.currentImage.path;  // 요청 시점의 이미지 경로 저장
+            // 탭에 따라 올바른 method selector 사용
+            const methodSelector = 'censorMethod';
+            const method = document.getElementById(methodSelector)?.value || censorState.processingMethod;
+
+            try {
+                const requestBody = {
+                    boxes: censorState.editBoxes.map(box => ({
+                        box: box.box,
+                        method: box.method || method,
+                        rotation: box.rotation || 0
+                    })),
+                    method: method,
+                    expand_pixels: censorState.expandPixels || 0,
+                    feather: censorState.feather || 0
+                };
+
+                // 이미지 소스 설정
+                if (censorState.currentTab === 'processing') {
+                    // 검열중 탭: 드롭된 이미지인지 확인
+                    const imageKey = censorState.currentImage?.id || censorState.currentImage?.path;
+                    const procResult = censorState.processingResults[imageKey];
+                    const imgInfo = procResult?.imgInfo;
+
+                    if (imgInfo?.isDropped) {
+                        // 드롭된 이미지: absolutePath 또는 base64 사용
+                        if (imgInfo.absolutePath) {
+                            requestBody.absolute_path = imgInfo.absolutePath;
+                        } else if (imgInfo.base64) {
+                            requestBody.image_base64 = imgInfo.base64;
+                        }
+                    } else {
+                        // 일반 이미지: uncensored 폴더
+                        requestBody.image_path = censorState.currentImage.path;
+                    }
+                } else if (censorState.currentTab === 'after') {
+                    // 검열후 탭: censored 폴더의 이미지
+                    requestBody.image_path = censorState.currentImage.path;
+                    requestBody.source = 'censored';
+                } else {
+                    // 기타 탭: uncensored 이미지
+                    requestBody.image_path = censorState.currentImage.path;
+                }
+
+                const response = await fetch(`${API_BASE}/api/censor/apply`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                });
+
+                // 요청 ID 및 이미지 경로 확인 (다른 요청이 이미 처리 중이거나 이미지가 변경됐으면 무시)
+                if (requestId !== censorPreviewRequestId) return;
+                if (censorState.currentImage?.path !== requestImagePath) return;
+
+                const result = await response.json();
+                if (result.success && result.image) {
+                    // base64 이미지를 캔버스에 그리기
+                    const img = new Image();
+                    img.onload = () => {
+                        // 이미지 로드 완료 시에도 다시 확인
+                        if (requestId !== censorPreviewRequestId) return;
+                        if (censorState.currentImage?.path !== requestImagePath) return;
+
+                        // 캐시에 저장
+                        cachedApiPreviewImage = img;
+                        cachedApiPreviewKey = getPreviewCacheKey();
+
+                        const displayW = censorPreviewCanvas.width;
+                        const displayH = censorPreviewCanvas.height;
+                        censorPreviewCtx.drawImage(img, 0, 0, displayW, displayH);
+
+                        // 오버레이 (선택 박스 등)
+                        drawProcessingOverlay();
+                    };
+                    img.src = `data:image/png;base64,${result.image}`;
+                }
+            } catch (err) {
+                console.error('Censor preview update failed:', err);
+            }
+        }
+
+        // 검열후 탭 원본만 그리기 (편집 박스 없이)
+        function redrawAfterPreviewBase() {
+            if (censorState.currentTab !== 'after' || !censorState.originalImageObj) return;
+
+            const img = censorState.originalImageObj;
+            const displayW = censorPreviewCanvas.width;
+            const displayH = censorPreviewCanvas.height;
+            censorPreviewCtx.drawImage(img, 0, 0, displayW, displayH);
+        }
+
         // 검열중 탭 오버레이 그리기 (호버 시에만 핸들 표시)
         function drawProcessingOverlay() {
             if (!censorOverlayCtx) return;
@@ -13414,14 +13920,35 @@
         }
         
         // 검열중 모드에서 이미지 재렌더링 (박스 편집 후)
-        function redrawProcessingPreview() {
+        // overlayOnly=true면 오버레이만 갱신 (호버 등)
+        function redrawProcessingPreview(overlayOnly = false) {
             if (censorState.currentTab !== 'processing' || !censorState.originalImageObj) return;
-            
+
             const img = censorState.originalImageObj;
             const displayW = censorPreviewCanvas.width;
             const displayH = censorPreviewCanvas.height;
-            
-            drawCensoredImage(img, displayW, displayH);
+
+            // 드래그/리사이즈/회전/그리기 중에는 API 호출 안 함 (Canvas만 사용)
+            const isEditing = censorState.isDragging || censorState.isResizing || censorState.isRotating || censorState.isDrawing;
+
+            // 하이브리드 프리뷰: 확장/그라데이션이 있으면 API 결과 사용
+            if ((censorState.expandPixels > 0 || censorState.feather > 0) && censorState.editBoxes.length > 0) {
+                if (overlayOnly && !isEditing) {
+                    // 오버레이만 갱신: 캐시된 이미지가 있으면 그대로 사용, 오버레이만 다시 그리기
+                    if (drawCachedApiPreview()) {
+                        drawProcessingOverlay();
+                        return;
+                    }
+                }
+                // Canvas로 빠르게 그리기
+                drawCensoredImage(img, displayW, displayH);
+                // 편집 중이 아닐 때만 API 호출
+                if (!isEditing) {
+                    requestCensorPreviewUpdate();
+                }
+            } else {
+                drawCensoredImage(img, displayW, displayH);
+            }
         }
         
         // 검열후 탭 오버레이 그리기 (추가된 편집 박스 + 검열 효과)
@@ -13429,7 +13956,7 @@
             if (!censorOverlayCtx) return;
             
             const scale = censorState.displayScale || 1;
-            const method = document.getElementById('censorAfterMethod')?.value || 'black';
+            const method = document.getElementById('censorMethod')?.value || 'black';
             
             // 추가된 editBoxes에 검열 효과 적용
             if (censorState.editBoxes.length > 0) {
@@ -13547,17 +14074,37 @@
         }
         
         // 검열후 탭 재렌더링
-        function redrawAfterPreview() {
+        // overlayOnly=true면 오버레이만 갱신 (호버 등)
+        function redrawAfterPreview(overlayOnly = false) {
             if (censorState.currentTab !== 'after' || !censorState.originalImageObj) return;
-            
+
             const img = censorState.originalImageObj;
             const displayW = censorPreviewCanvas.width;
             const displayH = censorPreviewCanvas.height;
-            
-            // 원본(검열된) 이미지 다시 그리기
-            censorPreviewCtx.drawImage(img, 0, 0, displayW, displayH);
-            // 추가 편집 오버레이
-            drawAfterTabOverlay(img, displayW, displayH);
+
+            // 드래그/리사이즈/회전/그리기 중에는 API 호출 안 함 (Canvas만 사용)
+            const isEditing = censorState.isDragging || censorState.isResizing || censorState.isRotating || censorState.isDrawing;
+
+            // 하이브리드 프리뷰: 확장/그라데이션이 있으면 API 결과 사용
+            if ((censorState.expandPixels > 0 || censorState.feather > 0) && censorState.editBoxes.length > 0) {
+                if (overlayOnly && !isEditing) {
+                    // 오버레이만 갱신: 캐시된 이미지가 있으면 그대로 사용
+                    if (drawCachedApiPreview()) {
+                        drawProcessingOverlay();
+                        return;
+                    }
+                }
+                // 원본 + Canvas 오버레이 그린 후 API 호출 (편집 중 아닐 때만)
+                censorPreviewCtx.drawImage(img, 0, 0, displayW, displayH);
+                drawAfterTabOverlay(img, displayW, displayH);
+                if (!isEditing) {
+                    requestCensorPreviewUpdate();
+                }
+            } else {
+                // 확장/그라데이션 없음: 기존 방식
+                censorPreviewCtx.drawImage(img, 0, 0, displayW, displayH);
+                drawAfterTabOverlay(img, displayW, displayH);
+            }
         }
         
         // 검열후 탭 편집 변경 표시
@@ -13575,7 +14122,7 @@
                 return;
             }
             
-            const method = document.getElementById('censorAfterMethod').value;
+            const method = document.getElementById('censorMethod').value;
             const boxes = censorState.editBoxes.map(d => ({
                 box: d.box,
                 method: d.method || method,
@@ -13596,7 +14143,9 @@
                         method: method,
                         output_folder: outputFolder,
                         filename: censorState.currentImage.filename,
-                        source: 'censored'
+                        source: 'censored',
+                        expand_pixels: censorState.expandPixels || 0,
+                        feather: censorState.feather || 0
                     })
                 });
                 
@@ -13742,7 +14291,14 @@
             }
             censorState.currentImage = null;
             censorState.detections = [];
-            document.getElementById('censorPreviewEmpty').style.display = 'flex';
+            // 검열전 탭: 드롭존 표시, 검열중/후 탭: empty 표시
+            if (censorState.currentTab === 'before') {
+                document.getElementById('censorDropzone').style.display = 'block';
+                document.getElementById('censorPreviewEmpty').style.display = 'none';
+            } else {
+                document.getElementById('censorDropzone').style.display = 'none';
+                document.getElementById('censorPreviewEmpty').style.display = 'flex';
+            }
         }
         
         // 전체 검열 실행 → 검열중 탭으로 전환
@@ -13866,7 +14422,7 @@
 
             // 검열중 탭 표시 및 전환
             document.getElementById('censorTabProcessing').style.display = 'inline-block';
-            document.getElementById('censorProcMethod').value = method;
+            document.getElementById('censorMethod').value = method;
 
             // 이전 탭의 상태 초기화 (editBoxes 덮어쓰기 방지)
             censorState.currentImage = null;
@@ -13879,7 +14435,16 @@
         async function selectProcessingImage(index) {
             const imageKeys = censorState.processingImages;
             if (index < 0 || index >= imageKeys.length) return;
-            
+
+            // API 프리뷰 캐시 무효화 및 진행 중인 요청 취소
+            cachedApiPreviewImage = null;
+            cachedApiPreviewKey = null;
+            censorPreviewRequestId++;  // 진행 중인 API 요청 무효화
+            if (censorPreviewDebounceTimer) {
+                clearTimeout(censorPreviewDebounceTimer);
+                censorPreviewDebounceTimer = null;
+            }
+
             // 현재 이미지의 editBoxes를 저장 (이미 검열중 탭에 있을 때만)
             const currentKey = censorState.currentImage?.id || censorState.currentImage?.path;
             if (censorState.currentTab === 'processing' && 
@@ -14002,7 +14567,7 @@
                 }));
             }
             
-            const method = document.getElementById('censorProcMethod')?.value || censorState.processingMethod;
+            const method = document.getElementById('censorMethod')?.value || censorState.processingMethod;
             // 검열후 탭에서 선택된 폴더 사용 (없으면 루트)
             const outputFolder = censorState.currentCensoredFolder || '';
             let savedCount = 0;
@@ -14065,7 +14630,9 @@
                         boxes: boxes,
                         method: method,
                         output_folder: outputFolder,  // 검열후 탭에서 선택된 폴더
-                        filename: imgInfo?.filename  // 원본 파일명 유지
+                        filename: imgInfo?.filename,  // 원본 파일명 유지
+                        expand_pixels: censorState.expandPixels || 0,
+                        feather: censorState.feather || 0
                     };
                     
                     // 드롭된 이미지면 image_base64 사용, 아니면 path 사용
@@ -14229,18 +14796,43 @@
             document.getElementById('censorTabProcessing').classList.toggle('active', tab === 'processing');
             document.getElementById('censorTabAfter').classList.toggle('active', tab === 'after');
 
-            // 하단 옵션 패널 표시
+            // 하단 옵션 패널 표시 (기존 호환용 - 숨김 처리됨)
             document.getElementById('censorOptionsBefore').style.display = tab === 'before' ? 'flex' : 'none';
             document.getElementById('censorOptionsProcessing').style.display = tab === 'processing' ? 'flex' : 'none';
             document.getElementById('censorOptionsAfter').style.display = tab === 'after' ? 'flex' : 'none';
 
+            // 우측 패널 섹션 표시/숨김
+            const sideModel = document.getElementById('censorSideModel');
+            const sideTargets = document.getElementById('censorSideTargets');
+            const sideTools = document.getElementById('censorSideTools');
+            const sideToolsAfter = document.getElementById('censorSideToolsAfter');
+            const sideShortcuts = document.getElementById('censorSideShortcuts');
+            const runAllBtn = document.getElementById('censorRunAllBtn');
+            const completeBtn = document.getElementById('censorCompleteBtn');
+            const cancelBtn = document.getElementById('censorCancelBtn');
+            const afterSaveBtn = document.getElementById('censorAfterSaveBtn');
+
+            // 검열전: 모델/감지대상 표시, 도구/단축키 숨김
+            // 검열중/후: 모델/감지대상 숨김, 도구/단축키 표시
+            if (sideModel) sideModel.style.display = tab === 'before' ? 'block' : 'none';
+            if (sideTargets) sideTargets.style.display = tab === 'before' ? 'block' : 'none';
+            if (sideTools) sideTools.style.display = tab === 'processing' ? 'block' : 'none';
+            if (sideToolsAfter) sideToolsAfter.style.display = tab === 'after' ? 'block' : 'none';
+            if (sideShortcuts) sideShortcuts.style.display = (tab === 'processing' || tab === 'after') ? 'block' : 'none';
+
+            // 액션 버튼 표시/숨김
+            if (runAllBtn) runAllBtn.style.display = tab === 'before' ? 'block' : 'none';
+            if (completeBtn) completeBtn.style.display = tab === 'processing' ? 'block' : 'none';
+            if (cancelBtn) cancelBtn.style.display = tab === 'processing' ? 'block' : 'none';
+            if (afterSaveBtn) afterSaveBtn.style.display = tab === 'after' ? 'block' : 'none';
+
             // 프리뷰 영역 배경 구분 (검열중 탭만 다른 배경)
             document.querySelector('.censor-preview-area')?.classList.toggle('processing', tab === 'processing');
 
-            // 검열전 탭 안내 문구: 검열전 탭에서만 표시
+            // 검열전 탭 안내 문구: 검열전 탭이고 이미지가 1개 이상 있을 때만 표시
             const previewHint = document.getElementById('censorPreviewHint');
             if (previewHint) {
-                previewHint.style.display = tab === 'before' ? 'block' : 'none';
+                previewHint.style.display = (tab === 'before' && censorState.images.length > 0) ? 'block' : 'none';
             }
 
             // 네비게이션 화살표 및 카운터 항상 표시
@@ -14265,20 +14857,27 @@
             if (censorOverlayCtx) {
                 censorOverlayCtx.clearRect(0, 0, censorOverlayCanvas.width, censorOverlayCanvas.height);
             }
-            // 빈 상태 표시 (탭에 따라 메시지 변경)
+            // 빈 상태 표시 (탭에 따라 드롭존 또는 empty 메시지)
+            const dropzone = document.getElementById('censorDropzone');
             const emptyEl = document.getElementById('censorPreviewEmpty');
-            emptyEl.style.display = 'flex';
             const emptyIcon = emptyEl.querySelector('.icon');
             const emptyText = emptyEl.querySelector('p');
+
             if (tab === 'before') {
-                emptyIcon.textContent = '📁';
-                emptyText.textContent = '이미지를 드롭하여 시작하세요';
-            } else if (tab === 'after') {
-                emptyIcon.textContent = '📭';
-                emptyText.textContent = '검열된 이미지가 없습니다';
+                // 검열전 탭: 드롭존 표시, empty 숨김
+                dropzone.style.display = 'block';
+                emptyEl.style.display = 'none';
             } else {
-                emptyIcon.textContent = '⏳';
-                emptyText.textContent = '검열 중인 이미지가 없습니다';
+                // 검열중/후 탭: 드롭존 숨김, empty 표시
+                dropzone.style.display = 'none';
+                emptyEl.style.display = 'flex';
+                if (tab === 'after') {
+                    emptyIcon.textContent = '📭';
+                    emptyText.textContent = '검열된 이미지가 없습니다';
+                } else {
+                    emptyIcon.textContent = '⏳';
+                    emptyText.textContent = '검열 중인 이미지가 없습니다';
+                }
             }
 
             // 이전 탭의 detections/editBoxes 상태 초기화
@@ -14292,11 +14891,7 @@
             // 드롭존/썸네일 UI 업데이트 (검열 전 탭용)
             updateCensorDropzoneUI();
             
-            // 검열 후 탭 폴더 드롭다운 표시/숨김
-            document.getElementById('censorFolderAfter').style.display = tab === 'after' ? 'flex' : 'none';
-            
-            // 폴더 열기 버튼: 검열 전 탭에서는 숨김 (드롭 모드이므로 불필요)
-            document.getElementById('censorOpenFolderBtn').style.display = tab === 'before' ? 'none' : 'inline-flex';
+            // 폴더 드롭다운은 항상 표시 (저장 위치 선택용)
             
             // 검열중 탭이면 processingImages 기반 썸네일 렌더링
             if (tab === 'processing') {
@@ -14350,10 +14945,11 @@
                 // 검열 전 탭: 드롭 모드 (서버 로드 안 함)
                 const currentImages = censorState.images;
                 updateCensorDropzoneUI();
-                
+
+                // 항상 썸네일 렌더링 (이전 탭 썸네일 제거 위해)
+                renderCensorThumbnails(currentImages);
+
                 if (currentImages.length > 0) {
-                    // 기존 이미지로 썸네일만 렌더링
-                    renderCensorThumbnails(currentImages);
                     // 저장된 인덱스의 이미지 선택
                     const validIndex = Math.min(censorState.currentIndex, currentImages.length - 1);
                     if (validIndex >= 0) {
@@ -14432,12 +15028,38 @@
                 }
                 saveCensorSettings();
             };
-            
-            // 검열 방식 변경
-            document.getElementById('censorMethod').onchange = function() {
+            // 확장 픽셀 슬라이더
+            const expandSlider = document.getElementById('censorExpandPixels');
+            expandSlider.oninput = function() {
+                censorState.expandPixels = parseInt(this.value);
+                document.getElementById('censorExpandValue').textContent = this.value;
+                // 검열전 탭: 박스 시각화 갱신
+                if (censorState.currentTab === 'before') {
+                    drawDetectionBoxes();
+                }
+                // 검열중/후 탭: 프리뷰 갱신 요청 (디바운스)
+                else if (censorState.currentTab === 'processing' || censorState.currentTab === 'after') {
+                    requestCensorPreviewUpdate();
+                }
                 saveCensorSettings();
             };
-            
+
+            // 부드럽게 슬라이더
+            const featherSlider = document.getElementById('censorFeather');
+            featherSlider.oninput = function() {
+                censorState.feather = parseInt(this.value);
+                document.getElementById('censorFeatherValue').textContent = this.value;
+                // 검열전 탭: 박스 시각화 갱신
+                if (censorState.currentTab === 'before') {
+                    drawDetectionBoxes();
+                }
+                // 검열중/후 탭: 프리뷰 갱신 요청 (디바운스)
+                else if (censorState.currentTab === 'processing' || censorState.currentTab === 'after') {
+                    requestCensorPreviewUpdate();
+                }
+                saveCensorSettings();
+            };
+
             // 검열 후 탭 폴더 드롭다운 버튼 클릭 이벤트 (검열 전 폴더 드롭다운은 제거됨)
             const censoredFolderBtn = document.getElementById('censorCensoredFolderBtn');
             if (censoredFolderBtn) {
@@ -14666,6 +15288,9 @@
                             markAfterEditDirty();
                         }
 
+                        // 박스가 삭제되었으므로 캐시 무효화
+                        cachedApiPreviewImage = null;
+                        cachedApiPreviewKey = null;
                         redrawCurrentTab();
                         break;
                     }
@@ -14679,19 +15304,39 @@
             document.getElementById('censorCompleteBtn').onclick = completeCensoring;
             document.getElementById('censorCancelBtn').onclick = cancelCensoring;
             
-            // 검열중 탭 방식 변경 시 재렌더링
-            document.getElementById('censorProcMethod').onchange = function() {
+            // 검열 방식 변경 시 재렌더링 (모든 탭 공통)
+            document.getElementById('censorMethod').onchange = function() {
                 censorState.processingMethod = this.value;
-                // 현재 이미지의 모든 박스 방식 변경
-                censorState.editBoxes.forEach(box => {
-                    box.method = this.value;
-                });
-                if (censorState.currentImage && censorState.processingResults[censorState.currentImage.path]) {
-                    censorState.processingResults[censorState.currentImage.path].editBoxes = censorState.editBoxes.map(b => ({...b, box: [...b.box]}));
+                const newMethod = this.value;
+
+                if (censorState.currentTab === 'processing') {
+                    // 검열중 탭: 모든 이미지의 박스 방식 변경
+                    censorState.editBoxes.forEach(box => {
+                        box.method = newMethod;
+                    });
+                    // processingResults의 모든 이미지에도 적용
+                    for (const key of Object.keys(censorState.processingResults)) {
+                        const result = censorState.processingResults[key];
+                        if (result.editBoxes) {
+                            result.editBoxes.forEach(box => {
+                                box.method = newMethod;
+                            });
+                        }
+                    }
+                    redrawCurrentTab();
+                } else if (censorState.currentTab === 'after') {
+                    // 검열후 탭: 현재 이미지만 변경
+                    censorState.editBoxes.forEach(box => {
+                        box.method = newMethod;
+                    });
+                    redrawCurrentTab();
+                } else if (censorState.currentTab === 'before') {
+                    // 검열전 탭: 프리뷰 박스 색상만 변경
+                    drawEditBoxes();
                 }
-                redrawProcessingPreview();
+                saveCensorSettings();
             };
-            
+
             // 검열중 탭 도구 버튼
             const procToolBtns = ['procToolSelect', 'procToolAdd', 'procToolDelete'];
             procToolBtns.forEach(id => {
@@ -14742,14 +15387,7 @@
             
             // 검열후 탭 저장 버튼
             document.getElementById('censorAfterSaveBtn').onclick = saveAfterEdit;
-            
-            // 검열후 탭 검열 방식 변경 시 재렌더링
-            document.getElementById('censorAfterMethod').onchange = function() {
-                if (censorState.currentTab === 'after' && censorState.editBoxes.length > 0) {
-                    redrawAfterPreview();
-                }
-            };
-            
+
             // 캔버스 마우스 이벤트
             setupCensorCanvasEvents();
             
@@ -15813,7 +16451,7 @@
                             censorState.selectedBoxIndex = -1;
                         }
                     }
-                    redrawCurrentTab();
+                    redrawCurrentTab(true);  // 선택 변경만: 오버레이만 갱신
                     break;
                     
                 case 'add':
@@ -15882,6 +16520,9 @@
                         if (censorState.currentTab === 'after') {
                             markAfterEditDirty();
                         }
+                        // 박스가 삭제되었으므로 캐시 무효화
+                        cachedApiPreviewImage = null;
+                        cachedApiPreviewKey = null;
                         redrawCurrentTab();
                     }
                     break;
@@ -15912,20 +16553,20 @@
                 const hoverIndex = hitTestBox(coords.imageX, coords.imageY);
                 if (hoverIndex !== censorState.hoverBoxIndex) {
                     censorState.hoverBoxIndex = hoverIndex;
-                    redrawCurrentTab();
+                    redrawCurrentTab(true);  // 호버 변경: 오버레이만 갱신
                 }
                 censorOverlayCanvas.style.cursor = hoverIndex >= 0 ? 'pointer' : 'default';
             }
             // 선택/추가 모드에서 호버 시 핸들 표시
-            else if ((censorState.currentTool === 'select' || censorState.currentTool === 'add') && 
+            else if ((censorState.currentTool === 'select' || censorState.currentTool === 'add') &&
                      !censorState.isDragging && !censorState.isResizing && !censorState.isRotating && !censorState.isDrawing) {
                 // 호버 중인 박스 또는 핸들 체크
                 const handleResult = hitTestResizeHandle(coords.imageX, coords.imageY);
                 const hoverIndex = handleResult.boxIndex >= 0 ? handleResult.boxIndex : hitTestBox(coords.imageX, coords.imageY);
-                
+
                 if (hoverIndex !== censorState.hoverBoxIndex) {
                     censorState.hoverBoxIndex = hoverIndex;
-                    redrawCurrentTab();
+                    redrawCurrentTab(true);  // 호버 변경: 오버레이만 갱신
                 }
                 
                 // 커서 업데이트
@@ -16117,7 +16758,11 @@
                 const y1 = Math.min(censorState.newBoxStart.y, coords.imageY);
                 const x2 = Math.max(censorState.newBoxStart.x, coords.imageX);
                 const y2 = Math.max(censorState.newBoxStart.y, coords.imageY);
-                
+
+                // 상태 먼저 초기화 (redrawCurrentTab 호출 전에 isDrawing=false 필요)
+                censorState.isDrawing = false;
+                censorState.newBoxStart = null;
+
                 // 최소 크기 체크 (10x10 픽셀)
                 if (x2 - x1 > 10 && y2 - y1 > 10) {
                     const method = document.getElementById(getCurrentMethodSelector())?.value || 'black';
@@ -16131,11 +16776,16 @@
                     if (censorState.currentTab === 'after') {
                         markAfterEditDirty();
                     }
+                    // 박스가 추가되었으므로 캐시 무효화
+                    cachedApiPreviewImage = null;
+                    cachedApiPreviewKey = null;
+                    redrawCurrentTab();  // 박스 추가됨: 전체 갱신
+                } else {
+                    redrawCurrentTab(true);  // 박스 미추가(클릭만): 오버레이만 갱신
                 }
-                redrawCurrentTab();
             }
             
-            // 드래그/리사이즈/회전 완료 시 결과 저장
+            // 드래그/리사이즈/회전 완료 시 결과 저장 및 API 프리뷰 업데이트
             if (censorState.isDragging || censorState.isResizing || censorState.isRotating) {
                 if (censorState.currentTab === 'processing') {
                     if (censorState.currentImage && censorState.processingResults[censorState.currentImage.path]) {
@@ -16156,9 +16806,14 @@
                     // 검열후 탭에서 편집 시 dirty 표시
                     markAfterEditDirty();
                 }
+
+                // 박스가 변경되었으므로 캐시 무효화 및 API 프리뷰 업데이트
+                cachedApiPreviewImage = null;
+                cachedApiPreviewKey = null;
             }
-            
-            // 상태 초기화
+
+            // 상태 초기화 (API 호출 전에 해야 isEditing이 false가 됨)
+            const wasEditing = censorState.isDragging || censorState.isResizing || censorState.isRotating;
             censorState.isDragging = false;
             censorState.isResizing = false;
             censorState.isRotating = false;
@@ -16167,6 +16822,11 @@
             censorState.resizeHandle = null;
             censorState.rotateCenter = null;
             censorState.resizeAnchor = null;
+
+            // 편집 완료 후 API 프리뷰 업데이트 (확장/그라데이션이 있을 때만)
+            if (wasEditing && (censorState.expandPixels > 0 || censorState.feather > 0) && censorState.editBoxes.length > 0) {
+                requestCensorPreviewUpdate();
+            }
         }
         
         // 편집 박스 그리기 (선택 상태, 핸들 포함)
@@ -16214,8 +16874,61 @@
                     strokeColor = 'rgba(128, 128, 128, 0.4)';
                     fillColor = 'rgba(128, 128, 128, 0.5)';
                 }
-                
-                // 박스 그리기
+
+                // 검열전 탭: 확장/그라데이션 영역 시각화 (개념도)
+                const isBeforeTab = censorState.currentTab === 'before';
+                const expandPx = censorState.expandPixels || 0;
+                const featherPx = censorState.feather || 0;
+
+                if (isBeforeTab && passesThreshold && (expandPx > 0 || featherPx > 0)) {
+                    const expandScaled = expandPx * scale;
+                    const featherScaled = featherPx * scale;
+
+                    // 그라데이션 영역 (가장 바깥, 연한 색)
+                    if (featherPx > 0) {
+                        const totalExpand = expandScaled + featherScaled;
+                        censorOverlayCtx.fillStyle = 'rgba(255, 100, 100, 0.15)';
+                        censorOverlayCtx.fillRect(
+                            sx1 - totalExpand,
+                            sy1 - totalExpand,
+                            sw + totalExpand * 2,
+                            sh + totalExpand * 2
+                        );
+                        // 그라데이션 경계선 (점선)
+                        censorOverlayCtx.strokeStyle = 'rgba(255, 100, 100, 0.4)';
+                        censorOverlayCtx.lineWidth = 1;
+                        censorOverlayCtx.setLineDash([3, 3]);
+                        censorOverlayCtx.strokeRect(
+                            sx1 - totalExpand,
+                            sy1 - totalExpand,
+                            sw + totalExpand * 2,
+                            sh + totalExpand * 2
+                        );
+                    }
+
+                    // 확장 영역 (중간, 더 진한 색)
+                    if (expandPx > 0) {
+                        censorOverlayCtx.fillStyle = 'rgba(255, 50, 50, 0.25)';
+                        censorOverlayCtx.fillRect(
+                            sx1 - expandScaled,
+                            sy1 - expandScaled,
+                            sw + expandScaled * 2,
+                            sh + expandScaled * 2
+                        );
+                        // 확장 경계선 (점선)
+                        censorOverlayCtx.strokeStyle = 'rgba(255, 50, 50, 0.6)';
+                        censorOverlayCtx.lineWidth = 1;
+                        censorOverlayCtx.setLineDash([4, 4]);
+                        censorOverlayCtx.strokeRect(
+                            sx1 - expandScaled,
+                            sy1 - expandScaled,
+                            sw + expandScaled * 2,
+                            sh + expandScaled * 2
+                        );
+                    }
+                }
+
+                // 박스 그리기 (원본 감지 영역)
                 censorOverlayCtx.strokeStyle = strokeColor;
                 censorOverlayCtx.lineWidth = isSelected ? 3 : 2;
                 censorOverlayCtx.setLineDash(isSelected ? [] : (passesThreshold ? [5, 5] : [3, 6]));

@@ -13606,8 +13606,52 @@
                     censorState.afterEditDirty = false;
                     censorState.editBoxes = [];
                     document.getElementById('censorAfterSaveBtn').disabled = true;
-                    // 현재 이미지 새로고침
-                    selectCensorImage(censorState.currentIndex);
+                    
+                    // 현재 인덱스 저장
+                    const currentIndex = censorState.currentIndex;
+                    
+                    // 1. 모든 관련 캐시 삭제
+                    const cacheKey = `censored:${imagePath}`;
+                    censorState.imgCache.delete(cacheKey);
+
+                    
+                    // 2. 서버에서 새 썸네일 가져오기
+                    const folder = censorState.currentCensoredFolder;
+                    const endpoint = `/api/censor/censored?folder=${encodeURIComponent(folder)}`;
+                    const listResponse = await fetch(`${API_BASE}${endpoint}`);
+                    const listResult = await listResponse.json();
+                    
+                    if (listResult.success) {
+                        // 파일명 순 정렬
+                        const images = (listResult.images || []).sort((a, b) =>
+                            a.filename.localeCompare(b.filename, undefined, { numeric: true, sensitivity: 'base' })
+                        );
+                        censorState.censoredImages = images;
+
+                        
+                        // 3. 썸네일 다시 렌더링
+                        renderCensorThumbnails(images);
+                        
+                        // 4. 프리뷰 이미지 강제 새로고침
+                        const imgInfo = images[currentIndex];
+                        if (imgInfo) {
+                            const img = await loadCensorImageFile('censored', imgInfo.path);
+
+                            
+                            // 캐시에 새 이미지 저장
+                            censorCacheSet(cacheKey, {
+                                img,
+                                width: img.naturalWidth,
+                                height: img.naturalHeight,
+                                filename: imgInfo.filename
+                            });
+                            
+                            // 캔버스에 그리기
+                            censorState.originalImageObj = img;
+                            censorState.currentImage = imgInfo;
+                            drawCensorPreview(img);
+                        }
+                    }
                 } else {
                     showToast('저장 실패: ' + result.error, 'error');
                 }

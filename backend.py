@@ -288,22 +288,114 @@ def binarize_mask(base64_mask: str, threshold: int = 1) -> str:
 # Windows Explorer 폴더 열기 (포커스 포함)
 # ============================================================
 
+def _force_foreground_window(hwnd) -> bool:
+    """Windows 제한을 우회하여 창을 강제로 foreground로 가져오기"""
+    try:
+        import win32gui
+        import win32process
+        import win32con
+        import ctypes
+        
+        # 최소화 상태면 복원
+        if win32gui.IsIconic(hwnd):
+            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+        
+        # 이미 foreground면 완료
+        if win32gui.GetForegroundWindow() == hwnd:
+            return True
+        
+        # 현재 foreground 창의 스레드와 대상 창의 스레드 ID 획득
+        foreground_hwnd = win32gui.GetForegroundWindow()
+        foreground_thread = win32process.GetWindowThreadProcessId(foreground_hwnd)[0]
+        target_thread = win32process.GetWindowThreadProcessId(hwnd)[0]
+        
+        # 스레드가 다르면 AttachThreadInput으로 권한 우회
+        if foreground_thread != target_thread:
+            ctypes.windll.user32.AttachThreadInput(target_thread, foreground_thread, True)
+            win32gui.BringWindowToTop(hwnd)
+            win32gui.SetForegroundWindow(hwnd)
+            ctypes.windll.user32.AttachThreadInput(target_thread, foreground_thread, False)
+        else:
+            win32gui.BringWindowToTop(hwnd)
+            win32gui.SetForegroundWindow(hwnd)
+        
+        return True
+    except Exception as e:
+        print(f"[ForceForeground] Error: {e}")
+        return False
+
+
 def open_folder_in_explorer(path: str) -> bool:
-    """Windows에서 폴더를 포그라운드로 열기"""
+    """폴더를 파일 탐색기로 열기 (크로스 플랫폼)
+    
+    Windows:
+    - 이미 열린 폴더면 기존 창을 foreground로 활성화
+    - 새 폴더면 열고 foreground로 가져옴
+    """
+    import platform
     import subprocess
     
     try:
-        folder_path = Path(path)
-        items = list(folder_path.iterdir())
+        path = os.path.normpath(path)
+        system = platform.system()
         
-        if items:
-            # 폴더에 항목이 있으면 첫 번째 항목을 선택하며 열기
-            # explorer /select, 는 창을 포그라운드로 가져옴
-            first_item = str(items[0])
-            subprocess.Popen(["explorer", "/select,", first_item])
+        if system == "Windows":
+            try:
+                import win32com.client
+                import urllib.parse
+                
+                # Shell.Application으로 열린 탐색기 창 검색
+                shell = win32com.client.Dispatch("Shell.Application")
+                windows = shell.Windows()
+                
+                # 이미 열린 폴더인지 확인
+                for window in windows:
+                    try:
+                        # LocationURL에서 경로 추출 (file:///C:/path 형식)
+                        location = str(window.LocationURL)
+                        if location.startswith("file:///"):
+                            window_path = location[8:].replace("/", "\\")  # file:/// 제거
+                            window_path = urllib.parse.unquote(window_path)
+                            
+                            if os.path.normcase(window_path) == os.path.normcase(path):
+                                # 이미 열려있음 - 해당 창을 foreground로
+                                _force_foreground_window(window.HWND)
+                                return True
+                    except:
+                        continue
+                
+                # 열려있지 않음 - 새로 열기
+                os.startfile(path)
+                
+                # 새로 열린 창을 foreground로 가져오기 (약간의 딜레이 필요)
+                import time
+                time.sleep(0.3)
+                
+                # 다시 창 목록에서 찾아서 foreground로
+                windows = shell.Windows()
+                for window in windows:
+                    try:
+                        location = str(window.LocationURL)
+                        if location.startswith("file:///"):
+                            window_path = location[8:].replace("/", "\\")
+                            window_path = urllib.parse.unquote(window_path)
+                            if os.path.normcase(window_path) == os.path.normcase(path):
+                                _force_foreground_window(window.HWND)
+                                break
+                    except:
+                        continue
+                
+                return True
+                
+            except ImportError:
+                # pywin32 없으면 기본 방식
+                os.startfile(path)
+                return True
+                
+        elif system == "Darwin":
+            subprocess.Popen(["open", path])
         else:
-            # 빈 폴더면 직접 열기
-            subprocess.Popen(["explorer", path])
+            subprocess.Popen(["xdg-open", path])
         return True
     except Exception as e:
         print(f"[OpenFolder] Error: {e}")
@@ -2411,25 +2503,16 @@ async def rename_gallery_image(filename: str, request: Request):
 @app.post("/api/gallery/open-folder")
 async def open_gallery_folder(request: dict = None):
     """갤러리 폴더 열기"""
-    import subprocess
-    import platform
-
     try:
         # 서브폴더 지정 시 해당 폴더 열기
         subfolder = request.get("folder", "") if request else ""
         target_folder = get_gallery_folder_path(subfolder)
         folder_path = str(target_folder.absolute())
-        system = platform.system()
 
-        if system == "Windows":
-            if not open_folder_in_explorer(folder_path):
-                os.startfile(folder_path)
-        elif system == "Darwin":  # macOS
-            subprocess.Popen(["open", folder_path])
-        else:  # Linux
-            subprocess.Popen(["xdg-open", folder_path])
-
-        return {"success": True}
+        if open_folder_in_explorer(folder_path):
+            return {"success": True}
+        else:
+            return {"success": False, "error": "Failed to open folder"}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -2607,9 +2690,6 @@ async def get_config():
 @app.post("/api/open-folder")
 async def open_folder(request: dict):
     """폴더를 파일 탐색기로 열기 (Windows/macOS/Linux)"""
-    import subprocess
-    import platform
-
     folder_type = request.get("folder", "")
     subfolder = request.get("subfolder", "")  # outputs 서브폴더 지원
 
@@ -2634,19 +2714,11 @@ async def open_folder(request: dict):
     folder_path.mkdir(parents=True, exist_ok=True)
 
     try:
-        system = platform.system()
         abs_path = str(folder_path.resolve())
-
-        if system == "Windows":
-            # SHOpenFolderAndSelectItems API 사용 (Electron/VS Code 방식)
-            if not open_folder_in_explorer(abs_path):
-                # 실패 시 fallback
-                os.startfile(abs_path)
-        elif system == "Darwin":
-            subprocess.Popen(["open", abs_path])
+        if open_folder_in_explorer(abs_path):
+            return {"success": True, "path": abs_path}
         else:
-            subprocess.Popen(["xdg-open", abs_path])
-        return {"success": True, "path": abs_path}
+            return {"error": "Failed to open folder"}
     except Exception as e:
         print(f"[OpenFolder] Error: {e}")
         return {"error": str(e)}
@@ -4761,5 +4833,14 @@ if __name__ == "__main__":
             print("[Preload] YOLO model ready")
         except Exception as e:
             print(f"[Preload] YOLO model failed: {e}")
+
+    # Windows: 폴더 열기 foreground 권한 획득을 위한 더미 호출
+    import platform
+    if platform.system() == "Windows":
+        try:
+            import win32com.client
+            win32com.client.Dispatch("Shell.Application")
+        except:
+            pass
 
     uvicorn.run(app, host="127.0.0.1", port=8765, log_level="warning")

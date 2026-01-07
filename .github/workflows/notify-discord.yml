@@ -31,11 +31,16 @@ jobs:
           echo "$RELEASE" | jq -r '.body // ""' >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+      - name: Write Body to File
+        run: |
+          cat > /tmp/release_body.txt << 'EOF'
+          ${{ steps.release.outputs.body }}
+          EOF
+
       - name: Send to Discord
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           TAG_NAME: ${{ steps.release.outputs.tag }}
-          RELEASE_BODY: ${{ steps.release.outputs.body }}
           PLATFORMS: ${{ inputs.platforms }}
         run: |
           WIN_URL="https://github.com/${{ github.repository }}/releases/download/${TAG_NAME}/PeroPix-Windows.zip"
@@ -49,6 +54,8 @@ jobs:
           else
             DOWNLOADS="📥 [Windows](${WIN_URL}) | [macOS](${MAC_URL})"
           fi
+          
+          RELEASE_BODY=$(cat /tmp/release_body.txt)
           
           jq -n \
             --arg tag "$TAG_NAME" \

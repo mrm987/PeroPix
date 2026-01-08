@@ -3532,7 +3532,7 @@ def _get_site_packages_dir():
     if platform.system() == "Windows":
         return PYTHON_ENV_DIR / "Lib" / "site-packages"
     else:
-        return PYTHON_ENV_DIR / "python" / "lib" / "python3.11" / "site-packages"
+        return PYTHON_ENV_DIR / "python" / "lib" / f"python{PYTHON_VERSION[:4]}" / "site-packages"
 
 # 설치 상태 파일 (영구 저장 - 매번 파일시스템 체크 방지)
 INSTALL_STATUS_FILE = PYTHON_ENV_DIR / "install_status.json"
@@ -4035,9 +4035,10 @@ def _install_local_environment_sync():
         )
         if ret != 0:
             raise Exception(f"diffusers installation failed with code {ret}")
-        
+
         # ultralytics가 없으면 설치 (80% -> 90%)
-        if not status.get("censor"):
+        current_status = get_install_status()
+        if not current_status.get("censor"):
             install_status["message"] = "Installing ultralytics..."
             install_status["progress"] = 80
             
@@ -4151,7 +4152,7 @@ async def uninstall_local():
     packages_to_remove = [
         "torch", "torchvision", "torchaudio",
         "diffusers", "transformers", "accelerate",
-        "safetensors", "peft", "huggingface_hub",
+        "safetensors", "peft", "huggingface_hub", "spandrel",
         "nvidia_cublas", "nvidia_cuda", "nvidia_cudnn", "nvidia_cufft",
         "nvidia_curand", "nvidia_cusolver", "nvidia_cusparse", "nvidia_nccl", "nvidia_nvtx",
         "triton"
@@ -4162,7 +4163,7 @@ async def uninstall_local():
         site_packages = PYTHON_ENV_DIR / "Lib" / "site-packages"
     else:
         # macOS/Linux
-        site_packages = PYTHON_ENV_DIR / "lib" / "python3.11" / "site-packages"
+        site_packages = PYTHON_ENV_DIR / "lib" / f"python{PYTHON_VERSION[:4]}" / "site-packages"
 
     if not site_packages.exists():
         return {"status": "uninstalled", "message": "이미 제거되었거나 설치된 적 없음"}

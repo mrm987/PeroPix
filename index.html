@@ -7675,6 +7675,12 @@
 
                 if (res.ok && data.success) {
                     showToast('설정 저장됨', 'success');
+                    // NAI 토큰이 입력되었으면 상태 및 Anlas 업데이트
+                    const tokenValue = document.getElementById('naiToken').value;
+                    if (tokenValue) {
+                        updateNaiStatus(true);
+                        fetchAnlasBalance();
+                    }
                     closeSettings();
                 } else {
                     showToast(data.error || '저장 실패', 'error');

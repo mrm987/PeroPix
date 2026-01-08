@@ -14,6 +14,8 @@ import datetime
 import math
 import random
 import ctypes
+import logging
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Optional, List
 from contextlib import asynccontextmanager
@@ -42,6 +44,67 @@ CENSOR_MODELS_DIR = MODELS_DIR / "censor"  # 검열 모델 (YOLO)
 CENSORING_DIR = APP_DIR / "censoring"  # 검열 작업 폴더 (레거시, 더 이상 사용 안함)
 UNCENSORED_DIR = CENSORING_DIR / "uncensored"  # 검열 전 이미지 (레거시, 더 이상 사용 안함)
 CENSORED_DIR = OUTPUT_DIR / "censored"  # 검열 후 이미지 (새 경로: outputs/censored)
+LOGS_DIR = APP_DIR / "logs"
+VERSION_FILE = APP_DIR / "version.json"
+
+# 로그 디렉토리 생성
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
+
+# 버전 정보 로드
+def load_version():
+    """version.json에서 버전 정보 로드"""
+    if VERSION_FILE.exists():
+        try:
+            return json.loads(VERSION_FILE.read_text(encoding='utf-8'))
+        except Exception:
+            pass
+    return {"version": "1.0.0", "build_date": "unknown"}
+
+APP_VERSION = load_version()
+
+# 로깅 설정
+def setup_logging():
+    """파일 및 콘솔 로깅 설정"""
+    log_file = LOGS_DIR / f"peropix_{datetime.datetime.now().strftime('%Y%m%d')}.log"
+
+    # 로그 포맷
+    formatter = logging.Formatter(
+        '%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+
+    # 파일 핸들러 (5MB 제한, 최대 5개 파일 보관)
+    file_handler = RotatingFileHandler(
+        log_file,
+        maxBytes=5*1024*1024,
+        backupCount=5,
+        encoding='utf-8'
+    )
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+
+    # 콘솔 핸들러
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(formatter)
+
+    # 루트 로거 설정
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)
+    root_logger.addHandler(file_handler)
+    root_logger.addHandler(console_handler)
+
+    # 외부 라이브러리 로그 레벨 조정
+    logging.getLogger('httpx').setLevel(logging.WARNING)
+    logging.getLogger('httpcore').setLevel(logging.WARNING)
+    logging.getLogger('uvicorn').setLevel(logging.INFO)
+    logging.getLogger('uvicorn.access').setLevel(logging.WARNING)
+
+    return logging.getLogger('peropix')
+
+# 로거 초기화
+logger = setup_logging()
+logger.info(f"PeroPix v{APP_VERSION['version']} 시작")
 
 # 카테고리별 이미지 순번 - 매번 실제 폴더 스캔
 def get_next_image_number(category: str, save_dir: Path = None, ext: str = 'png') -> int:
@@ -2183,6 +2246,74 @@ def image_to_base64(img) -> str:
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/api/version")
+async def get_version():
+    """현재 앱 버전 정보 반환"""
+    return {
+        "version": APP_VERSION.get("version", "1.0.0"),
+        "build_date": APP_VERSION.get("build_date", "unknown")
+    }
+
+
+@app.get("/api/check-update")
+async def check_update():
+    """GitHub Releases에서 최신 버전 확인"""
+    import httpx
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                "https://api.github.com/repos/mrm987/PeroPix/releases/latest",
+                headers={"Accept": "application/vnd.github.v3+json"}
+            )
+
+            if response.status_code == 200:
+                release_data = response.json()
+                latest_version = release_data.get("tag_name", "").lstrip("v")
+                current_version = APP_VERSION.get("version", "1.0.0")
+
+                # 버전 비교 (semantic versioning)
+                def parse_version(v):
+                    try:
+                        parts = v.split(".")
+                        return tuple(int(p) for p in parts[:3])
+                    except:
+                        return (0, 0, 0)
+
+                current = parse_version(current_version)
+                latest = parse_version(latest_version)
+                has_update = latest > current
+
+                return {
+                    "has_update": has_update,
+                    "current_version": current_version,
+                    "latest_version": latest_version,
+                    "release_url": release_data.get("html_url", ""),
+                    "release_notes": release_data.get("body", ""),
+                    "published_at": release_data.get("published_at", "")
+                }
+            elif response.status_code == 404:
+                return {
+                    "has_update": False,
+                    "current_version": APP_VERSION.get("version", "1.0.0"),
+                    "error": "No releases found"
+                }
+            else:
+                logger.warning(f"GitHub API 응답 오류: {response.status_code}")
+                return {
+                    "has_update": False,
+                    "current_version": APP_VERSION.get("version", "1.0.0"),
+                    "error": f"GitHub API error: {response.status_code}"
+                }
+    except Exception as e:
+        logger.error(f"업데이트 확인 실패: {e}")
+        return {
+            "has_update": False,
+            "current_version": APP_VERSION.get("version", "1.0.0"),
+            "error": str(e)
+        }
 
 
 @app.post("/api/extract-metadata")

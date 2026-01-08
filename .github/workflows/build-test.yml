@@ -1,8 +1,12 @@
-name: Build and Release
+name: Build Test
+
 on:
-  release:
-    types: [created]
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Test version (e.g., 1.0.0)'
+        required: false
+        default: 'test'
 
 jobs:
   build-windows:
@@ -31,9 +35,9 @@ jobs:
       - name: Generate version.json
         shell: pwsh
         run: |
-          $version = "1.0.0"
-          if ("${{ github.event_name }}" -eq "release") {
-            $version = "${{ github.event.release.tag_name }}" -replace '^v', ''
+          $version = "${{ github.event.inputs.version }}"
+          if ($version -eq "" -or $version -eq "test") {
+            $version = "test-build"
           }
           $buildDate = Get-Date -Format "yyyy-MM-dd"
           $json = @{
@@ -68,20 +72,12 @@ jobs:
         shell: pwsh
         run: |
           Compress-Archive -Path "dist/PeroPix/*" -DestinationPath "PeroPix-Windows.zip"
-      - name: Upload Release Asset
-        if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: PeroPix-Windows.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload Build Artifact
-        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: PeroPix-Windows
+          name: PeroPix-Windows-Test
           path: PeroPix-Windows.zip
-          retention-days: 7
+          retention-days: 3
 
   build-macos:
     runs-on: macos-latest
@@ -103,10 +99,9 @@ jobs:
           dist/PeroPix/python/bin/python3 -m pip install -r requirements-core.txt
       - name: Generate version.json
         run: |
-          VERSION="1.0.0"
-          if [ "${{ github.event_name }}" = "release" ]; then
-            VERSION="${{ github.event.release.tag_name }}"
-            VERSION="${VERSION#v}"
+          VERSION="${{ github.event.inputs.version }}"
+          if [ -z "$VERSION" ] || [ "$VERSION" = "test" ]; then
+            VERSION="test-build"
           fi
           BUILD_DATE=$(date +%Y-%m-%d)
           cat > version.json << EOF
@@ -151,19 +146,9 @@ jobs:
         run: |
           cd dist
           zip -r ../PeroPix-macOS.zip PeroPix
-      - name: Upload Release Asset
-        if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: PeroPix-macOS.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload Build Artifact
-        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: PeroPix-macOS
+          name: PeroPix-macOS-Test
           path: PeroPix-macOS.zip
-          retention-days: 7
-
-
+          retention-days: 3

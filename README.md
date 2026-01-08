@@ -65,11 +65,22 @@ NovelAI 구독만 있으면 됩니다. (Windows 10/11 또는 macOS)
 
 로컬 생성을 원하면 NVIDIA GPU 12GB 이상이 권장됩니다.
 
+## 문제 해결
+
+### 로그 파일 위치
+앱 폴더 내 `logs/` 폴더에 저장됩니다.
+로그 파일명: `peropix_YYYYMMDD.log`
+
+### 앱이 시작되지 않을 때
+1. `logs/` 폴더에서 최근 로그 파일 확인
+2. `config.json` 삭제 후 재시작
+3. 포트 7860이 다른 프로그램에서 사용 중인지 확인
+
 ## 크레딧
 
 태그 자동완성: [Danbooru Tag Database](https://github.com/DraconicDragon/dbr-e621-lists-archive) (2026-01-01)
 
-자동 검열: YOLOv8 Nudenet Detector
+자동 검열: [Anime NSFW Detection (ntd11)](https://civitai.com/models/1313556/anime-nsfw-detectionadetailer-all-in-one)
 
 ---
 

@@ -7296,9 +7296,13 @@
             try {
                 const response = await fetch(`${API_BASE}/api/cancel-current`, { method: 'POST' });
                 const result = await response.json();
-                showToast(result.message, result.success ? 'warning' : 'error');
+                if (result.success) {
+                    showToast('현재 이미지 완료 후 취소됩니다', 'warning');
+                } else {
+                    showToast('진행 중인 작업이 없습니다', 'error');
+                }
             } catch (e) {
-                showToast(`Error: ${e.message}`, 'error');
+                showToast(`오류: ${e.message}`, 'error');
             }
         }
         
@@ -7474,7 +7478,16 @@
                 case 'job_cancelled':
                     console.log(`[WS] Job cancelled: ${data.job_id}`);
                     updateProgressFromServer(data.progress);
-                    showToast('작업 취소됨', 'warning');
+                    // 큐가 비었으면 상태 초기화
+                    if (!data.progress || data.progress.total === 0 || data.progress.queue_length === 0) {
+                        totalImages = 0;
+                        currentIndex = 0;
+                        updateProgress();
+                    }
+                    // 실제로 취소된 이미지가 있을 때만 토스트 표시
+                    if (data.cancelled_images > 0) {
+                        showToast(`작업 취소됨 (${data.cancelled_images}장 취소)`, 'warning');
+                    }
                     break;
 
                 case 'queue_cleared':

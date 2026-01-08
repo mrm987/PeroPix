@@ -713,18 +713,22 @@ class ModelCache:
     def load_lora(self, lora_name: str, scale: float = 1.0):
         if self.pipe is None:
             raise ValueError("Model not loaded")
-        
+
         if lora_name in self.loaded_loras:
             return
-        
+
         lora_dir = Path(CONFIG.get("lora_dir", LORA_DIR))
         lora_path = lora_dir / lora_name
-        
+
         if not lora_path.exists():
             raise ValueError(f"LoRA not found: {lora_path}")
-        
+
+        # adapter_name에 '.'이 포함되면 PEFT에서 모듈 경로 파싱 오류 발생
+        # 파일명에서 '.'을 '_'로 치환하여 안전한 adapter_name 생성
+        safe_adapter_name = lora_name.replace(".", "_")
+
         print(f"[Load] Loading LoRA: {lora_name} (scale={scale})")
-        self.pipe.load_lora_weights(str(lora_path), adapter_name=lora_name)
+        self.pipe.load_lora_weights(str(lora_path), adapter_name=safe_adapter_name)
         self.loaded_loras[lora_name] = scale
     
     def set_lora_scales(self, lora_configs: List[dict]):
@@ -733,20 +737,22 @@ class ModelCache:
                 self.pipe.unload_lora_weights()
                 self.loaded_loras = {}
             return
-        
+
         adapter_names = []
         adapter_weights = []
-        
+
         for config in lora_configs:
             name = config["name"]
             scale = config.get("scale", 1.0)
-            
+
             if name not in self.loaded_loras:
                 self.load_lora(name, scale)
-            
-            adapter_names.append(name)
+
+            # adapter_name은 '.'을 '_'로 치환한 safe name 사용
+            safe_adapter_name = name.replace(".", "_")
+            adapter_names.append(safe_adapter_name)
             adapter_weights.append(scale)
-        
+
         if adapter_names:
             self.pipe.set_adapters(adapter_names, adapter_weights=adapter_weights)
     

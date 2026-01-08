@@ -120,6 +120,13 @@ def _choose_cr_canvas(w: int, h: int) -> tuple:
             best = (cw, ch)
     return best
 
+def decode_base64_image(base64_image: str):
+    """base64 문자열을 PIL Image로 디코딩"""
+    from PIL import Image as PILImage
+    image_data = base64.b64decode(base64_image)
+    return PILImage.open(io.BytesIO(image_data))
+
+
 def pad_image_to_canvas_base64(base64_image: str, target_size: tuple) -> str:
     """base64 이미지를 캔버스 크기에 맞게 letterbox 패딩 후 base64 반환 (NAIS2 방식: JPEG 95%)"""
     from PIL import Image as PILImage
@@ -1401,8 +1408,10 @@ async def call_nai_api(req: GenerateRequest):
             print(f"[NAI] Mode: Inpaint, model={model_to_use}, user_strength={req.base_strength}")
         else:
             action = "img2img"
-            # img2img만 noise 파라미터 사용
+            # img2img 파라미터 (NAI 웹 페이로드와 동일하게)
             params["noise"] = req.base_noise
+            params["image_format"] = "png"
+            params["inpaintImg2ImgStrength"] = 1
             print(f"[NAI] Mode: Img2Img, strength={req.base_strength}, noise={req.base_noise}")
 
     payload = {
@@ -1411,12 +1420,12 @@ async def call_nai_api(req: GenerateRequest):
         "action": action,
         "parameters": params
     }
-    
+
     # 로그
     vibe_count = len(params.get("reference_image_multiple", []))
     has_char_ref = "director_reference_images" in params
     print(f"[NAI] Generating: {req.width}x{req.height}, steps={req.steps}, model={model_to_use}, vibes={vibe_count}, charref={has_char_ref}")
-    
+
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
@@ -1494,20 +1503,70 @@ def call_local_diffusers(req: GenerateRequest):
             print(f"[Warning] Failed to set scheduler {scheduler_name}: {e}")
     
     print(f"[Generate] prompt={req.prompt[:50]}..., size={req.width}x{req.height}, steps={req.steps}")
-    
-    # 1st pass - 기본 생성
-    result = pipe(
-        prompt=req.prompt,
-        negative_prompt=req.negative_prompt,
-        width=req.width,
-        height=req.height,
-        num_inference_steps=req.steps,
-        guidance_scale=req.cfg,
-        generator=generator,
-    )
-    
-    image = result.images[0]
-    print(f"[Generate] 1st pass done, seed={seed}")
+
+    # Base Image 처리 (img2img / inpaint)
+    if req.base_image:
+        base_img = decode_base64_image(req.base_image)
+
+        if req.base_mode == "inpaint" and req.base_mask:
+            # Inpaint 모드
+            from diffusers import AutoPipelineForInpainting
+
+            mask_img = decode_base64_image(req.base_mask)
+            # 마스크를 그레이스케일로 변환 (흰색 = 인페인트 영역)
+            mask_img = mask_img.convert("L")
+
+            inpaint_pipe = AutoPipelineForInpainting.from_pipe(pipe)
+            print(f"[Generate] Inpaint mode, strength={req.base_strength}")
+
+            result = inpaint_pipe(
+                prompt=req.prompt,
+                negative_prompt=req.negative_prompt,
+                image=base_img,
+                mask_image=mask_img,
+                width=req.width,
+                height=req.height,
+                num_inference_steps=req.steps,
+                guidance_scale=req.cfg,
+                strength=req.base_strength,
+                generator=generator,
+            )
+        else:
+            # Img2Img 모드
+            from diffusers import AutoPipelineForImage2Image
+
+            # 베이스 이미지를 타겟 크기로 리사이즈
+            base_img = base_img.resize((req.width, req.height), Image.LANCZOS)
+
+            img2img_pipe = AutoPipelineForImage2Image.from_pipe(pipe)
+            print(f"[Generate] Img2Img mode, strength={req.base_strength}")
+
+            result = img2img_pipe(
+                prompt=req.prompt,
+                negative_prompt=req.negative_prompt,
+                image=base_img,
+                num_inference_steps=req.steps,
+                guidance_scale=req.cfg,
+                strength=req.base_strength,
+                generator=generator,
+            )
+
+        image = result.images[0]
+        print(f"[Generate] Done (base image mode), seed={seed}")
+    else:
+        # 일반 txt2img 생성
+        result = pipe(
+            prompt=req.prompt,
+            negative_prompt=req.negative_prompt,
+            width=req.width,
+            height=req.height,
+            num_inference_steps=req.steps,
+            guidance_scale=req.cfg,
+            generator=generator,
+        )
+
+        image = result.images[0]
+        print(f"[Generate] 1st pass done, seed={seed}")
     
     # 2nd pass - 업스케일 (옵션)
     if req.enable_upscale and req.upscale_model:
@@ -2007,18 +2066,34 @@ async def process_job(job):
             if save_format == 'jpg' and image.mode in ('RGBA', 'P'):
                 save_image = image.convert('RGB')
 
-            # 임시로 메타데이터 없이 저장
-            if save_format == 'jpg':
-                save_image.save(img_buffer, format=pil_format, quality=jpg_quality)
-            elif save_format == 'webp':
-                save_image.save(img_buffer, format=pil_format, quality=jpg_quality)
+            # strip_metadata 처리
+            if strip_metadata:
+                # 메타데이터 제거: 깨끗한 이미지로 저장
+                # PIL의 info 딕셔너리를 제거하기 위해 새 이미지로 복사
+                clean_image = Image.new(save_image.mode, save_image.size)
+                clean_image.putdata(list(save_image.getdata()))
+
+                if save_format == 'jpg':
+                    clean_image.save(img_buffer, format=pil_format, quality=jpg_quality)
+                elif save_format == 'webp':
+                    clean_image.save(img_buffer, format=pil_format, quality=jpg_quality)
+                else:
+                    clean_image.save(img_buffer, format=pil_format)
+
+                image_bytes = img_buffer.getvalue()
             else:
-                save_image.save(img_buffer, format=pil_format)
+                # 메타데이터 유지: 먼저 깨끗하게 저장 후 새 메타데이터 추가
+                clean_image = Image.new(save_image.mode, save_image.size)
+                clean_image.putdata(list(save_image.getdata()))
 
-            image_bytes = img_buffer.getvalue()
+                if save_format == 'jpg':
+                    clean_image.save(img_buffer, format=pil_format, quality=jpg_quality)
+                elif save_format == 'webp':
+                    clean_image.save(img_buffer, format=pil_format, quality=jpg_quality)
+                else:
+                    clean_image.save(img_buffer, format=pil_format)
 
-            # 메타데이터 추가 (strip_metadata가 False일 때만)
-            if not strip_metadata:
+                image_bytes = img_buffer.getvalue()
                 image_bytes = save_metadata_to_exif(image_bytes, unified_metadata, pil_format)
 
             # 파일로 저장
@@ -2795,7 +2870,8 @@ async def get_nai_subscription():
 
 
 def calculate_anlas_cost(width: int, height: int, steps: int, is_opus: bool = False,
-                         vibe_count: int = 0, has_char_ref: bool = False) -> int:
+                         vibe_count: int = 0, has_char_ref: bool = False,
+                         strength: float = 1.0) -> int:
     """NAI 이미지 생성 Anlas 소모량 계산"""
     pixels = width * height
     base_pixels = 1024 * 1024
@@ -2815,6 +2891,10 @@ def calculate_anlas_cost(width: int, height: int, steps: int, is_opus: bool = Fa
     # Steps 보정 (28 초과시)
     if steps > 28 and base_cost > 0:
         base_cost = int(base_cost * (steps / 28))
+
+    # img2img strength 보정 (strength < 1.0이면 비용 감소)
+    if strength < 1.0 and base_cost > 0:
+        base_cost = max(math.ceil(base_cost * strength), 2)
 
     # Vibe Transfer (첫 사용 시 2 Anlas, 이후 무료)
     if vibe_count >= 1:
@@ -2874,7 +2954,8 @@ async def calculate_cost(request: dict):
     else:
         uncached_vibe_count = vibe_count
 
-    cost_per_image = calculate_anlas_cost(width, height, steps, is_opus, uncached_vibe_count, has_char_ref)
+    strength = request.get("strength", 1.0)
+    cost_per_image = calculate_anlas_cost(width, height, steps, is_opus, uncached_vibe_count, has_char_ref, strength)
     total_cost = cost_per_image * count
 
     # Vibe 인코딩 비용 (캐시되지 않은 것만, 첫 이미지에서만 발생)
@@ -4065,19 +4146,39 @@ def detect_nsfw_regions(image_path: str, model_name: str = None,
     return detections
 
 
-def apply_censor_boxes(image_path: str, boxes: list, method: str = "black", 
-                       color: str = None, output_path: str = None):
-    """이미지에 검열 박스 적용 (회전 지원)"""
+def apply_censor_boxes(image_path: str, boxes: list, method: str = "black",
+                       color: str = None, output_path: str = None,
+                       expand_pixels: int = 0, feather: int = 0):
+    """이미지에 검열 박스 적용 (회전, 확장, 그라데이션 지원)
+
+    Args:
+        image_path: 이미지 경로
+        boxes: 검열 박스 목록
+        method: 검열 방식 (black, white, blur, mosaic, color)
+        color: 커스텀 색상 (hex)
+        output_path: 저장 경로 (None이면 저장 안 함)
+        expand_pixels: 박스 확장 픽셀 (0 이상)
+        feather: 그라데이션 테두리 픽셀 (0 이상)
+    """
     import cv2
     import numpy as np
     import math
-    
+
     image = cv2.imread(image_path)
     if image is None:
         raise ValueError(f"이미지 로드 실패: {image_path}")
-    
-    def get_rotated_corners(x1, y1, x2, y2, rotation):
-        """회전된 사각형의 네 코너 좌표 계산"""
+
+    h, w = image.shape[:2]
+
+    def get_rotated_corners(x1, y1, x2, y2, rotation, expand=0):
+        """회전된 사각형의 네 코너 좌표 계산 (확장 포함)"""
+        # 확장 적용 (회전 전에 적용)
+        if expand > 0:
+            x1 -= expand
+            y1 -= expand
+            x2 += expand
+            y2 += expand
+
         cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
         # 로컬 코너 (중심 기준)
         corners_local = [
@@ -4094,7 +4195,105 @@ def apply_censor_boxes(image_path: str, boxes: list, method: str = "black",
             wy = cy + lx * sin_r + ly * cos_r
             corners_world.append((int(round(wx)), int(round(wy))))
         return corners_world
-    
+
+    def apply_feathered_censor(image, pts, censor_color, feather_px):
+        """그라데이션 테두리가 적용된 검열"""
+        # 바운딩 박스 계산 (feather 영역 포함)
+        bx, by, bw, bh = cv2.boundingRect(pts)
+        margin = feather_px + 2
+        bx = max(0, bx - margin)
+        by = max(0, by - margin)
+        bx2 = min(w, bx + bw + margin * 2)
+        by2 = min(h, by + bh + margin * 2)
+
+        if bx2 <= bx or by2 <= by:
+            return image
+
+        # ROI 추출
+        roi = image[by:by2, bx:bx2].copy()
+        roi_h, roi_w = roi.shape[:2]
+
+        # 마스크 생성 (ROI 좌표계)
+        pts_local = pts - np.array([bx, by])
+        core_mask = np.zeros((roi_h, roi_w), dtype=np.uint8)
+        cv2.fillPoly(core_mask, [pts_local], 255, lineType=cv2.LINE_AA)
+
+        # 그라데이션 영역: 마스크 확장
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (feather_px * 2 + 1, feather_px * 2 + 1))
+        expanded_mask = cv2.dilate(core_mask, kernel, iterations=1)
+        feather_zone = (expanded_mask > 0) & (core_mask == 0)
+
+        # 거리 변환으로 그라데이션 알파 계산
+        inv_core = 255 - core_mask
+        dist_outside = cv2.distanceTransform(inv_core, cv2.DIST_L2, 5)
+
+        # 알파 맵 생성
+        alpha = np.zeros((roi_h, roi_w), dtype=np.float32)
+        alpha[core_mask > 0] = 1.0  # 코어 영역은 100%
+        # feather zone은 거리에 따라 감쇠
+        alpha[feather_zone] = 1.0 - np.clip(dist_outside[feather_zone] / feather_px, 0, 1)
+
+        # 검열 레이어 생성
+        censor_layer = np.full_like(roi, censor_color, dtype=np.uint8)
+
+        # 알파 블렌딩
+        alpha_3ch = cv2.merge([alpha, alpha, alpha])
+        blended = (censor_layer.astype(np.float32) * alpha_3ch +
+                   roi.astype(np.float32) * (1 - alpha_3ch)).astype(np.uint8)
+
+        image[by:by2, bx:bx2] = blended
+        return image
+
+    def apply_feathered_effect(image, pts, effect_type, feather_px):
+        """그라데이션 테두리가 적용된 블러/모자이크"""
+        bx, by, bw, bh = cv2.boundingRect(pts)
+        margin = feather_px + 2
+        bx = max(0, bx - margin)
+        by = max(0, by - margin)
+        bx2 = min(w, bx + bw + margin * 2)
+        by2 = min(h, by + bh + margin * 2)
+
+        if bx2 <= bx or by2 <= by:
+            return image
+
+        roi = image[by:by2, bx:bx2].copy()
+        roi_h, roi_w = roi.shape[:2]
+
+        # 마스크 생성
+        pts_local = pts - np.array([bx, by])
+        core_mask = np.zeros((roi_h, roi_w), dtype=np.uint8)
+        cv2.fillPoly(core_mask, [pts_local], 255, lineType=cv2.LINE_AA)
+
+        # 그라데이션 확장
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (feather_px * 2 + 1, feather_px * 2 + 1))
+        expanded_mask = cv2.dilate(core_mask, kernel, iterations=1)
+        feather_zone = (expanded_mask > 0) & (core_mask == 0)
+
+        # 알파 계산
+        inv_core = 255 - core_mask
+        dist_outside = cv2.distanceTransform(inv_core, cv2.DIST_L2, 5)
+        alpha = np.zeros((roi_h, roi_w), dtype=np.float32)
+        alpha[core_mask > 0] = 1.0
+        alpha[feather_zone] = 1.0 - np.clip(dist_outside[feather_zone] / feather_px, 0, 1)
+
+        # 효과 적용
+        if effect_type == "blur":
+            effected = cv2.GaussianBlur(roi, (99, 99), 30)
+        else:  # mosaic
+            if roi_h > 0 and roi_w > 0:
+                small = cv2.resize(roi, (max(1, roi_w // 10), max(1, roi_h // 10)), interpolation=cv2.INTER_LINEAR)
+                effected = cv2.resize(small, (roi_w, roi_h), interpolation=cv2.INTER_NEAREST)
+            else:
+                effected = roi
+
+        # 알파 블렌딩
+        alpha_3ch = cv2.merge([alpha, alpha, alpha])
+        blended = (effected.astype(np.float32) * alpha_3ch +
+                   roi.astype(np.float32) * (1 - alpha_3ch)).astype(np.uint8)
+
+        image[by:by2, bx:bx2] = blended
+        return image
+
     for i, box_info in enumerate(boxes):
         # 박스 데이터 검증
         box = box_info.get("box")
@@ -4107,72 +4306,82 @@ def apply_censor_boxes(image_path: str, boxes: list, method: str = "black",
         if len(box) != 4:
             print(f"[WARNING] Box {i}: box 길이가 4가 아님, len={len(box)}, box={box}")
             continue
-        
+
         try:
             x1, y1, x2, y2 = int(box[0]), int(box[1]), int(box[2]), int(box[3])
         except (ValueError, TypeError, IndexError) as e:
             print(f"[WARNING] Box {i}: 좌표 변환 실패, box={box}, error={e}")
             continue
-        
+
         box_method = box_info.get("method", method)
         box_color = box_info.get("color", color)
         rotation = box_info.get("rotation", 0)
-        
-        # 회전된 코너 계산
-        corners = get_rotated_corners(x1, y1, x2, y2, rotation)
+
+        # 회전된 코너 계산 (확장 포함)
+        corners = get_rotated_corners(x1, y1, x2, y2, rotation, expand_pixels)
         pts = np.array(corners, dtype=np.int32)
-        
+
+        # 검열 색상 결정
         if box_method == "black":
-            cv2.fillPoly(image, [pts], (0, 0, 0), lineType=cv2.LINE_AA)
+            censor_color = (0, 0, 0)
         elif box_method == "white":
-            cv2.fillPoly(image, [pts], (255, 255, 255), lineType=cv2.LINE_AA)
-        elif box_method == "blur" or box_method == "mosaic":
-            # 회전된 영역에 blur/mosaic 적용
-            # 바운딩 박스로 ROI 추출 후 마스크 적용
-            bx, by, bw, bh = cv2.boundingRect(pts)
-            bx = max(0, bx)
-            by = max(0, by)
-            bx2 = min(image.shape[1], bx + bw)
-            by2 = min(image.shape[0], by + bh)
-            
-            if bx2 > bx and by2 > by:
-                roi = image[by:by2, bx:bx2].copy()
-                
-                # 안티앨리어싱 마스크 생성 (ROI 좌표계로 변환)
-                mask = np.zeros((by2 - by, bx2 - bx), dtype=np.uint8)
-                pts_local = pts - np.array([bx, by])
-                cv2.fillPoly(mask, [pts_local], 255, lineType=cv2.LINE_AA)
-                
-                if box_method == "blur":
-                    blurred = cv2.GaussianBlur(roi, (99, 99), 30)
-                else:  # mosaic
-                    h, w = roi.shape[:2]
-                    if h > 0 and w > 0:
-                        small = cv2.resize(roi, (max(1, w // 10), max(1, h // 10)), interpolation=cv2.INTER_LINEAR)
-                        blurred = cv2.resize(small, (w, h), interpolation=cv2.INTER_NEAREST)
-                    else:
-                        blurred = roi
-                
-                # 알파 블렌딩으로 부드러운 경계 적용
-                alpha = mask.astype(np.float32) / 255.0
-                alpha_3ch = cv2.merge([alpha, alpha, alpha])
-                roi_result = (blurred.astype(np.float32) * alpha_3ch + 
-                             roi.astype(np.float32) * (1 - alpha_3ch)).astype(np.uint8)
-                image[by:by2, bx:bx2] = roi_result
-                
-        elif box_method == "color" and box_color:
-            # hex color to BGR
-            if box_color.startswith("#"):
-                hex_color = box_color[1:]
-                r = int(hex_color[0:2], 16)
-                g = int(hex_color[2:4], 16)
-                b = int(hex_color[4:6], 16)
-                cv2.fillPoly(image, [pts], (b, g, r), lineType=cv2.LINE_AA)
-    
+            censor_color = (255, 255, 255)
+        elif box_method == "color" and box_color and box_color.startswith("#"):
+            hex_color = box_color[1:]
+            r = int(hex_color[0:2], 16)
+            g = int(hex_color[2:4], 16)
+            b = int(hex_color[4:6], 16)
+            censor_color = (b, g, r)
+        else:
+            censor_color = None
+
+        # 그라데이션 적용 여부
+        use_feather = feather > 0
+
+        if box_method in ("black", "white", "color") and censor_color:
+            if use_feather:
+                image = apply_feathered_censor(image, pts, censor_color, feather)
+            else:
+                cv2.fillPoly(image, [pts], censor_color, lineType=cv2.LINE_AA)
+
+        elif box_method in ("blur", "mosaic"):
+            if use_feather:
+                image = apply_feathered_effect(image, pts, box_method, feather)
+            else:
+                # 기존 로직
+                bx, by, bw, bh = cv2.boundingRect(pts)
+                bx = max(0, bx)
+                by = max(0, by)
+                bx2 = min(w, bx + bw)
+                by2 = min(h, by + bh)
+
+                if bx2 > bx and by2 > by:
+                    roi = image[by:by2, bx:bx2].copy()
+
+                    mask = np.zeros((by2 - by, bx2 - bx), dtype=np.uint8)
+                    pts_local = pts - np.array([bx, by])
+                    cv2.fillPoly(mask, [pts_local], 255, lineType=cv2.LINE_AA)
+
+                    if box_method == "blur":
+                        blurred = cv2.GaussianBlur(roi, (99, 99), 30)
+                    else:  # mosaic
+                        roi_h, roi_w = roi.shape[:2]
+                        if roi_h > 0 and roi_w > 0:
+                            small = cv2.resize(roi, (max(1, roi_w // 10), max(1, roi_h // 10)), interpolation=cv2.INTER_LINEAR)
+                            blurred = cv2.resize(small, (roi_w, roi_h), interpolation=cv2.INTER_NEAREST)
+                        else:
+                            blurred = roi
+
+                    alpha = mask.astype(np.float32) / 255.0
+                    alpha_3ch = cv2.merge([alpha, alpha, alpha])
+                    roi_result = (blurred.astype(np.float32) * alpha_3ch +
+                                 roi.astype(np.float32) * (1 - alpha_3ch)).astype(np.uint8)
+                    image[by:by2, bx:bx2] = roi_result
+
     # 저장
     if output_path:
         cv2.imwrite(output_path, image)
-    
+
     # base64로 반환
     _, buffer = cv2.imencode('.png', image)
     return base64.b64encode(buffer).decode('utf-8')
@@ -4319,6 +4528,9 @@ class CensorApplyRequest(BaseModel):
     boxes: List[dict]  # [{"box": [x1,y1,x2,y2], "method": "black", "color": "#000000"}]
     method: str = "black"  # 기본 검열 방식
     color: str = None  # 커스텀 색상
+    expand_pixels: int = 0  # 박스 확장 픽셀
+    feather: int = 0  # 그라데이션 테두리 픽셀
+    source: str = "uncensored"  # 이미지 소스 폴더 (uncensored 또는 censored)
 
 
 @app.post("/api/censor/apply")
@@ -4326,7 +4538,7 @@ async def apply_censor(req: CensorApplyRequest):
     """검열 적용 (프리뷰용, 저장 안 함)"""
     import tempfile
     temp_file = None
-    
+
     try:
         # 이미지 경로 결정 (우선순위: absolute_path > image_path > image_base64)
         if req.absolute_path:
@@ -4334,7 +4546,9 @@ async def apply_censor(req: CensorApplyRequest):
             if not image_path.exists():
                 return {"success": False, "error": f"이미지 없음: {req.absolute_path}"}
         elif req.image_path:
-            image_path = UNCENSORED_DIR / req.image_path
+            # source에 따라 적절한 폴더 사용
+            base_dir = CENSORED_DIR if req.source == "censored" else UNCENSORED_DIR
+            image_path = base_dir / req.image_path
             if not image_path.exists():
                 return {"success": False, "error": f"이미지 없음: {req.image_path}"}
         elif req.image_base64:
@@ -4345,15 +4559,17 @@ async def apply_censor(req: CensorApplyRequest):
             image_path = Path(temp_file.name)
         else:
             return {"success": False, "error": "image_path 또는 image_base64 필요"}
-        
+
         # 검열 적용
         result_base64 = apply_censor_boxes(
             str(image_path),
             req.boxes,
             method=req.method,
-            color=req.color
+            color=req.color,
+            expand_pixels=req.expand_pixels,
+            feather=req.feather
         )
-        
+
         return {"success": True, "image": result_base64}
     
     except Exception as e:
@@ -4373,6 +4589,8 @@ class CensorSaveRequest(BaseModel):
     output_folder: str = ""  # censored 하위 폴더
     filename: str = None  # 저장 파일명 (없으면 원본명 사용)
     source: str = "uncensored"  # uncensored 또는 censored (absolute_path 사용 시 무시됨)
+    expand_pixels: int = 0  # 박스 확장 픽셀
+    feather: int = 0  # 그라데이션 테두리 픽셀
 
 
 @app.post("/api/censor/save")
@@ -4426,9 +4644,11 @@ async def save_censored_image(req: CensorSaveRequest):
             req.boxes,
             method=req.method,
             color=req.color,
-            output_path=str(output_path)
+            output_path=str(output_path),
+            expand_pixels=req.expand_pixels,
+            feather=req.feather
         )
-        
+
         return {"success": True, "filename": output_path.name, "path": str(output_path.relative_to(APP_DIR))}
     
     except Exception as e:
@@ -4597,19 +4817,21 @@ async def batch_censor(request: dict):
     default_conf = request.get("default_conf", 0.25)
     method = request.get("method", "black")
     color = request.get("color")
-    
+    expand_pixels = request.get("expand_pixels", 0)
+    feather = request.get("feather", 0)
+
     source_path = UNCENSORED_DIR / source_folder if source_folder else UNCENSORED_DIR
     output_path = CENSORED_DIR / output_folder if output_folder else CENSORED_DIR
     output_path.mkdir(parents=True, exist_ok=True)
-    
+
     if not source_path.exists():
         return {"success": False, "error": f"폴더 없음: {source_folder}"}
-    
+
     # 이미지 파일 목록
     all_files = []
     for ext in ['*.png', '*.jpg', '*.jpeg', '*.webp']:
         all_files.extend(source_path.glob(ext))
-    
+
     results = []
     for filepath in all_files:
         try:
@@ -4621,14 +4843,18 @@ async def batch_censor(request: dict):
                 label_conf=label_conf,
                 default_conf=default_conf
             )
-            
+
             # 박스 형식 변환
             boxes = [{"box": d["box"], "method": method, "color": color} for d in detections]
-            
+
             if boxes:
                 # 검열 적용 및 저장
                 out_filepath = output_path / filepath.name
-                apply_censor_boxes(str(filepath), boxes, method=method, color=color, output_path=str(out_filepath))
+                apply_censor_boxes(
+                    str(filepath), boxes, method=method, color=color,
+                    output_path=str(out_filepath),
+                    expand_pixels=expand_pixels, feather=feather
+                )
                 results.append({
                     "filename": filepath.name,
                     "censored": len(boxes),
@@ -4645,10 +4871,10 @@ async def batch_censor(request: dict):
                 "filename": filepath.name,
                 "error": str(e)
             })
-    
+
     total = len(results)
     censored = sum(1 for r in results if r.get("censored", 0) > 0)
-    
+
     return {
         "success": True,
         "total": total,

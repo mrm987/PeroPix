@@ -1488,6 +1488,30 @@
         }
         .btn-success:hover { background: #16a34a; }
 
+        /* Enhance Modal Resolution Buttons */
+        .enhance-res-btn {
+            flex: 1;
+            padding: 8px 12px;
+            font-size: 0.85rem;
+            background: var(--bg-lighter);
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+            transition: var(--transition-fast);
+        }
+        .enhance-res-btn:hover {
+            background: var(--bg);
+            border-color: var(--accent);
+            color: var(--text);
+        }
+        .enhance-res-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+        .enhance-res-btn.active:hover {
+            background: var(--accent-hover);
+        }
+
         /* Inline button row (for vibe buttons, etc.) */
         .btn-row {
             display: flex;
@@ -3759,6 +3783,7 @@
         .slot-image-card .load-settings-btn,
         .slot-image-card .apply-seed-btn,
         .slot-image-card .inpaint-btn,
+        .slot-image-card .enhance-btn,
         .slot-image-card .clear-card-btn {
             background: var(--bg-lighter);
             border: 1px solid var(--border);
@@ -3783,7 +3808,10 @@
         .slot-image-card .inpaint-btn:hover {
             background: #9b59b6;
             color: white;
-            border-color: #9b59b6;
+        }
+        .slot-image-card .enhance-btn:hover {
+            background: #e67e22;
+            color: white;
         }
         .slot-image-card .clear-card-btn:hover {
             background: var(--danger);
@@ -4258,37 +4286,48 @@
                 </div>
 
                 <!-- Base Image (Inpaint/Img2Img) -->
-                <div class="section" id="baseImageSection" style="display: none;">
+                <div class="section" id="baseImageSection">
                     <div class="section-title">
                         <button type="button" class="collapse-toggle" data-target="baseImageContent" title="접기/펼치기">▼</button>
                         <span>Base Image</span>
-                        <button type="button" class="btn btn-secondary" id="clearBaseImage" style="margin-left: auto; padding: 4px 8px; font-size: 0.8rem;">✕ Clear</button>
+                        <button type="button" class="btn btn-secondary" id="clearBaseImage" style="margin-left: auto; padding: 4px 8px; font-size: 0.8rem; display: none;">✕ Clear</button>
                     </div>
                     <div id="baseImageContent" class="collapsible-content">
-                        <div style="display: flex; gap: 12px; align-items: flex-start;">
-                            <div id="baseImagePreview" style="flex: 0 0 120px; height: 120px; background: var(--bg); border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;">
-                                <img id="baseImageImg" src="" style="max-width: 100%; max-height: 100%; object-fit: contain;">
-                                <div id="baseImageMaskOverlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0.5; pointer-events: none;"></div>
+                        <!-- 이미지가 없을 때: 파일 선택 버튼 -->
+                        <div id="baseImageDropZone" style="text-align: center; padding: 12px;">
+                            <button type="button" class="btn" id="baseImageSelectBtn" style="width: 100%;">📷 이미지 선택</button>
+                            <div style="color: var(--text-dim); font-size: 0.75rem; margin-top: 6px;">
+                                또는 슬롯/갤러리에서 🎨 Inpaint / ✨ Enhance 사용
                             </div>
-                            <div style="flex: 1;">
-                                <div class="row" style="margin-bottom: 8px;">
-                                    <div style="flex: 1;">
-                                        <label>Mode</label>
-                                        <select id="baseImageMode">
-                                            <option value="inpaint">Inpaint</option>
-                                            <option value="img2img">Img2Img</option>
-                                        </select>
+                            <input type="file" id="baseImageFileInput" accept="image/*" style="display: none;">
+                        </div>
+                        <!-- 이미지가 있을 때: 프리뷰 및 설정 -->
+                        <div id="baseImageSettings" style="display: none;">
+                            <div style="display: flex; gap: 12px; align-items: flex-start;">
+                                <div id="baseImagePreview" style="flex: 0 0 120px; height: 120px; background: var(--bg); border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;">
+                                    <img id="baseImageImg" src="" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                                    <div id="baseImageMaskOverlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0.5; pointer-events: none;"></div>
+                                </div>
+                                <div style="flex: 1;">
+                                    <div class="row" style="margin-bottom: 8px;">
+                                        <div style="flex: 1;">
+                                            <label>Mode</label>
+                                            <select id="baseImageMode">
+                                                <option value="img2img">Img2Img</option>
+                                                <option value="inpaint">Inpaint</option>
+                                            </select>
+                                        </div>
                                     </div>
+                                    <div style="margin-bottom: 8px;">
+                                        <label>Strength: <span id="baseImageStrengthValue">0.7</span></label>
+                                        <input type="range" id="baseImageStrength" min="0" max="1" step="0.05" value="0.7" style="width: 100%;">
+                                    </div>
+                                    <div id="baseImageNoiseContainer">
+                                        <label>Noise: <span id="baseImageNoiseValue">0</span></label>
+                                        <input type="range" id="baseImageNoise" min="0" max="1" step="0.05" value="0" style="width: 100%;">
+                                    </div>
+                                    <button type="button" class="btn" id="editMaskBtn" style="margin-top: 8px; width: 100%; display: none;">🎨 마스크 수정</button>
                                 </div>
-                                <div style="margin-bottom: 8px;">
-                                    <label>Strength: <span id="baseImageStrengthValue">0.7</span></label>
-                                    <input type="range" id="baseImageStrength" min="0" max="1" step="0.05" value="0.7" style="width: 100%;">
-                                </div>
-                                <div id="baseImageNoiseContainer">
-                                    <label>Noise: <span id="baseImageNoiseValue">0</span></label>
-                                    <input type="range" id="baseImageNoise" min="0" max="1" step="0.05" value="0" style="width: 100%;">
-                                </div>
-                                <button type="button" class="btn" id="editMaskBtn" style="margin-top: 8px; width: 100%;">🎨 Edit Mask</button>
                             </div>
                         </div>
                     </div>
@@ -4820,6 +4859,7 @@
                 <button type="button" class="btn btn-secondary" id="dropModalCancel">취소</button>
                 <button type="button" class="btn" id="dropModalAsVibe" style="display: none;">바이브로 추가</button>
                 <button type="button" class="btn" id="dropModalAsCharRef" style="display: none;">캐릭터 레퍼런스</button>
+                <button type="button" class="btn" id="dropModalAsBaseImage" style="display: none;">베이스 이미지</button>
                 <button type="button" class="btn" id="dropModalPromptOnly" style="display: none;">프롬프트만</button>
                 <button type="button" class="btn" id="dropModalSeedOnly" style="display: none;">시드만</button>
                 <button type="button" class="btn btn-primary" id="dropModalConfirm">적용</button>
@@ -4848,6 +4888,43 @@
             <div class="buttons">
                 <button type="button" class="btn btn-secondary" id="inputModalCancel">취소</button>
                 <button type="button" class="btn" id="inputModalOk">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enhance Modal (NAI) -->
+    <div class="drop-modal" id="enhanceModal">
+        <div class="drop-modal-content" style="max-width: 500px;">
+            <h3>✨ Enhance</h3>
+            <div style="display: flex; gap: 16px; margin-bottom: 16px;">
+                <div id="enhanceModalPreview" style="flex: 0 0 150px; height: 150px; background: var(--bg); border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                    <img id="enhanceModalImg" src="" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                </div>
+                <div style="flex: 1;">
+                    <div style="margin-bottom: 12px;">
+                        <label>Resolution</label>
+                        <div style="display: flex; gap: 8px; margin-top: 4px;">
+                            <button type="button" class="btn enhance-res-btn active" data-scale="1">Normal (1x)</button>
+                            <button type="button" class="btn enhance-res-btn" data-scale="1.5">Large (1.5x)</button>
+                        </div>
+                        <div id="enhanceResInfo" style="font-size: 0.8rem; color: var(--text-dim); margin-top: 4px;"></div>
+                    </div>
+                    <div style="margin-bottom: 12px;">
+                        <label>Magnitude: <span id="enhanceModalMagnitude">3</span></label>
+                        <input type="range" id="enhanceModalMagnitudeSlider" min="1" max="5" step="1" value="3" style="width: 100%;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-dim);">
+                            <span>Low (원본 유지)</span>
+                            <span>High (변형 많음)</span>
+                        </div>
+                    </div>
+                    <div id="enhanceModalCost" style="font-size: 0.9rem; padding: 8px; background: var(--bg); border-radius: 6px; text-align: center;">
+                        Cost: <span id="enhanceModalAnlas">0</span> Anlas
+                    </div>
+                </div>
+            </div>
+            <div class="buttons">
+                <button type="button" class="btn btn-secondary" id="enhanceModalCancel">취소</button>
+                <button type="button" class="btn btn-primary" id="enhanceModalConfirm">✨ Enhance 실행</button>
             </div>
         </div>
     </div>
@@ -5528,6 +5605,7 @@
                         <button type="button" class="clear-card-btn" title="미리보기 지우기">🧹</button>
                         <div class="filename" title="${data.filename}">${data.filename}</div>
                         <button type="button" class="inpaint-btn" title="Inpaint">🎨</button>
+                        <button type="button" class="enhance-btn" title="Enhance (NAI)" style="display: none;">✨</button>
                         <button type="button" class="apply-seed-btn" title="이 시드 적용">🎲</button>
                         <button type="button" class="load-settings-btn" title="전체 설정 불러오기">📋</button>
                     </div>
@@ -5658,6 +5736,37 @@
                 }
                 if (imageBase64) {
                     setBaseImageForInpaint('data:image/png;base64,' + imageBase64);
+                } else {
+                    showToast('이미지 데이터가 없습니다', 'error');
+                }
+            };
+
+            // Enhance 버튼 (NAI 전용)
+            const enhanceBtn = card.querySelector('.enhance-btn');
+            // NAI 모드일 때만 표시
+            if (currentProvider === 'nai') {
+                enhanceBtn.style.display = 'inline-block';
+            }
+            enhanceBtn.onclick = async (e) => {
+                e.stopPropagation();
+                // 이미지 base64 가져오기
+                let imageBase64 = card._imageData.image;
+                if (!imageBase64 && card._imageData.image_path) {
+                    try {
+                        const response = await fetch(`${API_BASE}/api/outputs/${card._imageData.image_path}`);
+                        const blob = await response.blob();
+                        imageBase64 = await new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onload = () => resolve(reader.result.split(',')[1]);
+                            reader.readAsDataURL(blob);
+                        });
+                    } catch (err) {
+                        showToast('이미지 로드 실패', 'error');
+                        return;
+                    }
+                }
+                if (imageBase64) {
+                    openEnhanceModal('data:image/png;base64,' + imageBase64, card._imageData.metadata);
                 } else {
                     showToast('이미지 데이터가 없습니다', 'error');
                 }
@@ -11020,6 +11129,7 @@
                     </div>
                     <div class="gallery-item-actions">
                         <button class="inpaint-btn" title="인페인트">🎨 Inpaint</button>
+                        <button class="enhance-btn" title="Enhance (NAI)" style="display: ${currentProvider === 'nai' ? 'inline-block' : 'none'};">✨ Enhance</button>
                         <button class="copy-seed-btn" title="시드 복사">🎲 Seed</button>
                         <button class="apply-all-btn" title="전체 설정 적용">📋 Apply</button>
                         <button class="delete-btn" title="삭제">🗑️</button>
@@ -11192,6 +11302,22 @@
                         }
                     } catch (err) {
                         showToast('인페인트 오류: ' + err.message, 'error');
+                    }
+                };
+
+                // Enhance (NAI 전용)
+                item.querySelector('.enhance-btn').onclick = async (e) => {
+                    e.stopPropagation();
+                    try {
+                        const response = await fetch(`${API_BASE}/api/gallery/${item._filename}${folderQuery}`);
+                        const result = await response.json();
+                        if (result.success && result.image) {
+                            openEnhanceModal(result.image, result.metadata);
+                        } else {
+                            showToast('이미지 로드 실패', 'error');
+                        }
+                    } catch (err) {
+                        showToast('Enhance 오류: ' + err.message, 'error');
                     }
                 };
 
@@ -11588,6 +11714,7 @@
                     document.getElementById('dropModalSeedOnly').style.display = 'inline-block';
                     document.getElementById('dropModalAsVibe').style.display = 'inline-block';
                     document.getElementById('dropModalAsCharRef').style.display = 'inline-block';
+                    document.getElementById('dropModalAsBaseImage').style.display = 'inline-block';
                     pendingDropData = {
                         type: 'nai',
                         metadata: result.nai_metadata,  // 원본 저장 (적용 시 다시 정규화)
@@ -11596,11 +11723,12 @@
                     };
                     window._isPureNaiImage = isPureNai;
                 } else {
-                    // 일반 이미지 - 바이브 또는 캐릭터 레퍼런스로 추가 제안
+                    // 일반 이미지 - 바이브, 캐릭터 레퍼런스, 베이스 이미지로 추가 제안
                     document.getElementById('dropModalTitle').textContent = '📷 일반 이미지';
-                    metadataDiv.innerHTML = '<div>메타데이터가 없습니다. 바이브 또는 캐릭터 레퍼런스로 추가할 수 있습니다.</div>';
+                    metadataDiv.innerHTML = '<div>메타데이터가 없습니다. 바이브, 캐릭터 레퍼런스, 또는 베이스 이미지로 추가할 수 있습니다.</div>';
                     document.getElementById('dropModalConfirm').textContent = '바이브에 추가';
                     document.getElementById('dropModalAsCharRef').style.display = 'inline-block';
+                    document.getElementById('dropModalAsBaseImage').style.display = 'inline-block';
                     pendingDropData = {
                         type: 'plain',
                         image: base64,
@@ -11626,6 +11754,7 @@
             document.getElementById('dropModalSeedOnly').style.display = 'none';
             document.getElementById('dropModalAsVibe').style.display = 'none';
             document.getElementById('dropModalAsCharRef').style.display = 'none';
+            document.getElementById('dropModalAsBaseImage').style.display = 'none';
             document.getElementById('dropModalConfirm').textContent = '확인';
         }
 
@@ -11726,6 +11855,33 @@
                 } catch (e) {
                     showToast('캐릭터 레퍼런스 추가 실패: ' + e.message, 'error');
                 }
+                closeDropModal();
+            }
+        };
+
+        // 베이스 이미지로 추가 버튼
+        document.getElementById('dropModalAsBaseImage').onclick = () => {
+            if (pendingDropData && pendingDropData.image) {
+                const img = new Image();
+                img.onload = () => {
+                    baseImageData = {
+                        enabled: true,
+                        image: pendingDropData.image,
+                        mask: null,
+                        mode: 'img2img',
+                        strength: 0.7,
+                        noise: 0,
+                        width: img.width,
+                        height: img.height
+                    };
+                    updateBaseImageUI();
+                    // 슬롯 모드로 전환
+                    if (currentMode !== 'slot') {
+                        document.getElementById('slotModeBtn').click();
+                    }
+                    showToast('베이스 이미지로 등록됨', 'success');
+                };
+                img.src = 'data:image/png;base64,' + pendingDropData.image;
                 closeDropModal();
             }
         };
@@ -11861,7 +12017,7 @@
             enabled: false,
             image: null,        // base64
             mask: null,         // base64 (white = inpaint area)
-            mode: 'inpaint',    // 'inpaint' | 'img2img'
+            mode: 'img2img',    // 'img2img' | 'inpaint'
             strength: 0.7,
             noise: 0,
             width: 0,
@@ -11926,6 +12082,9 @@
                 // 이미지 그리기 (원본 크기)
                 maskEditor.imageCtx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
 
+                // paintedCells 초기화
+                maskEditor.paintedCells.clear();
+
                 // 기존 마스크 로드 또는 클리어 (검정 배경)
                 maskEditor.maskCtx.fillStyle = 'black';
                 maskEditor.maskCtx.fillRect(0, 0, canvasWidth, canvasHeight);
@@ -11933,6 +12092,8 @@
                     const maskImg = new Image();
                     maskImg.onload = () => {
                         maskEditor.maskCtx.drawImage(maskImg, 0, 0, canvasWidth, canvasHeight);
+                        // 기존 마스크에서 paintedCells 복원 (흰색 영역 스캔)
+                        syncPaintedCellsFromMask(canvasWidth, canvasHeight);
                     };
                     maskImg.src = existingMask;
                 }
@@ -11947,6 +12108,30 @@
             img.src = imageBase64.startsWith('data:') ? imageBase64 : 'data:image/png;base64,' + imageBase64;
         }
 
+        // 기존 마스크에서 paintedCells 동기화 (8x8 그리드 기반)
+        function syncPaintedCellsFromMask(canvasWidth, canvasHeight) {
+            const GRID_SIZE = 8;
+            const imageData = maskEditor.maskCtx.getImageData(0, 0, canvasWidth, canvasHeight);
+            const data = imageData.data;
+
+            const gridCols = Math.floor(canvasWidth / GRID_SIZE);
+            const gridRows = Math.floor(canvasHeight / GRID_SIZE);
+
+            for (let gy = 0; gy < gridRows; gy++) {
+                for (let gx = 0; gx < gridCols; gx++) {
+                    // 그리드 셀의 중앙 픽셀 확인
+                    const centerX = gx * GRID_SIZE + Math.floor(GRID_SIZE / 2);
+                    const centerY = gy * GRID_SIZE + Math.floor(GRID_SIZE / 2);
+                    const idx = (centerY * canvasWidth + centerX) * 4;
+
+                    // 흰색(또는 밝은 색)이면 paintedCells에 추가
+                    if (data[idx] > 128) {  // R 채널로 판단
+                        maskEditor.paintedCells.add(`${gx},${gy}`);
+                    }
+                }
+            }
+        }
+
         // Mask Editor 닫기
         function closeMaskEditor() {
             document.getElementById('maskEditorModal').classList.remove('active');
@@ -11959,7 +12144,7 @@
             // NAIS2/NAI 웹 방식: 8x8 그리드 기반 브러시
             const GRID_SIZE = 8;
             let lastGridPos = null;  // 마지막 그리드 위치 (선 그리기용)
-            maskEditor.paintedCells.clear();  // 에디터 열 때 초기화
+            // paintedCells 초기화는 openMaskEditor에서 수행
 
             function getPos(e) {
                 const rect = drawCanvas.getBoundingClientRect();
@@ -12211,12 +12396,18 @@
 
         // Base Image UI 업데이트
         function updateBaseImageUI() {
-            const section = document.getElementById('baseImageSection');
+            const dropZone = document.getElementById('baseImageDropZone');
+            const settings = document.getElementById('baseImageSettings');
+            const clearBtn = document.getElementById('clearBaseImage');
             const preview = document.getElementById('baseImageImg');
             const maskOverlay = document.getElementById('baseImageMaskOverlay');
+            const editMaskBtn = document.getElementById('editMaskBtn');
 
             if (baseImageData.enabled && baseImageData.image) {
-                section.style.display = 'block';
+                // 이미지가 있을 때: 드롭존 숨기고 설정 표시
+                dropZone.style.display = 'none';
+                settings.style.display = 'block';
+                clearBtn.style.display = 'block';
                 preview.src = 'data:image/png;base64,' + baseImageData.image;
 
                 if (baseImageData.mask) {
@@ -12235,23 +12426,47 @@
                 document.getElementById('baseImageNoiseValue').textContent = baseImageData.noise;
                 updateBaseImageNoiseVisibility();
 
+                // 마스크 수정 버튼: inpaint 모드일 때만 표시
+                editMaskBtn.style.display = baseImageData.mode === 'inpaint' ? 'block' : 'none';
+
                 // 사이즈 동기화
                 document.getElementById('width').value = baseImageData.width;
                 document.getElementById('height').value = baseImageData.height;
             } else {
-                section.style.display = 'none';
+                // 이미지가 없을 때: 드롭존 표시
+                dropZone.style.display = 'block';
+                settings.style.display = 'none';
+                clearBtn.style.display = 'none';
             }
+
+            // 비용 업데이트
+            updateAnlasCost();
         }
 
         // Base Image 섹션 이벤트
         function setupBaseImageEvents() {
+            const selectBtn = document.getElementById('baseImageSelectBtn');
+            const fileInput = document.getElementById('baseImageFileInput');
+
+            // 버튼 클릭 → 파일 선택
+            selectBtn.onclick = () => fileInput.click();
+
+            // 파일 선택 처리
+            fileInput.onchange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    loadBaseImageFromFile(file);
+                }
+                fileInput.value = '';  // 리셋
+            };
+
             // Clear 버튼
             document.getElementById('clearBaseImage').onclick = () => {
                 baseImageData = {
                     enabled: false,
                     image: null,
                     mask: null,
-                    mode: 'inpaint',
+                    mode: 'img2img',
                     strength: 0.7,
                     noise: 0,
                     width: 0,
@@ -12281,7 +12496,49 @@
             document.getElementById('baseImageMode').onchange = function() {
                 baseImageData.mode = this.value;
                 updateBaseImageNoiseVisibility();
+                // 마스크 수정 버튼 표시 업데이트
+                document.getElementById('editMaskBtn').style.display = this.value === 'inpaint' ? 'block' : 'none';
+                // 비용 업데이트
+                updateAnlasCost();
             };
+
+            // Strength/Noise 변경 시에도 비용 업데이트 (input + change 모두)
+            ['input', 'change'].forEach(evt => {
+                document.getElementById('baseImageStrength').addEventListener(evt, updateAnlasCost);
+                document.getElementById('baseImageNoise').addEventListener(evt, updateAnlasCost);
+            });
+        }
+
+        // Base Image 파일 로드
+        function loadBaseImageFromFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    // Canvas로 PNG 변환
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    const base64 = canvas.toDataURL('image/png').split(',')[1];
+
+                    baseImageData = {
+                        enabled: true,
+                        image: base64,
+                        mask: null,
+                        mode: 'img2img',  // 드롭으로 등록 시 기본 img2img
+                        strength: 0.7,
+                        noise: 0,
+                        width: img.width,
+                        height: img.height
+                    };
+                    updateBaseImageUI();
+                    showToast('Base Image 등록됨', 'success');
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
         }
 
         // Noise 슬라이더 가시성 업데이트 (인페인트는 noise 없음)
@@ -12299,6 +12556,322 @@
             }
             openMaskEditor(imageBase64);
         }
+
+        // Enhance용 이미지 설정 함수 (NAI 전용)
+        function setBaseImageForEnhance(imageBase64, metadata = null) {
+            // 슬롯 모드로 전환
+            if (currentMode !== 'slot') {
+                document.getElementById('slotModeBtn').click();
+            }
+
+            const img = new Image();
+            img.onload = () => {
+                // data:image/png;base64, 접두사 제거
+                const base64 = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64;
+
+                // NAI Enhance 기본값: Magnitude 3 (strength 0.5, noise 0)
+                baseImageData = {
+                    enabled: true,
+                    image: base64,
+                    mask: null,
+                    mode: 'img2img',
+                    strength: 0.5,
+                    noise: 0,
+                    width: img.width,
+                    height: img.height
+                };
+
+                // 메타데이터가 있으면 프롬프트 등 복원
+                if (metadata) {
+                    const normalized = normalizeMetadata(metadata);
+                    if (normalized.prompt) {
+                        document.getElementById('prompt').value = normalized.prompt;
+                    }
+                    if (normalized.negative_prompt) {
+                        document.getElementById('negativePrompt').value = normalized.negative_prompt;
+                    }
+                }
+
+                updateBaseImageUI();
+                showToast('Enhance 모드: Base Image 등록됨', 'success');
+            };
+            img.src = imageBase64.startsWith('data:') ? imageBase64 : 'data:image/png;base64,' + imageBase64;
+        }
+
+        // ============================================================
+        // Enhance Modal (NAI)
+        // ============================================================
+        const enhanceState = {
+            imageBase64: null,
+            metadata: null,
+            width: 0,
+            height: 0,
+            scale: 1,       // 1 또는 1.5
+            magnitude: 3    // 1-5
+        };
+
+        // Magnitude별 strength/noise 매핑
+        const magnitudePresets = {
+            1: { strength: 0.2, noise: 0 },
+            2: { strength: 0.4, noise: 0 },
+            3: { strength: 0.5, noise: 0 },
+            4: { strength: 0.6, noise: 0 },
+            5: { strength: 0.7, noise: 0.1 }
+        };
+
+        function openEnhanceModal(imageBase64, metadata = null) {
+            if (currentProvider !== 'nai') {
+                showToast('Enhance는 NAI 전용 기능입니다', 'error');
+                return;
+            }
+
+            const img = new Image();
+            img.onload = () => {
+                enhanceState.imageBase64 = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64;
+                enhanceState.metadata = metadata;
+                enhanceState.width = img.width;
+                enhanceState.height = img.height;
+                enhanceState.scale = 1;
+                enhanceState.magnitude = 3;
+
+                // 모달 UI 업데이트
+                document.getElementById('enhanceModalImg').src = img.src;
+                document.getElementById('enhanceModalMagnitude').textContent = '3';
+                const magnitudeSlider = document.getElementById('enhanceModalMagnitudeSlider');
+                magnitudeSlider.value = 3;
+                updateSliderFill(magnitudeSlider);
+
+                // Large 이미지(1MP 초과)는 1.5x 비활성화 (NAI 제한)
+                const megapixels = (img.width * img.height) / 1000000;
+                const isLargeImage = megapixels > 1.1;  // Normal 최대 ~1MP, Large는 그 이상
+
+                // Resolution 버튼 초기화
+                document.querySelectorAll('.enhance-res-btn').forEach(btn => {
+                    const isLargeBtn = btn.dataset.scale === '1.5';
+                    btn.classList.toggle('active', btn.dataset.scale === '1');
+                    if (isLargeBtn && isLargeImage) {
+                        btn.disabled = true;
+                        btn.title = '이미 Large 이미지입니다';
+                        btn.style.opacity = '0.5';
+                    } else {
+                        btn.disabled = false;
+                        btn.title = '';
+                        btn.style.opacity = '1';
+                    }
+                });
+
+                updateEnhanceResInfo();
+                updateEnhanceModalCost();
+
+                document.getElementById('enhanceModal').classList.add('active');
+            };
+            img.src = imageBase64.startsWith('data:') ? imageBase64 : 'data:image/png;base64,' + imageBase64;
+        }
+
+        function closeEnhanceModal() {
+            document.getElementById('enhanceModal').classList.remove('active');
+            enhanceState.imageBase64 = null;
+            enhanceState.metadata = null;
+        }
+
+        // NAI Large 해상도 목록 (1.5배용)
+        const NAI_LARGE_RESOLUTIONS = [
+            [2304, 960], [2112, 1088], [1984, 1152], [1856, 1280], [1728, 1408], [1536, 1536],
+            [1408, 1728], [1280, 1856], [1152, 1984], [1088, 2112], [960, 2304]
+        ];
+
+        // 가장 가까운 NAI 해상도 찾기
+        function findClosestNAIResolution(targetW, targetH) {
+            let closest = NAI_LARGE_RESOLUTIONS[0];
+            let minDiff = Infinity;
+            for (const [w, h] of NAI_LARGE_RESOLUTIONS) {
+                const diff = Math.abs(w - targetW) + Math.abs(h - targetH);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closest = [w, h];
+                }
+            }
+            return closest;
+        }
+
+        function getEnhanceTargetSize() {
+            if (enhanceState.scale > 1) {
+                const targetW = Math.round(enhanceState.width * enhanceState.scale);
+                const targetH = Math.round(enhanceState.height * enhanceState.scale);
+                return findClosestNAIResolution(targetW, targetH);
+            }
+            return [enhanceState.width, enhanceState.height];
+        }
+
+        function updateEnhanceResInfo() {
+            const [w, h] = getEnhanceTargetSize();
+            document.getElementById('enhanceResInfo').textContent = `${w} × ${h}`;
+        }
+
+        async function updateEnhanceModalCost() {
+            // Enhance 비용 계산: sidebar steps 사용, 해상도 * scale, magnitude별 strength
+            const [w, h] = getEnhanceTargetSize();
+            const steps = parseInt(document.getElementById('steps').value) || 28;
+            const preset = magnitudePresets[enhanceState.magnitude];
+            const strength = preset.strength;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/nai/calculate-cost`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        width: w,
+                        height: h,
+                        steps: steps,
+                        is_opus: isOpusTier,
+                        vibe_count: 0,
+                        has_char_ref: false,
+                        count: 1,
+                        strength: strength
+                    })
+                });
+                const data = await response.json();
+
+                if (data.is_free) {
+                    document.getElementById('enhanceModalAnlas').textContent = 'Free';
+                } else {
+                    document.getElementById('enhanceModalAnlas').textContent = data.cost_per_image || data.total_cost || '?';
+                }
+            } catch (e) {
+                // 백엔드 실패 시 로컬 계산 (fallback)
+                const pixels = w * h;
+                const basePixels = 1024 * 1024;
+                let cost = Math.ceil(pixels / basePixels * 20);
+                if (steps > 28) {
+                    cost = Math.ceil(cost * (steps / 28));
+                }
+                cost = Math.max(Math.ceil(cost * strength), 2);
+                document.getElementById('enhanceModalAnlas').textContent = cost;
+            }
+        }
+
+        async function executeEnhance() {
+            if (!enhanceState.imageBase64) {
+                showToast('이미지가 없습니다', 'error');
+                return;
+            }
+
+            const preset = magnitudePresets[enhanceState.magnitude];
+
+            // 목표 해상도 (1.5x면 NAI 지원 해상도로 스냅)
+            const [w, h] = getEnhanceTargetSize();
+
+            // 이미지 준비 (1.5x면 Canvas로 업스케일)
+            let imageBase64 = enhanceState.imageBase64;
+            if (enhanceState.scale > 1) {
+                const img = new Image();
+                await new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = reject;
+                    img.src = 'data:image/png;base64,' + enhanceState.imageBase64;
+                });
+
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, w, h);
+                imageBase64 = canvas.toDataURL('image/png').split(',')[1];
+            }
+
+            // 메타데이터에서 프롬프트 가져오기
+            let prompt = '';
+            let negativePrompt = '';
+            if (enhanceState.metadata) {
+                const normalized = normalizeMetadata(enhanceState.metadata);
+                prompt = normalized.prompt || '';
+                negativePrompt = normalized.negative_prompt || '';
+            }
+
+            // 현재 UI에서 가져오기 (메타데이터가 없으면)
+            if (!prompt) {
+                prompt = document.getElementById('prompt').value || '';
+            }
+            if (!negativePrompt) {
+                negativePrompt = document.getElementById('negativePrompt').value || '';
+            }
+
+            const enhanceParams = {
+                nai_model: document.getElementById('naiModel').value,
+                base_prompt: prompt,
+                negative_prompt: negativePrompt,
+                width: w,
+                height: h,
+                steps: parseInt(document.getElementById('steps').value) || 28,
+                cfg: parseFloat(document.getElementById('cfg').value) || 5,
+                seed: Math.floor(Math.random() * 2147483647),
+                sampler: document.getElementById('sampler').value || 'k_euler_ancestral',
+                scheduler: document.getElementById('scheduler').value || 'karras',
+                base_image: imageBase64,
+                base_mode: 'img2img',
+                base_strength: preset.strength,
+                base_noise: preset.noise
+            };
+
+            closeEnhanceModal();
+
+            try {
+                // 큐 시스템 사용 (기존 생성과 동일)
+                const response = await fetch(`${API_BASE}/api/generate/multi`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(enhanceParams)
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Enhance 큐 등록 실패');
+                }
+
+                showToast('Enhance 큐에 추가됨', 'success');
+
+            } catch (error) {
+                console.error('Enhance error:', error);
+                showToast('Enhance 실패: ' + error.message, 'error');
+            }
+        }
+
+        // Enhance 모달 이벤트 설정
+        function setupEnhanceModalEvents() {
+            // Resolution 버튼 토글
+            document.querySelectorAll('.enhance-res-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.enhance-res-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    enhanceState.scale = parseFloat(btn.dataset.scale);
+                    updateEnhanceResInfo();
+                    updateEnhanceModalCost();
+                });
+            });
+
+            // Magnitude 슬라이더
+            const magnitudeSlider = document.getElementById('enhanceModalMagnitudeSlider');
+            magnitudeSlider.addEventListener('input', () => {
+                enhanceState.magnitude = parseInt(magnitudeSlider.value);
+                document.getElementById('enhanceModalMagnitude').textContent = enhanceState.magnitude;
+                updateEnhanceModalCost();
+            });
+
+            // 취소 버튼
+            document.getElementById('enhanceModalCancel').addEventListener('click', closeEnhanceModal);
+
+            // 확인 버튼
+            document.getElementById('enhanceModalConfirm').addEventListener('click', executeEnhance);
+
+            // 모달 배경 클릭시 닫기
+            document.getElementById('enhanceModal').addEventListener('click', (e) => {
+                if (e.target.id === 'enhanceModal') {
+                    closeEnhanceModal();
+                }
+            });
+        }
+
+        setupEnhanceModalEvents();
 
         // 초기화
         setupMaskEditorEvents();

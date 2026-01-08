@@ -4113,27 +4113,71 @@ async def start_local_install(background_tasks: BackgroundTasks):
 
 @app.delete("/api/local/uninstall")
 async def uninstall_local():
-    """로컬 환경 삭제"""
+    """로컬 환경 삭제 - torch/diffusers 등 로컬 생성 패키지만 삭제 (embedded python 유지)"""
     if install_status["installing"]:
         raise HTTPException(status_code=400, detail="Installation in progress")
-    
-    if PYTHON_ENV_DIR.exists():
-        try:
-            shutil.rmtree(PYTHON_ENV_DIR)
-        except Exception as e:
-            # Windows에서 파일 잠금 문제 시 재시도
-            import time
-            time.sleep(1)
-            try:
-                shutil.rmtree(PYTHON_ENV_DIR)
-            except Exception as e2:
-                raise HTTPException(status_code=500, detail=f"삭제 실패: {e2}. 앱을 종료하고 수동으로 python_env 폴더를 삭제해주세요.")
-    
-    # 삭제 확인
-    if PYTHON_ENV_DIR.exists():
-        raise HTTPException(status_code=500, detail="폴더가 완전히 삭제되지 않았습니다. 앱을 종료하고 수동으로 삭제해주세요.")
-    
-    return {"status": "uninstalled"}
+
+    # 삭제할 패키지 목록 (로컬 생성에 필요한 패키지들)
+    packages_to_remove = [
+        "torch", "torchvision", "torchaudio",
+        "diffusers", "transformers", "accelerate",
+        "safetensors", "peft", "huggingface_hub",
+        "nvidia_cublas", "nvidia_cuda", "nvidia_cudnn", "nvidia_cufft",
+        "nvidia_curand", "nvidia_cusolver", "nvidia_cusparse", "nvidia_nccl", "nvidia_nvtx",
+        "triton"
+    ]
+
+    # site-packages 경로 찾기
+    if platform.system() == "Windows":
+        site_packages = PYTHON_ENV_DIR / "Lib" / "site-packages"
+    else:
+        # macOS/Linux
+        site_packages = PYTHON_ENV_DIR / "lib" / "python3.11" / "site-packages"
+
+    if not site_packages.exists():
+        return {"status": "uninstalled", "message": "이미 제거되었거나 설치된 적 없음"}
+
+    deleted_count = 0
+    errors = []
+
+    try:
+        # site-packages 내 패키지 폴더/파일 삭제
+        for item in site_packages.iterdir():
+            item_name = item.name.lower()
+            should_delete = False
+
+            # 패키지 이름 매칭
+            for pkg in packages_to_remove:
+                pkg_lower = pkg.lower()
+                if (item_name == pkg_lower or
+                    item_name.startswith(pkg_lower + "-") or
+                    item_name.startswith(pkg_lower + "_") or
+                    (item_name.endswith(".dist-info") and pkg_lower in item_name) or
+                    (item_name.endswith(".egg-info") and pkg_lower in item_name)):
+                    should_delete = True
+                    break
+
+            if should_delete:
+                try:
+                    if item.is_dir():
+                        shutil.rmtree(item)
+                    else:
+                        item.unlink()
+                    deleted_count += 1
+                except Exception as e:
+                    errors.append(f"{item.name}: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"삭제 중 오류: {e}")
+
+    if errors:
+        # 일부만 삭제된 경우
+        return {
+            "status": "partial",
+            "message": f"{deleted_count}개 삭제됨, {len(errors)}개 실패",
+            "errors": errors[:5]  # 처음 5개만
+        }
+
+    return {"status": "uninstalled", "deleted": deleted_count}
 
 
 @app.post("/api/restart")

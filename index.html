@@ -8157,11 +8157,16 @@
                     try {
                         showToast('제거 중...', '', 30000);
                         const res = await fetch(`${API_BASE}/api/local/uninstall`, { method: 'DELETE' });
+                        const data = await res.json();
                         if (res.ok) {
-                            showToast('제거 완료', 'success');
+                            if (data.status === 'partial') {
+                                showToast(`일부 제거됨: ${data.message}`, 'warning');
+                            } else {
+                                showToast('제거 완료', 'success');
+                            }
                             checkLocalEnvStatus();
                         } else {
-                            showToast('제거 실패', 'error');
+                            showToast('제거 실패: ' + (data.detail || ''), 'error');
                         }
                     } catch (e) {
                         showToast('제거 실패: ' + e.message, 'error');

@@ -53,6 +53,7 @@ jobs:
           Copy-Item -Recurse "assets" -Destination "dist/PeroPix/"
           Copy-Item -Recurse "scripts" -Destination "dist/PeroPix/"
           Copy-Item -Recurse "data" -Destination "dist/PeroPix/"
+          # Note: python folder is already created in dist/PeroPix/python by "Download Embedded Python" step
           New-Item -ItemType Directory -Force -Path "dist/PeroPix/models/censor"
           Copy-Item "models/censor/*" -Destination "dist/PeroPix/models/censor/"
           New-Item -ItemType Directory -Force -Path "dist/PeroPix/models/checkpoints"

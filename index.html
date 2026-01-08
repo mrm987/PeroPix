@@ -2346,6 +2346,36 @@
             padding: 10px 16px;
         }
 
+        /* Drop Modal Buttons - Multi-row layout */
+        #dropModalButtons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        #dropModalButtons .btn-row {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        #dropModalButtons .btn-row .btn {
+            flex: 1;
+            min-width: 0;
+            padding: 12px 8px;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+        #dropModalButtons .btn-row-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 4px;
+        }
+        #dropModalButtons .btn-row-actions .btn {
+            flex: 0 0 auto;
+            min-width: 80px;
+            padding: 12px 20px;
+        }
+
         /* Mask Editor Modal */
         .mask-editor-modal {
             position: fixed;
@@ -4855,14 +4885,32 @@
             <h3 id="dropModalTitle">이미지 가져오기</h3>
             <img id="dropModalPreview" class="preview" src="" alt="">
             <div id="dropModalMetadata" class="metadata"></div>
-            <div class="buttons" id="dropModalButtons">
-                <button type="button" class="btn btn-secondary" id="dropModalCancel">취소</button>
-                <button type="button" class="btn" id="dropModalAsVibe" style="display: none;">바이브로 추가</button>
-                <button type="button" class="btn" id="dropModalAsCharRef" style="display: none;">캐릭터 레퍼런스</button>
-                <button type="button" class="btn" id="dropModalAsBaseImage" style="display: none;">베이스 이미지</button>
-                <button type="button" class="btn" id="dropModalPromptOnly" style="display: none;">프롬프트만</button>
-                <button type="button" class="btn" id="dropModalSeedOnly" style="display: none;">시드만</button>
-                <button type="button" class="btn btn-primary" id="dropModalConfirm">적용</button>
+            <div id="dropModalButtons">
+                <!-- 이미지 용도 선택 버튼 그룹 -->
+                <div class="btn-row" id="dropModalImageOptions" style="display: none;">
+                    <button type="button" class="btn" id="dropModalAsVibe">바이브 추가</button>
+                    <button type="button" class="btn" id="dropModalAsCharRef">캐릭터 레퍼런스</button>
+                    <button type="button" class="btn" id="dropModalAsBaseImage">베이스 이미지</button>
+                </div>
+                <!-- 메타데이터 적용 버튼 그룹 -->
+                <div class="btn-row" id="dropModalMetaOptions" style="display: none;">
+                    <button type="button" class="btn" id="dropModalPromptOnly">프롬프트만</button>
+                    <button type="button" class="btn" id="dropModalSeedOnly">시드만</button>
+                    <button type="button" class="btn btn-primary" id="dropModalConfirm">전체 적용</button>
+                </div>
+                <!-- 취소 버튼 (일반 이미지용) -->
+                <div class="btn-row-actions" id="dropModalPlainActions" style="display: none;">
+                    <button type="button" class="btn btn-secondary" id="dropModalCancel">취소</button>
+                </div>
+                <!-- 취소 버튼 (메타데이터 있는 이미지용) -->
+                <div class="btn-row-actions" id="dropModalMetaActions" style="display: none;">
+                    <button type="button" class="btn btn-secondary" id="dropModalCancelMeta">취소</button>
+                </div>
+                <!-- 바이브 파일용 버튼 -->
+                <div class="btn-row-actions" id="dropModalVibeActions" style="display: none;">
+                    <button type="button" class="btn btn-secondary" id="dropModalCancelVibe">취소</button>
+                    <button type="button" class="btn btn-primary" id="dropModalAddVibe">바이브에 추가</button>
+                </div>
             </div>
         </div>
     </div>
@@ -8386,8 +8434,11 @@
                 <div><strong>Model:</strong> ${metadata.nai_model || metadata.model || 'N/A'}</div>
             `;
 
-            document.getElementById('dropModalConfirm').textContent = '전체 적용';
-            document.getElementById('dropModalPromptOnly').style.display = 'inline-block';
+            // 설정 불러오기: 메타데이터 적용 버튼만 표시 (이미지 옵션 없음)
+            document.getElementById('dropModalMetaOptions').style.display = 'flex';
+            document.getElementById('dropModalMetaActions').style.display = 'flex';
+            // 시드만 버튼 숨기기 (설정 불러오기에서는 시드만 따로 제공 안함)
+            document.getElementById('dropModalSeedOnly').style.display = 'none';
 
             // 정규화된 데이터 저장
             window._pendingLoadMetadata = metadata;
@@ -11709,7 +11760,8 @@
                         <div><strong>Info Extracted:</strong> ${infoExtracted}</div>
                         ${encodedData ? '<div style="color:#4ade80">✓ 인코딩 캐시 있음 (Anlas 무료)</div>' : '<div style="color:#fbbf24">⚠ 인코딩 없음 - 생성 시 인코딩됨</div>'}
                     `;
-                    document.getElementById('dropModalConfirm').textContent = '바이브에 추가';
+                    // 바이브 파일: 확인/취소만 표시
+                    document.getElementById('dropModalVibeActions').style.display = 'flex';
 
                     pendingDropData = {
                         type: 'nai-vibe',
@@ -11765,7 +11817,8 @@
                         <div><strong>Info Extracted:</strong> ${result.vibe_info_extracted}</div>
                         ${hasCache ? `<div><strong>Model:</strong> ${result.vibe_model}</div><div style="color:#4ade80">✓ 인코딩 캐시 있음 (Anlas 무료)</div>` : ''}
                     `;
-                    document.getElementById('dropModalConfirm').textContent = '바이브에 추가';
+                    // 바이브 캐시 파일: 확인/취소만 표시
+                    document.getElementById('dropModalVibeActions').style.display = 'flex';
                     pendingDropData = {
                         type: 'vibe',
                         image: base64,
@@ -11793,12 +11846,10 @@
                         <div><strong>Model:</strong> ${meta.nai_model || 'N/A'}</div>
                         ${isPureNai ? '<div style="color:#4ade80; margin-top:8px;">✓ NAI 원본: 퀄리티 태그/UC 프리셋 자동 분리됨</div>' : ''}
                     `;
-                    document.getElementById('dropModalConfirm').textContent = '전체 적용';
-                    document.getElementById('dropModalPromptOnly').style.display = 'inline-block';
-                    document.getElementById('dropModalSeedOnly').style.display = 'inline-block';
-                    document.getElementById('dropModalAsVibe').style.display = 'inline-block';
-                    document.getElementById('dropModalAsCharRef').style.display = 'inline-block';
-                    document.getElementById('dropModalAsBaseImage').style.display = 'inline-block';
+                    // NAI/PeroPix 이미지: 이미지 용도 + 메타데이터 적용 버튼 모두 표시
+                    document.getElementById('dropModalImageOptions').style.display = 'flex';
+                    document.getElementById('dropModalMetaOptions').style.display = 'flex';
+                    document.getElementById('dropModalMetaActions').style.display = 'flex';
                     pendingDropData = {
                         type: 'nai',
                         metadata: result.nai_metadata,  // 원본 저장 (적용 시 다시 정규화)
@@ -11810,9 +11861,9 @@
                     // 일반 이미지 - 바이브, 캐릭터 레퍼런스, 베이스 이미지로 추가 제안
                     document.getElementById('dropModalTitle').textContent = '📷 일반 이미지';
                     metadataDiv.innerHTML = '<div>메타데이터가 없습니다. 바이브, 캐릭터 레퍼런스, 또는 베이스 이미지로 추가할 수 있습니다.</div>';
-                    document.getElementById('dropModalConfirm').textContent = '바이브에 추가';
-                    document.getElementById('dropModalAsCharRef').style.display = 'inline-block';
-                    document.getElementById('dropModalAsBaseImage').style.display = 'inline-block';
+                    // 일반 이미지: 이미지 용도 + 취소 버튼만 표시
+                    document.getElementById('dropModalImageOptions').style.display = 'flex';
+                    document.getElementById('dropModalPlainActions').style.display = 'flex';
                     pendingDropData = {
                         type: 'plain',
                         image: base64,
@@ -11834,16 +11885,57 @@
             window._pendingLoadMetadata = null;
             window._isPureNaiImage = false;
             document.getElementById('dropModalPreview').style.display = '';
-            document.getElementById('dropModalPromptOnly').style.display = 'none';
-            document.getElementById('dropModalSeedOnly').style.display = 'none';
-            document.getElementById('dropModalAsVibe').style.display = 'none';
-            document.getElementById('dropModalAsCharRef').style.display = 'none';
-            document.getElementById('dropModalAsBaseImage').style.display = 'none';
-            document.getElementById('dropModalConfirm').textContent = '확인';
+            // 버튼 그룹 숨기기
+            document.getElementById('dropModalImageOptions').style.display = 'none';
+            document.getElementById('dropModalMetaOptions').style.display = 'none';
+            document.getElementById('dropModalPlainActions').style.display = 'none';
+            document.getElementById('dropModalMetaActions').style.display = 'none';
+            // 개별 버튼 display 리셋 (설정 불러오기에서 숨겼을 수 있음)
+            document.getElementById('dropModalSeedOnly').style.display = '';
+            document.getElementById('dropModalVibeActions').style.display = 'none';
         }
 
-        // 모달 버튼 이벤트
-        document.getElementById('dropModalCancel').onclick = () => {
+        // 모달 버튼 이벤트 - 취소 버튼들
+        document.getElementById('dropModalCancel').onclick = () => closeDropModal();
+        document.getElementById('dropModalCancelMeta').onclick = () => closeDropModal();
+        document.getElementById('dropModalCancelVibe').onclick = () => closeDropModal();
+
+        // 바이브 파일 추가 버튼 (nai-vibe, vibe 타입)
+        document.getElementById('dropModalAddVibe').onclick = () => {
+            if (!pendingDropData || (pendingDropData.type !== 'nai-vibe' && pendingDropData.type !== 'vibe')) return;
+
+            if (vibeList.length >= 16) {
+                showToast('바이브는 최대 16개까지만 추가할 수 있습니다', 'error');
+                closeDropModal();
+                return;
+            }
+
+            const vibeEntry = {
+                image: pendingDropData.image,
+                strength: pendingDropData.strength || 0.6,
+                info_extracted: pendingDropData.info_extracted || 1.0,
+                name: pendingDropData.name
+            };
+            if (pendingDropData.encoded) {
+                vibeEntry.encoded = pendingDropData.encoded;
+                vibeEntry.encoded_model = pendingDropData.encoded_model;
+                vibeEntry.encoded_info_extracted = pendingDropData.encoded_info_extracted || vibeEntry.info_extracted;
+            }
+            vibeList.push(vibeEntry);
+            renderVibeList();
+            saveAppSettings();
+            updateAnlasCost();
+            document.getElementById('enableVibeTransfer').checked = true;
+            document.getElementById('vibeTransferSettings').style.display = 'block';
+            document.getElementById('enableCharRef').checked = false;
+            document.getElementById('charRefSettings').style.display = 'none';
+            let msg;
+            if (pendingDropData.type === 'nai-vibe') {
+                msg = pendingDropData.encoded ? 'NAI 바이브 추가됨 (캐시 사용)' : 'NAI 바이브 추가됨';
+            } else {
+                msg = pendingDropData.encoded ? '바이브 추가됨 (캐시 사용)' : '바이브 추가됨';
+            }
+            showToast(msg, 'success');
             closeDropModal();
         };
 
@@ -11989,38 +12081,8 @@
 
             if (!pendingDropData) return;
 
-            if (pendingDropData.type === 'vibe') {
-                // 바이브 리스트에 추가 (캐시 데이터 포함)
-                if (vibeList.length >= 16) {
-                    showToast('바이브는 최대 16개까지만 추가할 수 있습니다', 'error');
-                } else {
-                    const vibeEntry = {
-                        image: pendingDropData.image,
-                        strength: pendingDropData.strength || 0.6,
-                        info_extracted: pendingDropData.info_extracted || 1.0,
-                        name: pendingDropData.name
-                    };
-                    // 캐시된 인코딩 데이터가 있으면 포함
-                    if (pendingDropData.encoded) {
-                        vibeEntry.encoded = pendingDropData.encoded;
-                        vibeEntry.encoded_model = pendingDropData.encoded_model;
-                        vibeEntry.encoded_info_extracted = pendingDropData.encoded_info_extracted || vibeEntry.info_extracted;  // 인코딩 시 사용된 값
-                    }
-                    vibeList.push(vibeEntry);
-                    renderVibeList();
-                    saveAppSettings();
-                    updateAnlasCost();
-                    // Vibe Transfer 활성화
-                    document.getElementById('enableVibeTransfer').checked = true;
-                    document.getElementById('vibeTransferSettings').style.display = 'block';
-                    // Vibe Transfer와 Character Reference는 동시 사용 불가 - CharRef 비활성화
-                    document.getElementById('enableCharRef').checked = false;
-                    document.getElementById('charRefSettings').style.display = 'none';
-                    const msg = pendingDropData.encoded ? '바이브 추가됨 (캐시 사용)' : '바이브에 추가됨';
-                    showToast(msg, 'success');
-                }
-            } else if (pendingDropData.type === 'nai') {
-                // NAI 메타데이터 적용 - 정규화 후 applyMetadataSettings 사용
+            if (pendingDropData.type === 'nai') {
+                // NAI 메타데이터 전체 적용 - 정규화 후 applyMetadataSettings 사용
                 const doApply = () => {
                     const normalized = normalizeMetadata(pendingDropData.metadata);
                     applyMetadataSettings(normalized);
@@ -12034,58 +12096,6 @@
                 } else {
                     doApply();
                     return;
-                }
-            } else if (pendingDropData.type === 'nai-vibe') {
-                // NAI 바이브 파일 (.naiv4vibe) 처리
-                if (vibeList.length >= 16) {
-                    showToast('바이브는 최대 16개까지만 추가할 수 있습니다', 'error');
-                } else {
-                    const vibeEntry = {
-                        image: pendingDropData.image,
-                        strength: pendingDropData.strength || 0.6,
-                        info_extracted: pendingDropData.info_extracted || 1.0,
-                        name: pendingDropData.name
-                    };
-                    // NAI 인코딩 데이터가 있으면 포함
-                    if (pendingDropData.encoded) {
-                        vibeEntry.encoded = pendingDropData.encoded;
-                        vibeEntry.encoded_model = pendingDropData.encoded_model;
-                        vibeEntry.encoded_info_extracted = pendingDropData.encoded_info_extracted || vibeEntry.info_extracted;
-                    }
-                    vibeList.push(vibeEntry);
-                    renderVibeList();
-                    saveAppSettings();
-                    updateAnlasCost();
-                    document.getElementById('enableVibeTransfer').checked = true;
-                    document.getElementById('vibeTransferSettings').style.display = 'block';
-                    // Vibe Transfer와 Character Reference는 동시 사용 불가 - CharRef 비활성화
-                    document.getElementById('enableCharRef').checked = false;
-                    document.getElementById('charRefSettings').style.display = 'none';
-                    const msg = pendingDropData.encoded ? 'NAI 바이브 추가됨 (캐시 사용)' : 'NAI 바이브 추가됨';
-                    showToast(msg, 'success');
-                }
-                closeDropModal();
-                return;
-            } else if (pendingDropData.type === 'plain') {
-                // 일반 이미지를 바이브로 추가
-                if (vibeList.length >= 16) {
-                    showToast('바이브는 최대 16개까지만 추가할 수 있습니다', 'error');
-                } else {
-                    vibeList.push({
-                        image: pendingDropData.image,
-                        strength: 0.6,
-                        info_extracted: 1.0,
-                        name: pendingDropData.name
-                    });
-                    renderVibeList();
-                    saveAppSettings();
-                    updateAnlasCost();
-                    document.getElementById('enableVibeTransfer').checked = true;
-                    document.getElementById('vibeTransferSettings').style.display = 'block';
-                    // Vibe Transfer와 Character Reference는 동시 사용 불가 - CharRef 비활성화
-                    document.getElementById('enableCharRef').checked = false;
-                    document.getElementById('charRefSettings').style.display = 'none';
-                    showToast('바이브에 추가됨', 'success');
                 }
             }
 

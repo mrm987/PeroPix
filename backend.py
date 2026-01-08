@@ -3959,11 +3959,18 @@ def _install_base_environment_sync():
             "censor": True,
             "local": False
         })
-        
+
         install_status["progress"] = 100
         install_status["message"] = "Installation complete!"
         install_status["installing"] = False
-        
+
+        # 기본 환경 설치 완료 후 상태 리셋 (로컬 환경과 구분)
+        # 잠시 후 리셋하여 프론트엔드가 progress=100을 "로컬 설치 완료"로 오인하지 않도록 함
+        import time
+        time.sleep(0.5)
+        install_status["progress"] = 0
+        install_status["message"] = ""
+
         return True
         
     except Exception as e:

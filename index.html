@@ -8617,46 +8617,30 @@
             }
         }
 
-        // 메타데이터에서 바이브 로드 (캐시에서 이름 매칭)
+        // 메타데이터에서 바이브 로드 (메타데이터에 직접 저장된 데이터 사용)
         async function loadVibesFromMetadata(vibeInfoList) {
             if (!vibeInfoList || vibeInfoList.length === 0) return;
 
             try {
-                // 캐시된 바이브 목록 가져오기
-                const response = await fetch(`${API_BASE}/api/vibe-cache`);
-                const data = await response.json();
-                const cachedVibes = data.vibes || [];
-
                 let loadedCount = 0;
-                let matchedCount = 0;
 
                 for (const vibeInfo of vibeInfoList) {
-                    if (!vibeInfo.name) continue;
+                    // 기존 바이브에 같은 이름이 있으면 건너뛰기
+                    const exists = vibeList.some(v => v.name === vibeInfo.name);
+                    if (exists || vibeList.length >= 16) continue;
 
-                    // 캐시에서 이름 매칭
-                    const cached = cachedVibes.find(v => v.name === vibeInfo.name || v.filename === vibeInfo.name);
-                    if (cached) {
-                        // 상세 데이터 로드
-                        const detailRes = await fetch(`${API_BASE}/api/vibe-cache/${cached.filename}`);
-                        const detail = await detailRes.json();
-                        if (detail.success && detail.vibe_data) {
-                            // 기존 바이브에 같은 이름이 있으면 건너뛰기
-                            const exists = vibeList.some(v => v.name === vibeInfo.name);
-                            if (!exists && vibeList.length < 16) {
-                                const infoExtracted = vibeInfo.info_extracted || detail.info_extracted || 1.0;
-                                vibeList.push({
-                                    image: detail.image,
-                                    strength: vibeInfo.strength || detail.strength || 0.6,
-                                    info_extracted: infoExtracted,
-                                    name: vibeInfo.name,
-                                    encoded: detail.vibe_data,
-                                    encoded_model: cached.model,
-                                    encoded_info_extracted: detail.info_extracted || 1.0  // 캐시된 인코딩 시 사용된 값
-                                });
-                                loadedCount++;
-                            }
-                        }
-                        matchedCount++;
+                    // 메타데이터에 직접 저장된 바이브 데이터 사용
+                    if (vibeInfo.image) {
+                        vibeList.push({
+                            image: vibeInfo.image,
+                            strength: vibeInfo.strength || 0.6,
+                            info_extracted: vibeInfo.info_extracted || 1.0,
+                            name: vibeInfo.name || `Vibe ${vibeList.length + 1}`,
+                            encoded: vibeInfo.encoded || null,
+                            encoded_model: vibeInfo.encoded_model || null,
+                            encoded_info_extracted: vibeInfo.info_extracted || 1.0
+                        });
+                        loadedCount++;
                     }
                 }
 
@@ -8669,10 +8653,13 @@
                     // Vibe Transfer와 Character Reference는 동시 사용 불가 - CharRef 비활성화
                     document.getElementById('enableCharRef').checked = false;
                     document.getElementById('charRefSettings').style.display = 'none';
-                    showToast(`바이브 ${loadedCount}개 로드됨`, 'success');
+                    showToast(`바이브 ${loadedCount}개 복원됨`, 'success');
+                } else {
+                    showToast('바이브를 복원할 수 없습니다 (이미지 데이터 없음)', 'warning');
                 }
             } catch (err) {
                 console.error('[Vibe] 메타데이터에서 로드 실패:', err);
+                showToast('바이브 복원 실패', 'error');
             }
         }
 

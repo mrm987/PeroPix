@@ -3683,23 +3683,29 @@ def get_uv_download_url():
 
 
 def is_local_env_installed():
-    """로컬 환경 설치 여부 확인"""
+    """로컬 환경 설치 여부 확인 - torch와 diffusers 둘 다 필요"""
     if platform.system() == "Windows":
         # Windows embedded Python: python/python.exe
         python_exe = PYTHON_ENV_DIR / "python.exe"
-        torch_check = PYTHON_ENV_DIR / "Lib" / "site-packages" / "torch"
+        site_packages = PYTHON_ENV_DIR / "Lib" / "site-packages"
     else:
         # macOS/Linux: python-build-standalone
         python_exe = PYTHON_ENV_DIR / "python" / "bin" / "python3"
-        torch_check = PYTHON_ENV_DIR / "python" / "lib" / f"python{PYTHON_VERSION[:4]}" / "site-packages" / "torch"
+        site_packages = PYTHON_ENV_DIR / "python" / "lib" / f"python{PYTHON_VERSION[:4]}" / "site-packages"
+
+    torch_check = site_packages / "torch"
+    diffusers_check = site_packages / "diffusers"
 
     python_exists = python_exe.exists()
     torch_exists = torch_check.exists()
+    diffusers_exists = diffusers_check.exists()
 
     print(f"[Local Env Check] Python: {python_exe} exists={python_exists}")
     print(f"[Local Env Check] Torch: {torch_check} exists={torch_exists}")
+    print(f"[Local Env Check] Diffusers: {diffusers_check} exists={diffusers_exists}")
 
-    return python_exists and torch_exists
+    # torch와 diffusers 둘 다 있어야 설치된 것으로 인정
+    return python_exists and torch_exists and diffusers_exists
 
 
 def download_file(url: str, dest: Path, progress_callback=None):

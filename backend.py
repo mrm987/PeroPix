@@ -3865,8 +3865,12 @@ def _setup_python_and_uv():
     return python_exe, uv_exe, temp_dir
 
 
-def _run_uv_install(uv_exe, python_exe, packages, index_url=None, progress_base=40, progress_end=70, reinstall=False):
-    """uv로 패키지 설치"""
+def _run_uv_install(uv_exe, python_exe, packages, index_url=None, progress_base=40, progress_end=70, reinstall_packages=None):
+    """uv로 패키지 설치
+
+    Args:
+        reinstall_packages: 재설치할 특정 패키지 목록 (예: ["torch", "torchvision"])
+    """
     global install_status
 
     env = os.environ.copy()
@@ -3875,9 +3879,10 @@ def _run_uv_install(uv_exe, python_exe, packages, index_url=None, progress_base=
     cmd = [str(uv_exe), "pip", "install", "--python", str(python_exe)]
     if index_url:
         cmd.extend(["--index-url", index_url])
-    if reinstall:
-        # 강제 재설치 (CPU -> CUDA 전환 등)
-        cmd.append("--reinstall")
+    # 특정 패키지만 재설치 (의존성은 건드리지 않음)
+    if reinstall_packages:
+        for pkg in reinstall_packages:
+            cmd.extend(["--reinstall-package", pkg])
     cmd.extend(packages)
     
     proc = subprocess.Popen(
@@ -4003,7 +4008,7 @@ def _install_local_environment_sync():
             python_exe, uv_exe, temp_dir = _setup_python_and_uv()
         
         # torch CUDA로 업그레이드 (0% -> 50%)
-        # reinstall=True로 CPU 버전을 CUDA 버전으로 강제 교체
+        # reinstall_packages로 torch/torchvision만 재설치 (의존성은 건드리지 않음)
         install_status["message"] = "Upgrading PyTorch to CUDA version..."
         install_status["progress"] = 10
 
@@ -4013,7 +4018,7 @@ def _install_local_environment_sync():
             index_url="https://download.pytorch.org/whl/cu121",
             progress_base=10,
             progress_end=50,
-            reinstall=True  # CPU -> CUDA 강제 교체
+            reinstall_packages=["torch", "torchvision"]  # CPU -> CUDA 강제 교체
         )
         if ret != 0:
             raise Exception(f"PyTorch CUDA installation failed with code {ret}")

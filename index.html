@@ -8556,9 +8556,15 @@
 
             // Vibe Transfer 설정
             let vibesRestored = false;
+            let vibeCount = 0;
             if (metadata.vibe_transfer && metadata.vibe_transfer.length > 0) {
-                // PeroPix 형식 바이브 (캐시에서 이름 매칭)
-                loadVibesFromMetadata(metadata.vibe_transfer);
+                // PeroPix 형식 바이브 (캐시에서 이름 매칭) - async 함수를 별도로 호출
+                vibeCount = metadata.vibe_transfer.length;
+                loadVibesFromMetadata(metadata.vibe_transfer).then(() => {
+                    // 바이브 로드 완료 후 추가 알림은 loadVibesFromMetadata 내부에서 처리됨
+                }).catch(err => {
+                    console.error('[Vibe] 바이브 로드 실패:', err);
+                });
                 vibesRestored = true;
             } else if (metadata.nai_vibes && metadata.nai_vibes.images && metadata.nai_vibes.images.length > 0) {
                 // NAI 원본 이미지의 바이브 복원 (인코딩 데이터만 있음)
@@ -8601,9 +8607,11 @@
 
             autoSaveSettings();
 
-            // 결과 메시지
+            // 결과 메시지 - PeroPix 바이브는 loadVibesFromMetadata 내부에서 토스트 표시됨
             if (vibesRestored && metadata.nai_vibes?.images?.length > 0) {
-                showToast(`설정 적용됨 (바이브 ${metadata.nai_vibes.images.length}개 복원)`, 'success');
+                showToast(`설정 적용됨 (NAI 바이브 ${metadata.nai_vibes.images.length}개 복원)`, 'success');
+            } else if (vibesRestored && vibeCount > 0) {
+                showToast(`설정 적용됨 (바이브 로딩 중...)`, 'success');
             } else {
                 showToast('설정을 불러왔습니다', 'success');
             }
@@ -12038,11 +12046,12 @@
         // 베이스 이미지로 추가 버튼
         document.getElementById('dropModalAsBaseImage').onclick = () => {
             if (pendingDropData && pendingDropData.image) {
+                const imageBase64 = pendingDropData.image;  // 클로저 문제 방지
                 const img = new Image();
                 img.onload = () => {
                     baseImageData = {
                         enabled: true,
-                        image: pendingDropData.image,
+                        image: imageBase64,
                         mask: null,
                         mode: 'img2img',
                         strength: 0.7,
@@ -12057,7 +12066,7 @@
                     }
                     showToast('베이스 이미지로 등록됨', 'success');
                 };
-                img.src = 'data:image/png;base64,' + pendingDropData.image;
+                img.src = 'data:image/png;base64,' + imageBase64;
                 closeDropModal();
             }
         };

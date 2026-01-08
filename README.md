@@ -84,4 +84,8 @@ NovelAI 구독만 있으면 됩니다. (Windows 10/11 또는 macOS)
 
 ---
 
+배포/버그/건의 디스코드: https://discord.gg/Cv4hUFM2Z2
+
+---
+
 MIT License

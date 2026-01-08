@@ -3865,16 +3865,19 @@ def _setup_python_and_uv():
     return python_exe, uv_exe, temp_dir
 
 
-def _run_uv_install(uv_exe, python_exe, packages, index_url=None, progress_base=40, progress_end=70):
+def _run_uv_install(uv_exe, python_exe, packages, index_url=None, progress_base=40, progress_end=70, reinstall=False):
     """uv로 패키지 설치"""
     global install_status
-    
+
     env = os.environ.copy()
     env["UV_PYTHON"] = str(python_exe)
-    
+
     cmd = [str(uv_exe), "pip", "install", "--python", str(python_exe)]
     if index_url:
         cmd.extend(["--index-url", index_url])
+    if reinstall:
+        # 강제 재설치 (CPU -> CUDA 전환 등)
+        cmd.append("--reinstall")
     cmd.extend(packages)
     
     proc = subprocess.Popen(
@@ -4000,15 +4003,17 @@ def _install_local_environment_sync():
             python_exe, uv_exe, temp_dir = _setup_python_and_uv()
         
         # torch CUDA로 업그레이드 (0% -> 50%)
+        # reinstall=True로 CPU 버전을 CUDA 버전으로 강제 교체
         install_status["message"] = "Upgrading PyTorch to CUDA version..."
         install_status["progress"] = 10
-        
+
         ret = _run_uv_install(
             uv_exe, python_exe,
             ["torch==2.5.1", "torchvision==0.20.1"],
             index_url="https://download.pytorch.org/whl/cu121",
             progress_base=10,
-            progress_end=50
+            progress_end=50,
+            reinstall=True  # CPU -> CUDA 강제 교체
         )
         if ret != 0:
             raise Exception(f"PyTorch CUDA installation failed with code {ret}")
@@ -4175,6 +4180,15 @@ async def uninstall_local():
                     errors.append(f"{item.name}: {e}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"삭제 중 오류: {e}")
+
+    # install_status.json 업데이트 (torch/diffusers 제거 반영)
+    # 기본 환경(ultralytics 등)은 유지하므로 censor는 True로 유지
+    save_install_status({
+        "python": True,
+        "torch": "cpu",  # CUDA torch 제거됨, 기본 환경 재설치 시 CPU로
+        "censor": True,
+        "local": False   # diffusers 제거됨
+    })
 
     if errors:
         # 일부만 삭제된 경우

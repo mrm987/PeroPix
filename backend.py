@@ -4107,16 +4107,29 @@ async def get_local_status():
 async def start_local_install(background_tasks: BackgroundTasks):
     """로컬 환경 설치 시작"""
     global install_status
-    
+
     if install_status["installing"]:
         raise HTTPException(status_code=400, detail="Installation already in progress")
-    
+
     if is_local_env_installed():
         raise HTTPException(status_code=400, detail="Local environment already installed")
-    
+
+    # torch가 이미 로드되어 있으면 재시작 필요
+    # (실행 중 torch 파일 교체 불가 - 파일 잠금)
+    torch_dir = _get_site_packages_dir() / "torch"
+    if torch_dir.exists():
+        # pending 플래그 저장 후 재시작 요청
+        status = get_install_status()
+        status["pending_cuda_install"] = True
+        save_install_status(status)
+        return {
+            "status": "restart_required",
+            "message": "torch가 이미 로드되어 있어 재시작이 필요합니다. 재시작 후 자동으로 CUDA 버전이 설치됩니다."
+        }
+
     # 먼저 상태를 installing으로 설정 (race condition 방지)
     install_status = {"installing": True, "progress": 0, "message": "Starting...", "error": None}
-    
+
     # 백그라운드에서 설치 실행
     asyncio.create_task(install_local_environment())
     
@@ -5237,15 +5250,15 @@ if __name__ == "__main__":
     status = get_install_status()
     # Python은 있지만 torch/ultralytics가 없으면 설치 필요 (배포판 첫 실행)
     needs_install = not status["python"] or not status["torch"] or not status["censor"]
-    
+
     if needs_install:
         print("\n" + "=" * 50)
         print("  기본 환경 설치를 시작합니다")
         print("  (torch CPU + ultralytics, 약 3-5분 소요)")
         print("=" * 50 + "\n")
-        
+
         success = _install_base_environment_sync()
-        
+
         if success:
             print("\n" + "=" * 50)
             print("  ✅ 기본 환경 설치 완료!")
@@ -5258,6 +5271,32 @@ if __name__ == "__main__":
             print("  ❌ 설치 실패. 로그를 확인해주세요.")
             print("=" * 50 + "\n")
             # 실패해도 서버는 시작 (NAI 모드는 사용 가능)
+    elif status.get("pending_cuda_install"):
+        # 재시작 후 CUDA torch 설치 (서버 시작 전, torch 로드 전)
+        print("\n" + "=" * 50)
+        print("  🔥 CUDA PyTorch 설치를 시작합니다")
+        print("  (torch CUDA + diffusers, 약 5-10분 소요)")
+        print("=" * 50 + "\n")
+
+        success = _install_local_environment_sync()
+
+        if success:
+            print("\n" + "=" * 50)
+            print("  ✅ CUDA 환경 설치 완료!")
+            print("=" * 50 + "\n")
+            # pending 플래그 제거
+            status = get_install_status()
+            status.pop("pending_cuda_install", None)
+            save_install_status(status)
+        else:
+            print("\n" + "=" * 50)
+            print("  ❌ CUDA 설치 실패. 로그를 확인해주세요.")
+            print("=" * 50 + "\n")
+            # pending 플래그 제거 (무한 루프 방지)
+            status = get_install_status()
+            status.pop("pending_cuda_install", None)
+            save_install_status(status)
+        status = get_install_status()
     else:
         print(f"[Environment] torch={status['torch']}, censor={status['censor']}, local={status['local']}")
 

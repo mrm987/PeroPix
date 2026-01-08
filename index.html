@@ -8101,12 +8101,20 @@
             
             try {
                 const res = await fetch(`${API_BASE}/api/local/install`, { method: 'POST' });
+                const data = await res.json();
                 if (res.ok) {
-                    showToast('설치 시작됨', 'success');
-                    startInstallPolling();  // 폴링 시작
-                    checkLocalEnvStatus();  // Settings 모달도 업데이트
+                    if (data.status === 'restart_required') {
+                        // torch가 이미 로드되어 있어 재시작 필요
+                        showToast('재시작 후 CUDA가 설치됩니다', 'info', 5000);
+                        closeLocalInstallModal();
+                        showRestartModal();
+                        isInstalling = false;
+                    } else {
+                        showToast('설치 시작됨', 'success');
+                        startInstallPolling();  // 폴링 시작
+                        checkLocalEnvStatus();  // Settings 모달도 업데이트
+                    }
                 } else {
-                    const data = await res.json();
                     showToast(data.detail || '설치 시작 실패', 'error');
                     // 실패 시 UI 복원
                     isInstalling = false;
@@ -8137,11 +8145,16 @@
         async function installLocalEnv() {
             try {
                 const res = await fetch(`${API_BASE}/api/local/install`, { method: 'POST' });
+                const data = await res.json();
                 if (res.ok) {
-                    showToast('설치 시작됨', 'success');
-                    checkLocalEnvStatus();
+                    if (data.status === 'restart_required') {
+                        showToast('재시작 후 CUDA가 설치됩니다', 'info', 5000);
+                        showRestartModal();
+                    } else {
+                        showToast('설치 시작됨', 'success');
+                        checkLocalEnvStatus();
+                    }
                 } else {
-                    const data = await res.json();
                     showToast(data.detail || 'Failed to start installation', 'error');
                 }
             } catch (e) {

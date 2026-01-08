@@ -453,6 +453,7 @@
             letter-spacing: normal;
             white-space: pre-wrap;
             word-wrap: break-word;
+            box-sizing: border-box;
             overflow-wrap: break-word;
             word-break: break-word;
             overflow: hidden;
@@ -460,7 +461,6 @@
             z-index: 1;
             color: var(--text);
             background: var(--bg);
-            box-sizing: border-box;
         }
 
         .prompt-highlight-overlay::-webkit-scrollbar {
@@ -5427,9 +5427,19 @@
                 document.body.classList.add('resizing-slot');
                 handle.classList.add('active');
 
+                let rafId = null;
                 function onMouseMove(e) {
                     const deltaX = e.clientX - startX;
                     setSidebarWidth(startWidth + deltaX);
+                    // 드래그 중 프롬프트 하이라이트 동기화 (throttled via rAF)
+                    if (!rafId) {
+                        rafId = requestAnimationFrame(() => {
+                            if (typeof updatePromptHighlights === 'function') {
+                                updatePromptHighlights();
+                            }
+                            rafId = null;
+                        });
+                    }
                 }
 
                 function onMouseUp() {
@@ -5437,6 +5447,10 @@
                     handle.classList.remove('active');
                     document.removeEventListener('mousemove', onMouseMove);
                     document.removeEventListener('mouseup', onMouseUp);
+                    // 사이드바 리사이즈 완료 후 프롬프트 하이라이트 동기화
+                    if (typeof updatePromptHighlights === 'function') {
+                        updatePromptHighlights();
+                    }
                 }
 
                 document.addEventListener('mousemove', onMouseMove);
@@ -9453,6 +9467,20 @@
         }
 
         /**
+         * 모든 프롬프트 필드의 하이라이트를 업데이트
+         * (프로그래매틱하게 value를 변경한 후 호출)
+         */
+        function updatePromptHighlights() {
+            document.querySelectorAll('.prompt-highlight-overlay').forEach(overlay => {
+                const container = overlay.parentElement;
+                const textarea = container?.querySelector('textarea');
+                if (textarea) {
+                    highlightPrompt(textarea, overlay);
+                }
+            });
+        }
+
+        /**
          * 프롬프트 텍스트를 하이라이팅하여 overlay에 렌더링
          * @param {HTMLTextAreaElement} textarea - 프롬프트 textarea
          * @param {HTMLElement} overlay - overlay div
@@ -9564,11 +9592,17 @@
                 overlay.style.lineHeight = computed.lineHeight;
                 overlay.style.letterSpacing = computed.letterSpacing;
                 overlay.style.wordSpacing = computed.wordSpacing;
+
                 // 스크롤바 영역 보정: textarea에 스크롤바가 있으면 overlay의 padding-right 증가
                 const hasScrollbar = textarea.scrollHeight > textarea.clientHeight;
                 if (hasScrollbar) {
                     const paddingRight = parseFloat(computed.paddingRight) || 0;
-                    overlay.style.paddingRight = (paddingRight + 8) + 'px';
+                    // 스크롤바 너비: border 제외한 전체 너비 - 실제 컨텐츠 영역 너비
+                    const scrollbarWidth = textarea.offsetWidth - textarea.clientWidth -
+                        (parseFloat(computed.borderLeftWidth) || 0) - (parseFloat(computed.borderRightWidth) || 0);
+                    overlay.style.paddingRight = (paddingRight + scrollbarWidth) + 'px';
+                } else {
+                    overlay.style.paddingRight = computed.paddingRight;
                 }
             }
 
@@ -10206,11 +10240,21 @@
         
         // 설정을 UI에 적용
         function applyProviderSettings(settings, isFullRestore = false) {
-            if (!settings || Object.keys(settings).length === 0) return;
-            
-            // Prompts
-            if (settings.basePrompt !== undefined) document.getElementById('basePrompt').value = settings.basePrompt;
-            if (settings.negativePrompt !== undefined) document.getElementById('negativePrompt').value = settings.negativePrompt;
+            if (!settings) return;
+
+            // isFullRestore일 때는 빈 객체도 처리 (탭 전환 시 빈 값으로 초기화)
+            const isEmpty = Object.keys(settings).length === 0;
+
+            // Prompts - 빈 객체일 때 기본값으로 초기화
+            if (isFullRestore && isEmpty) {
+                document.getElementById('basePrompt').value = '';
+                document.getElementById('negativePrompt').value = '';
+            } else {
+                if (settings.basePrompt !== undefined) document.getElementById('basePrompt').value = settings.basePrompt;
+                if (settings.negativePrompt !== undefined) document.getElementById('negativePrompt').value = settings.negativePrompt;
+            }
+            // 프롬프트 하이라이트 업데이트
+            updatePromptHighlights();
             
             // Character prompts
             if (settings.characterPromptsLayout && settings.characterPromptsLayout.length > 0) {
@@ -10235,13 +10279,20 @@
             }
             
             // Size
-            if (settings.sizePreset) document.getElementById('sizePreset').value = settings.sizePreset;
-            if (settings.width) document.getElementById('width').value = settings.width;
-            if (settings.height) document.getElementById('height').value = settings.height;
-            
+            if (isFullRestore && isEmpty) {
+                document.getElementById('sizePreset').value = 'custom';
+                document.getElementById('width').value = currentProvider === 'nai' ? 832 : 1024;
+                document.getElementById('height').value = currentProvider === 'nai' ? 1216 : 1024;
+            } else {
+                if (settings.sizePreset) document.getElementById('sizePreset').value = settings.sizePreset;
+                if (settings.width) document.getElementById('width').value = settings.width;
+                if (settings.height) document.getElementById('height').value = settings.height;
+            }
+
             // Generation - 샘플러/스케줄러는 provider에 따라 옵션이 다름
-            if (settings.steps) document.getElementById('steps').value = settings.steps;
-            if (settings.cfg) document.getElementById('cfg').value = settings.cfg;
+            // (빈 객체일 때는 restoreProviderGenerationSettings에서 처리됨)
+            if (!isEmpty && settings.steps) document.getElementById('steps').value = settings.steps;
+            if (!isEmpty && settings.cfg) document.getElementById('cfg').value = settings.cfg;
             updateSamplerSchedulerOptions(currentProvider);
             if (settings.sampler) {
                 const samplerSelect = document.getElementById('sampler');
@@ -10255,18 +10306,35 @@
                     schedulerSelect.value = settings.scheduler;
                 }
             }
-            if (settings.seed !== undefined) document.getElementById('seed').value = settings.seed;
-            if (settings.randomSeed !== undefined) document.getElementById('randomSeed').checked = settings.randomSeed;
-            if (settings.lockSeed !== undefined) document.getElementById('lockSeed').checked = settings.lockSeed;
-            
+            if (isFullRestore && isEmpty) {
+                document.getElementById('seed').value = '';
+                document.getElementById('randomSeed').checked = true;
+                document.getElementById('lockSeed').checked = false;
+            } else {
+                if (settings.seed !== undefined) document.getElementById('seed').value = settings.seed;
+                if (settings.randomSeed !== undefined) document.getElementById('randomSeed').checked = settings.randomSeed;
+                if (settings.lockSeed !== undefined) document.getElementById('lockSeed').checked = settings.lockSeed;
+            }
+
             // Save Options
-            if (settings.saveFormat) document.getElementById('saveFormat').value = settings.saveFormat;
-            if (settings.jpgQuality) document.getElementById('jpgQuality').value = settings.jpgQuality;
-            if (settings.stripMetadata !== undefined) document.getElementById('stripMetadata').checked = settings.stripMetadata;
-            
+            if (isFullRestore && isEmpty) {
+                document.getElementById('saveFormat').value = 'png';
+                document.getElementById('jpgQuality').value = 95;
+                document.getElementById('stripMetadata').checked = false;
+            } else {
+                if (settings.saveFormat) document.getElementById('saveFormat').value = settings.saveFormat;
+                if (settings.jpgQuality) document.getElementById('jpgQuality').value = settings.jpgQuality;
+                if (settings.stripMetadata !== undefined) document.getElementById('stripMetadata').checked = settings.stripMetadata;
+            }
+
             // Output
-            if (settings.outputFolder) setOutputFolder(settings.outputFolder);
-            if (settings.repeatCount) document.getElementById('repeatCount').value = settings.repeatCount;
+            if (isFullRestore && isEmpty) {
+                setOutputFolder('');
+                document.getElementById('repeatCount').value = 1;
+            } else {
+                if (settings.outputFolder !== undefined) setOutputFolder(settings.outputFolder);
+                if (settings.repeatCount) document.getElementById('repeatCount').value = settings.repeatCount;
+            }
             
             // Slots - provider별로 분리됨
             if (settings.slots && settings.slots.length > 0) {

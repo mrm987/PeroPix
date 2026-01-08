@@ -2072,15 +2072,23 @@ async def process_job(job):
             sm = req.smea in ['SMEA', 'SMEA+DYN']
             sm_dyn = req.smea == 'SMEA+DYN'
 
-            # Vibe Transfer 정보 (이미지 제외, 설정값만)
+            # Vibe Transfer 정보 (이미지 포함 - 복원용)
             vibe_info = []
             if req.vibe_transfer:
                 for v in req.vibe_transfer:
-                    vibe_info.append({
+                    vibe_entry = {
                         "strength": v.get("strength", 0.6),
                         "info_extracted": v.get("info_extracted", 1.0),
                         "name": v.get("name", "")
-                    })
+                    }
+                    # 이미지 데이터 포함 (복원용)
+                    if v.get("image"):
+                        vibe_entry["image"] = v.get("image")
+                    if v.get("encoded"):
+                        vibe_entry["encoded"] = v.get("encoded")
+                    if v.get("encoded_model"):
+                        vibe_entry["encoded_model"] = v.get("encoded_model")
+                    vibe_info.append(vibe_entry)
 
             # PeroPix 확장 필드
             peropix_ext = {

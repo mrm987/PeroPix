@@ -12423,6 +12423,36 @@
             }
         };
 
+        // 섹션 펼치고 스크롤하는 헬퍼 함수
+        function expandAndScrollToSection(collapsibleContentId, scrollTargetId = null) {
+            const collapsibleContent = document.getElementById(collapsibleContentId);
+
+            if (collapsibleContent) {
+                // 접혀있으면 펼치기
+                if (collapsibleContent.classList.contains('collapsed')) {
+                    collapsibleContent.classList.remove('collapsed');
+                    // 토글 버튼 화살표 업데이트 (부모 section에서 찾기)
+                    const parentSection = collapsibleContent.closest('.section');
+                    if (parentSection) {
+                        const toggleBtn = parentSection.querySelector('.collapse-toggle');
+                        if (toggleBtn) toggleBtn.textContent = '▼';
+                    }
+                }
+
+                // 스크롤 대상 결정 (지정된 타겟 또는 collapsible content의 부모 섹션)
+                const scrollTarget = scrollTargetId
+                    ? document.getElementById(scrollTargetId)
+                    : collapsibleContent.closest('.section');
+
+                // 스크롤 (약간 딜레이 후 - 펼침 애니메이션 대기)
+                setTimeout(() => {
+                    if (scrollTarget) {
+                        scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }, 100);
+            }
+        }
+
         // 바이브로 추가 버튼
         document.getElementById('dropModalAsVibe').onclick = () => {
             if (pendingDropData && pendingDropData.image) {
@@ -12444,6 +12474,8 @@
                     document.getElementById('enableCharRef').checked = false;
                     document.getElementById('charRefSettings').style.display = 'none';
                     showToast('바이브에 추가됨', 'success');
+                    // Vibe / CharRef 섹션 펼치고 스크롤
+                    expandAndScrollToSection('vibeCharRefContent');
                 }
                 closeDropModal();
             }
@@ -12477,6 +12509,8 @@
                     saveAppSettings();
                     updateAnlasCost();
                     showToast('캐릭터 레퍼런스에 추가됨', 'success');
+                    // Vibe / CharRef 섹션 펼치고 Character Reference로 스크롤
+                    expandAndScrollToSection('vibeCharRefContent', 'charRefSection');
                 } catch (e) {
                     showToast('캐릭터 레퍼런스 추가 실패: ' + e.message, 'error');
                 }
@@ -12506,6 +12540,8 @@
                         document.getElementById('slotModeBtn').click();
                     }
                     showToast('베이스 이미지로 등록됨', 'success');
+                    // Base Image 섹션 펼치고 스크롤
+                    expandAndScrollToSection('baseImageContent', 'baseImageSection');
                 };
                 img.src = 'data:image/png;base64,' + imageBase64;
                 closeDropModal();

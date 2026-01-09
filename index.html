@@ -9503,6 +9503,8 @@
         // ============================================================
         let translateModeEnabled = false;
         const translateCache = new Map(); // 번역 캐시
+        const translateUndoStack = []; // 번역 Undo 스택 (textarea별로 저장)
+        const MAX_UNDO_STACK = 50; // 최대 Undo 저장 개수
 
         /**
          * Google Translate 무료 API로 번역
@@ -9869,12 +9871,53 @@
             });
 
             if (newText !== text) {
+                // Undo 스택에 이전 상태 저장
+                translateUndoStack.push({
+                    textarea: textarea,
+                    value: text,
+                    selectionStart: textarea.selectionStart,
+                    selectionEnd: textarea.selectionEnd
+                });
+                // 스택 크기 제한
+                if (translateUndoStack.length > MAX_UNDO_STACK) {
+                    translateUndoStack.shift();
+                }
+
                 textarea.value = newText;
                 textarea.dispatchEvent(new Event('input', { bubbles: true }));
                 hideTranslateTooltip();
-                showToast(`"${tag}" → "${translated}"`, 'success', 2000);
+                showToast(`"${tag}" → "${translated}" (Ctrl+Z로 되돌리기)`, 'success', 2000);
             }
         }
+
+        /**
+         * 번역 Undo 처리
+         */
+        function undoTranslation() {
+            if (translateUndoStack.length === 0) return false;
+
+            const lastState = translateUndoStack.pop();
+            if (lastState && lastState.textarea) {
+                lastState.textarea.value = lastState.value;
+                lastState.textarea.selectionStart = lastState.selectionStart;
+                lastState.textarea.selectionEnd = lastState.selectionEnd;
+                lastState.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                showToast('번역 되돌리기 완료', 'success', 1500);
+                return true;
+            }
+            return false;
+        }
+
+        // Ctrl+Z 키 이벤트 핸들러 (번역 모드에서 Undo)
+        document.addEventListener('keydown', (e) => {
+            if (translateModeEnabled && e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+                if (translateUndoStack.length > 0) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    undoTranslation();
+                }
+            }
+        }, true); // capture phase에서 처리
 
         /**
          * textarea에 프롬프트 하이라이팅 적용

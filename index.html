@@ -5850,16 +5850,31 @@
                 }
             };
 
-            // 설정 불러오기 버튼
+            // 설정 불러오기 버튼 - dropModal 사용
             const loadSettingsBtn = card.querySelector('.load-settings-btn');
-            loadSettingsBtn.onclick = (e) => {
+            loadSettingsBtn.onclick = async (e) => {
                 e.stopPropagation();
                 const metadata = card._imageData.metadata;
-                if (!metadata) {
-                    showToast('메타데이터가 없습니다', 'error');
-                    return;
+                // 이미지 base64 가져오기
+                let imageBase64 = card._imageData.image;
+                if (!imageBase64 && card._imageData.image_path) {
+                    try {
+                        const response = await fetch(`${API_BASE}/api/outputs/${card._imageData.image_path}`);
+                        const blob = await response.blob();
+                        imageBase64 = await new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onload = () => resolve(reader.result.split(',')[1]);
+                            reader.readAsDataURL(blob);
+                        });
+                    } catch (err) {
+                        console.error('이미지 로드 실패:', err);
+                    }
                 }
-                showLoadSettingsConfirm(metadata);
+                if (imageBase64) {
+                    showGalleryDropModal(imageBase64, metadata, card._imageData.image_path || 'output.png');
+                } else {
+                    showToast('이미지를 불러올 수 없습니다', 'error');
+                }
             };
 
             // Inpaint 버튼
@@ -8492,65 +8507,6 @@
             };
         }
 
-        // 설정 불러오기 확인 팝업 (드롭 모달 재사용)
-        function showLoadSettingsConfirm(rawMetadata) {
-            // NAI 형식을 앱 내부 형식으로 변환
-            const metadata = normalizeMetadata(rawMetadata) || rawMetadata;
-
-            const dropModal = document.getElementById('dropModal');
-            document.getElementById('dropModalTitle').textContent = '📋 설정 불러오기';
-            document.getElementById('dropModalPreview').src = '';
-            document.getElementById('dropModalPreview').style.display = 'none';
-
-            // 캐릭터 프롬프트 정보
-            const charPrompts = metadata.character_prompts || [];
-            const charPromptsHtml = charPrompts.length > 0
-                ? `<div><strong>캐릭터 (${charPrompts.length}):</strong> ${charPrompts.map((c, i) => `[${i+1}] ${(c || '').substring(0, 30)}${(c || '').length > 30 ? '...' : ''}`).join(', ')}</div>`
-                : '';
-
-            // 바이브 정보
-            const vibes = metadata.vibe_transfer || [];
-            const vibeHtml = vibes.length > 0
-                ? `<div><strong>Vibe (${vibes.length}):</strong> ${vibes.map(v => v.name || `S:${v.strength} I:${v.info_extracted}`).join(', ')}</div>`
-                : '';
-
-            // 순수 NAI 이미지 여부 확인 (peropix 확장이 없으면 순수 NAI)
-            const isPureNaiImage = !rawMetadata.peropix;
-
-            // 순수 NAI 이미지에 대한 경고 메시지
-            const naiWarningHtml = isPureNaiImage ? `
-                <div style="background: #3a3520; border: 1px solid #665c30; padding: 8px; margin-bottom: 8px; border-radius: 4px; font-size: 11px;">
-                    ⚠️ <strong>순수 NAI 이미지</strong> - Character Reference, Base Image 설정은 적용되지 않습니다.
-                </div>
-            ` : '';
-
-            const metadataDiv = document.getElementById('dropModalMetadata');
-            metadataDiv.innerHTML = `
-                ${naiWarningHtml}
-                <div><strong>Prompt:</strong> ${(metadata.prompt || '').substring(0, 100)}${(metadata.prompt || '').length > 100 ? '...' : ''}</div>
-                <div><strong>Negative:</strong> ${(metadata.negative_prompt || '').substring(0, 50)}${(metadata.negative_prompt || '').length > 50 ? '...' : ''}</div>
-                ${charPromptsHtml}
-                ${vibeHtml}
-                <div><strong>Seed:</strong> ${metadata.seed || 'N/A'}</div>
-                <div><strong>Size:</strong> ${metadata.width}x${metadata.height}</div>
-                <div><strong>Steps:</strong> ${metadata.steps}, <strong>CFG:</strong> ${metadata.cfg}</div>
-                <div><strong>Sampler:</strong> ${metadata.sampler}</div>
-                <div><strong>Model:</strong> ${metadata.nai_model || metadata.model || 'N/A'}</div>
-            `;
-
-            // 설정 불러오기: 메타데이터 적용 버튼만 표시 (이미지 옵션 없음)
-            document.getElementById('dropModalMetaOptions').style.display = 'flex';
-            document.getElementById('dropModalMetaActions').style.display = 'flex';
-            // 시드만 버튼 숨기기 (설정 불러오기에서는 시드만 따로 제공 안함)
-            document.getElementById('dropModalSeedOnly').style.display = 'none';
-
-            // 정규화된 데이터 저장
-            window._pendingLoadMetadata = metadata;
-            window._isPureNaiImage = isPureNaiImage;
-
-            dropModal.classList.add('active');
-        }
-
         // 순수 NAI 이미지 적용 시 경고 팝업
         function showPureNaiWarning(callback) {
             const msg = `⚠️ 순수 NAI 이미지입니다.
@@ -8568,8 +8524,16 @@
         // 프롬프트만 적용 (시드 포함)
         function applyPromptOnly(metadata) {
             // 프롬프트 (공란이어도 적용)
-            if (metadata.prompt !== undefined) document.getElementById('basePrompt').value = metadata.prompt;
-            if (metadata.negative_prompt !== undefined) document.getElementById('negativePrompt').value = metadata.negative_prompt;
+            if (metadata.prompt !== undefined) {
+                const basePrompt = document.getElementById('basePrompt');
+                basePrompt.value = metadata.prompt;
+                basePrompt.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            if (metadata.negative_prompt !== undefined) {
+                const negativePrompt = document.getElementById('negativePrompt');
+                negativePrompt.value = metadata.negative_prompt;
+                negativePrompt.dispatchEvent(new Event('input', { bubbles: true }));
+            }
 
             // 캐릭터 프롬프트 적용
             if (metadata.character_prompts && metadata.character_prompts.length > 0) {
@@ -11717,8 +11681,7 @@
                     <div class="gallery-item-actions">
                         <button class="inpaint-btn" title="인페인트">🎨 Inpaint</button>
                         <button class="enhance-btn" title="Enhance (NAI)" style="display: ${currentProvider === 'nai' ? 'inline-block' : 'none'};">✨ Enhance</button>
-                        <button class="copy-seed-btn" title="시드 복사">🎲 Seed</button>
-                        <button class="apply-all-btn" title="전체 설정 적용">📋 Apply</button>
+                        <button class="apply-all-btn" title="설정 적용">📋 Apply</button>
                         <button class="delete-btn" title="삭제">🗑️</button>
                     </div>
                 `;
@@ -11839,36 +11802,17 @@
                     };
                 };
 
-                // 시드 적용 (확인 팝업)
-                item.querySelector('.copy-seed-btn').onclick = async (e) => {
-                    e.stopPropagation();
-                    if (img.seed) {
-                        showConfirmModal(
-                            '🎲 시드 적용',
-                            `<p>이 시드를 적용하시겠습니까?</p><div class="metadata" style="font-size: 0.9rem; margin-top: 8px;"><strong>Seed:</strong> ${img.seed}</div>`,
-                            async () => {
-                                document.getElementById('seed').value = img.seed;
-                                await navigator.clipboard.writeText(String(img.seed));
-                                showToast('시드 적용 및 복사됨', 'success');
-                            },
-                            '적용'
-                        );
-                    } else {
-                        showToast('시드 정보 없음', 'warning');
-                    }
-                };
-
-                // 전체 설정 적용 (확인 팝업)
+                // 설정 적용 (팝업) - 이미지 드롭과 동일한 모달 사용
                 item.querySelector('.apply-all-btn').onclick = async (e) => {
                     e.stopPropagation();
                     try {
                         const response = await fetch(`${API_BASE}/api/gallery/${item._filename}${folderQuery}`);
                         const result = await response.json();
-                        if (result.success && result.metadata) {
-                            // showLoadSettingsConfirm 내부에서 normalizeMetadata 호출
-                            showLoadSettingsConfirm(result.metadata);
+                        if (result.success && result.image) {
+                            // 이미지 드롭과 동일한 방식으로 dropModal 표시
+                            showGalleryDropModal(result.image, result.metadata, item._filename);
                         } else {
-                            showToast('메타데이터 없음', 'warning');
+                            showToast('이미지 로드 실패', 'error');
                         }
                     } catch (err) {
                         showToast('적용 실패: ' + err.message, 'error');
@@ -12329,6 +12273,59 @@
                 showToast('메타데이터 추출 오류: ' + err.message, 'error');
             }
         });
+
+        // 갤러리 Apply 버튼용 - dropModal 표시 (이미지 드롭과 동일한 UI)
+        window.showGalleryDropModal = function(imageBase64, metadata, filename) {
+            const dropModal = document.getElementById('dropModal');
+
+            // 모달 표시 준비
+            document.getElementById('dropModalPreview').src = 'data:image/png;base64,' + imageBase64;
+            const metadataDiv = document.getElementById('dropModalMetadata');
+
+            if (metadata) {
+                // NAI/PeroPix 이미지 - 정규화된 메타데이터로 표시
+                const meta = normalizeMetadata(metadata);
+                const isPureNai = !metadata.peropix;
+                document.getElementById('dropModalTitle').textContent = isPureNai ? '🖼️ NAI 원본 이미지' : '🖼️ PeroPix 이미지';
+
+                metadataDiv.innerHTML = `
+                    <div><strong>Prompt:</strong> ${(meta.prompt || '').substring(0, 100)}${(meta.prompt || '').length > 100 ? '...' : ''}</div>
+                    <div><strong>Negative:</strong> ${(meta.negative_prompt || '').substring(0, 50)}${(meta.negative_prompt || '').length > 50 ? '...' : ''}</div>
+                    <div><strong>Seed:</strong> ${meta.seed || 'N/A'}</div>
+                    <div><strong>Size:</strong> ${meta.width}x${meta.height}</div>
+                    <div><strong>Steps:</strong> ${meta.steps}, <strong>CFG:</strong> ${meta.cfg}, <strong>Rescale:</strong> ${meta.cfg_rescale || 0}</div>
+                    <div><strong>Sampler:</strong> ${meta.sampler}, <strong>Scheduler:</strong> ${meta.scheduler}</div>
+                    <div><strong>SMEA:</strong> ${meta.smea}, <strong>Variety+:</strong> ${meta.variety_plus ? 'On' : 'Off'}</div>
+                    <div><strong>Model:</strong> ${meta.nai_model || 'N/A'}</div>
+                    ${isPureNai ? '<div style="color:#4ade80; margin-top:8px;">✓ NAI 원본: 퀄리티 태그/UC 프리셋 자동 분리됨</div>' : ''}
+                `;
+                // NAI/PeroPix 이미지: 이미지 용도 + 메타데이터 적용 버튼 모두 표시
+                document.getElementById('dropModalImageOptions').style.display = 'flex';
+                document.getElementById('dropModalMetaOptions').style.display = 'flex';
+                document.getElementById('dropModalMetaActions').style.display = 'flex';
+                pendingDropData = {
+                    type: 'nai',
+                    metadata: metadata,  // 원본 저장 (적용 시 다시 정규화)
+                    image: imageBase64,
+                    name: filename
+                };
+                window._isPureNaiImage = isPureNai;
+            } else {
+                // 메타데이터 없는 이미지 - 바이브, 캐릭터 레퍼런스, 베이스 이미지로 추가 제안
+                document.getElementById('dropModalTitle').textContent = '📷 갤러리 이미지';
+                metadataDiv.innerHTML = '<div>메타데이터가 없습니다. 바이브, 캐릭터 레퍼런스, 또는 베이스 이미지로 추가할 수 있습니다.</div>';
+                // 일반 이미지: 이미지 용도 + 취소 버튼만 표시
+                document.getElementById('dropModalImageOptions').style.display = 'flex';
+                document.getElementById('dropModalPlainActions').style.display = 'flex';
+                pendingDropData = {
+                    type: 'plain',
+                    image: imageBase64,
+                    name: filename
+                };
+            }
+
+            dropModal.classList.add('active');
+        };
 
         // 모달 닫기 헬퍼
         function closeDropModal() {

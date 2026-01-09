@@ -631,13 +631,210 @@ def read_metadata_from_image(image_bytes: bytes) -> dict:
     return metadata or {}
 
 
+# ============================================================
+# LyCORIS Loader (LokR/LoHa support)
+# Diffusers가 지원하지 않는 LyCORIS 형식을 직접 처리
+# 참고: ComfyUI weight_adapter 구현
+# ============================================================
+class LyCORISLoader:
+    """LyCORIS (LokR/LoHa) 전용 로더 - Diffusers와 독립적으로 동작"""
+
+    SUPPORTED_TYPES = {'lokr', 'loha'}
+
+    @staticmethod
+    def detect_type(state_dict: dict) -> str | None:
+        """
+        LoRA 파일의 타입 감지
+        Returns: 'lokr', 'loha', or None (일반 LoRA)
+        """
+        for key in state_dict.keys():
+            # LokR 감지: lokr_w1, lokr_w2, lokr_w1_a 등
+            if '.lokr_w1' in key or '.lokr_w2' in key:
+                return 'lokr'
+            # LoHa 감지: hada_w1_a, hada_w1_b 등
+            if '.hada_w1_a' in key or '.hada_w2_a' in key:
+                return 'loha'
+        return None  # 일반 LoRA
+
+    @staticmethod
+    def get_layer_name_mapping(state_dict: dict, model_type: str = 'sdxl') -> dict:
+        """
+        LyCORIS 키를 모델 레이어 이름으로 매핑
+        Returns: {lycoris_prefix: model_layer_name}
+        """
+        # LyCORIS 키에서 고유 prefix 추출
+        prefixes = set()
+        for key in state_dict.keys():
+            # 예: lora_unet_down_blocks_0_attentions_0_transformer_blocks_0_attn1_to_q.lokr_w1
+            # prefix: lora_unet_down_blocks_0_attentions_0_transformer_blocks_0_attn1_to_q
+            for suffix in ['.lokr_w1', '.lokr_w2', '.lokr_w1_a', '.lokr_w1_b',
+                          '.lokr_w2_a', '.lokr_w2_b', '.lokr_t2', '.alpha',
+                          '.hada_w1_a', '.hada_w1_b', '.hada_w2_a', '.hada_w2_b',
+                          '.hada_t1', '.hada_t2']:
+                if key.endswith(suffix):
+                    prefixes.add(key[:-len(suffix)])
+                    break
+
+        # prefix를 모델 레이어 이름으로 변환
+        mapping = {}
+        for prefix in prefixes:
+            # lora_unet_xxx -> unet.xxx (언더스코어를 점으로)
+            # lora_te1_xxx -> text_encoder.xxx
+            # lora_te2_xxx -> text_encoder_2.xxx
+            layer_name = prefix
+
+            if layer_name.startswith('lora_unet_'):
+                layer_name = 'unet.' + layer_name[10:].replace('_', '.')
+            elif layer_name.startswith('lora_te1_'):
+                layer_name = 'text_encoder.' + layer_name[9:].replace('_', '.')
+            elif layer_name.startswith('lora_te2_'):
+                layer_name = 'text_encoder_2.' + layer_name[9:].replace('_', '.')
+            elif layer_name.startswith('lora_te_'):
+                layer_name = 'text_encoder.' + layer_name[8:].replace('_', '.')
+
+            # 숫자 패턴 수정: down.blocks.0 -> down_blocks.0 등
+            # Diffusers 모델 구조에 맞게 변환
+            import re
+            # blocks.0.attentions -> blocks[0].attentions 스타일이 아닌
+            # down_blocks.0 형태 유지
+            layer_name = re.sub(r'\.(\d+)\.', r'[\1].', layer_name)
+
+            mapping[prefix] = layer_name
+
+        return mapping
+
+    @staticmethod
+    def calculate_lokr_weight(
+        state_dict: dict,
+        prefix: str,
+        device: str,
+        dtype
+    ):
+        """
+        LokR weight delta 계산
+        delta = kron(w1, w2) * (alpha / dim)
+        """
+        lazy_imports()
+
+        # weight 키 이름들
+        w1_key = f"{prefix}.lokr_w1"
+        w2_key = f"{prefix}.lokr_w2"
+        w1_a_key = f"{prefix}.lokr_w1_a"
+        w1_b_key = f"{prefix}.lokr_w1_b"
+        w2_a_key = f"{prefix}.lokr_w2_a"
+        w2_b_key = f"{prefix}.lokr_w2_b"
+        t2_key = f"{prefix}.lokr_t2"
+        alpha_key = f"{prefix}.alpha"
+
+        # alpha 값
+        alpha = state_dict.get(alpha_key, torch.tensor(1.0)).item() if alpha_key in state_dict else 1.0
+
+        # w1 계산
+        if w1_key in state_dict:
+            w1 = state_dict[w1_key].to(device=device, dtype=dtype)
+            dim = w1.shape[0]  # 또는 다른 차원
+        elif w1_a_key in state_dict and w1_b_key in state_dict:
+            w1_a = state_dict[w1_a_key].to(device=device, dtype=dtype)
+            w1_b = state_dict[w1_b_key].to(device=device, dtype=dtype)
+            w1 = torch.mm(w1_a, w1_b)
+            dim = w1_b.shape[0]
+        else:
+            return None
+
+        # w2 계산
+        if w2_key in state_dict:
+            w2 = state_dict[w2_key].to(device=device, dtype=dtype)
+        elif w2_a_key in state_dict and w2_b_key in state_dict:
+            w2_a = state_dict[w2_a_key].to(device=device, dtype=dtype)
+            w2_b = state_dict[w2_b_key].to(device=device, dtype=dtype)
+
+            # Tucker decomposition 체크
+            if t2_key in state_dict:
+                t2 = state_dict[t2_key].to(device=device, dtype=dtype)
+                w2 = torch.einsum('i j k l, j r, i p -> p r k l', t2, w2_b, w2_a)
+            else:
+                w2 = torch.mm(w2_a, w2_b)
+            dim = w2_b.shape[0]
+        else:
+            return None
+
+        # Kronecker product 계산
+        # Conv2d의 경우 4D 처리
+        if len(w2.shape) == 4:
+            w1 = w1.unsqueeze(2).unsqueeze(2)
+
+        # alpha 스케일링
+        scale = alpha / dim if dim > 0 else 1.0
+
+        delta = torch.kron(w1, w2) * scale
+        return delta
+
+    @staticmethod
+    def calculate_loha_weight(
+        state_dict: dict,
+        prefix: str,
+        device: str,
+        dtype
+    ):
+        """
+        LoHa weight delta 계산
+        delta = (w1_a @ w1_b) * (w2_a @ w2_b) * (alpha / dim)
+        Hadamard product (element-wise multiplication)
+        """
+        lazy_imports()
+
+        # weight 키 이름들
+        w1_a_key = f"{prefix}.hada_w1_a"
+        w1_b_key = f"{prefix}.hada_w1_b"
+        w2_a_key = f"{prefix}.hada_w2_a"
+        w2_b_key = f"{prefix}.hada_w2_b"
+        t1_key = f"{prefix}.hada_t1"
+        t2_key = f"{prefix}.hada_t2"
+        alpha_key = f"{prefix}.alpha"
+
+        # 필수 키 체크
+        if w1_a_key not in state_dict or w1_b_key not in state_dict:
+            return None
+        if w2_a_key not in state_dict or w2_b_key not in state_dict:
+            return None
+
+        # alpha 값
+        alpha = state_dict.get(alpha_key, torch.tensor(1.0)).item() if alpha_key in state_dict else 1.0
+
+        w1_a = state_dict[w1_a_key].to(device=device, dtype=dtype)
+        w1_b = state_dict[w1_b_key].to(device=device, dtype=dtype)
+        w2_a = state_dict[w2_a_key].to(device=device, dtype=dtype)
+        w2_b = state_dict[w2_b_key].to(device=device, dtype=dtype)
+
+        dim = w1_b.shape[0]
+
+        # Tucker decomposition 체크
+        if t1_key in state_dict and t2_key in state_dict:
+            t1 = state_dict[t1_key].to(device=device, dtype=dtype)
+            t2 = state_dict[t2_key].to(device=device, dtype=dtype)
+            m1 = torch.einsum('i j k l, j r, i p -> p r k l', t1, w1_b, w1_a)
+            m2 = torch.einsum('i j k l, j r, i p -> p r k l', t2, w2_b, w2_a)
+        else:
+            m1 = torch.mm(w1_a, w1_b)
+            m2 = torch.mm(w2_a, w2_b)
+
+        # Hadamard product (element-wise)
+        scale = alpha / dim if dim > 0 else 1.0
+        delta = (m1 * m2) * scale
+
+        return delta
+
+
 class ModelCache:
     def __init__(self):
         self.pipe = None
         self.model_path = None
-        self.loaded_loras = {}
+        self.loaded_loras = {}  # {name: {'type': 'lora'|'lokr'|'loha', 'scale': float, ...}}
         self._device = None
         self._dtype = None
+        # LyCORIS 적용을 위한 원본 weight 백업
+        self._original_weights = {}  # {layer_name: original_weight_tensor}
+        self._lycoris_deltas = {}    # {lora_name: {layer_name: delta_tensor}}
     
     @property
     def device(self):
@@ -723,23 +920,170 @@ class ModelCache:
         if not lora_path.exists():
             raise ValueError(f"LoRA not found: {lora_path}")
 
-        # adapter_name에 '.'이 포함되면 PEFT에서 모듈 경로 파싱 오류 발생
-        # 파일명에서 '.'을 '_'로 치환하여 안전한 adapter_name 생성
-        safe_adapter_name = lora_name.replace(".", "_")
+        # safetensors 파일 로드하여 타입 감지
+        from safetensors.torch import load_file
+        state_dict = load_file(str(lora_path))
+        lora_type = LyCORISLoader.detect_type(state_dict)
 
-        print(f"[Load] Loading LoRA: {lora_name} (scale={scale})")
-        self.pipe.load_lora_weights(str(lora_path), adapter_name=safe_adapter_name)
-        self.loaded_loras[lora_name] = scale
+        if lora_type in ('lokr', 'loha'):
+            # LyCORIS 형식 - 직접 처리
+            print(f"[Load] Loading {lora_type.upper()}: {lora_name} (scale={scale})")
+            self._load_lycoris(lora_name, state_dict, lora_type, scale)
+        else:
+            # 일반 LoRA - Diffusers 방식
+            # adapter_name에 '.'이 포함되면 PEFT에서 모듈 경로 파싱 오류 발생
+            safe_adapter_name = lora_name.replace(".", "_")
+            print(f"[Load] Loading LoRA: {lora_name} (scale={scale})")
+            self.pipe.load_lora_weights(str(lora_path), adapter_name=safe_adapter_name)
+            self.loaded_loras[lora_name] = {'type': 'lora', 'scale': scale}
+
+    def _load_lycoris(self, lora_name: str, state_dict: dict, lora_type: str, scale: float):
+        """LyCORIS (LokR/LoHa) weight를 모델에 직접 적용"""
+        # delta 계산 함수 선택
+        if lora_type == 'lokr':
+            calc_fn = LyCORISLoader.calculate_lokr_weight
+        else:  # loha
+            calc_fn = LyCORISLoader.calculate_loha_weight
+
+        # LyCORIS 키에서 prefix 추출
+        prefixes = set()
+        for key in state_dict.keys():
+            for suffix in ['.lokr_w1', '.lokr_w2', '.lokr_w1_a', '.lokr_w1_b',
+                          '.lokr_w2_a', '.lokr_w2_b', '.lokr_t2', '.alpha',
+                          '.hada_w1_a', '.hada_w1_b', '.hada_w2_a', '.hada_w2_b',
+                          '.hada_t1', '.hada_t2']:
+                if key.endswith(suffix):
+                    prefixes.add(key[:-len(suffix)])
+                    break
+
+        # 각 prefix에 대해 delta 계산 및 저장
+        deltas = {}
+        applied_count = 0
+        skipped_count = 0
+
+        for prefix in prefixes:
+            delta = calc_fn(state_dict, prefix, self.device, self.dtype)
+            if delta is not None:
+                deltas[prefix] = delta
+                applied_count += 1
+            else:
+                skipped_count += 1
+
+        self._lycoris_deltas[lora_name] = deltas
+        self.loaded_loras[lora_name] = {
+            'type': lora_type,
+            'scale': scale,
+            'prefixes': list(prefixes)
+        }
+
+        print(f"[Load] {lora_type.upper()} loaded: {applied_count} layers, {skipped_count} skipped")
+
+    def _apply_lycoris_to_model(self):
+        """저장된 LyCORIS delta들을 모델에 적용"""
+        if not self._lycoris_deltas:
+            return
+
+        # UNet과 Text Encoder의 state_dict 가져오기
+        unet_sd = self.pipe.unet.state_dict()
+        te1_sd = self.pipe.text_encoder.state_dict() if hasattr(self.pipe, 'text_encoder') else {}
+        te2_sd = self.pipe.text_encoder_2.state_dict() if hasattr(self.pipe, 'text_encoder_2') else {}
+
+        for lora_name, deltas in self._lycoris_deltas.items():
+            lora_info = self.loaded_loras.get(lora_name, {})
+            scale = lora_info.get('scale', 1.0)
+
+            for prefix, delta in deltas.items():
+                # prefix를 실제 weight 키로 변환
+                weight_key = self._lycoris_prefix_to_weight_key(prefix)
+                if weight_key is None:
+                    continue
+
+                # 해당 모듈 찾기 및 weight 업데이트
+                try:
+                    self._apply_delta_to_weight(prefix, weight_key, delta, scale)
+                except Exception as e:
+                    print(f"[LyCORIS] Failed to apply {prefix}: {e}")
+
+    def _lycoris_prefix_to_weight_key(self, prefix: str) -> str | None:
+        """LyCORIS prefix를 모델 weight 키로 변환"""
+        # lora_unet_down_blocks_0_attentions_0_transformer_blocks_0_attn1_to_q
+        # -> down_blocks.0.attentions.0.transformer_blocks.0.attn1.to_q.weight
+
+        if prefix.startswith('lora_unet_'):
+            key = prefix[10:]  # 'lora_unet_' 제거
+        elif prefix.startswith('lora_te1_'):
+            key = prefix[9:]
+        elif prefix.startswith('lora_te2_'):
+            key = prefix[9:]
+        elif prefix.startswith('lora_te_'):
+            key = prefix[8:]
+        else:
+            return None
+
+        # 언더스코어를 점으로 변환하되, 숫자 앞뒤는 유지
+        import re
+        # 패턴: word_word -> word.word, word_0_word -> word.0.word
+        parts = key.split('_')
+        result = []
+        i = 0
+        while i < len(parts):
+            part = parts[i]
+            result.append(part)
+            i += 1
+
+        return '.'.join(result) + '.weight'
+
+    def _apply_delta_to_weight(self, prefix: str, weight_key: str, delta, scale: float):
+        """delta를 실제 모델 weight에 적용"""
+        # 어떤 모듈에 적용할지 결정
+        if prefix.startswith('lora_unet_'):
+            module = self.pipe.unet
+            key_in_module = weight_key
+        elif prefix.startswith('lora_te1_') or prefix.startswith('lora_te_'):
+            module = self.pipe.text_encoder
+            key_in_module = weight_key
+        elif prefix.startswith('lora_te2_'):
+            module = self.pipe.text_encoder_2
+            key_in_module = weight_key
+        else:
+            return
+
+        # 해당 레이어 찾기
+        try:
+            # nested module 접근
+            parts = key_in_module.replace('.weight', '').split('.')
+            target = module
+            for part in parts:
+                if part.isdigit():
+                    target = target[int(part)]
+                else:
+                    target = getattr(target, part)
+
+            # 원본 백업 (최초 1회)
+            full_key = f"{prefix}.weight"
+            if full_key not in self._original_weights:
+                self._original_weights[full_key] = target.weight.data.clone()
+
+            # delta 적용
+            scaled_delta = delta * scale
+            if scaled_delta.shape != target.weight.data.shape:
+                scaled_delta = scaled_delta.reshape(target.weight.data.shape)
+
+            target.weight.data = self._original_weights[full_key] + scaled_delta.to(target.weight.data.dtype)
+
+        except Exception as e:
+            # 매핑 실패 - 디버그용 로그
+            print(f"[LyCORIS] Could not find layer for {prefix}: {e}")
     
     def set_lora_scales(self, lora_configs: List[dict]):
         if not lora_configs:
-            if self.loaded_loras:
-                self.pipe.unload_lora_weights()
-                self.loaded_loras = {}
+            # 모든 LoRA 언로드
+            self._unload_all_loras()
             return
 
-        adapter_names = []
-        adapter_weights = []
+        # 일반 LoRA와 LyCORIS 분리
+        diffusers_adapters = []  # (name, scale) for Diffusers
+        lycoris_configs = []     # (name, scale) for LyCORIS
 
         for config in lora_configs:
             name = config["name"]
@@ -748,20 +1092,101 @@ class ModelCache:
             if name not in self.loaded_loras:
                 self.load_lora(name, scale)
 
-            # adapter_name은 '.'을 '_'로 치환한 safe name 사용
-            safe_adapter_name = name.replace(".", "_")
-            adapter_names.append(safe_adapter_name)
-            adapter_weights.append(scale)
+            lora_info = self.loaded_loras.get(name, {})
+            lora_type = lora_info.get('type', 'lora')
 
-        if adapter_names:
+            if lora_type in ('lokr', 'loha'):
+                lycoris_configs.append((name, scale))
+                # scale 변경 시 업데이트
+                if lora_info.get('scale') != scale:
+                    self.loaded_loras[name]['scale'] = scale
+            else:
+                safe_adapter_name = name.replace(".", "_")
+                diffusers_adapters.append((safe_adapter_name, scale))
+
+        # Diffusers LoRA 적용
+        if diffusers_adapters:
+            adapter_names = [a[0] for a in diffusers_adapters]
+            adapter_weights = [a[1] for a in diffusers_adapters]
             self.pipe.set_adapters(adapter_names, adapter_weights=adapter_weights)
-    
+
+        # LyCORIS 적용 (scale 변경 포함)
+        if lycoris_configs:
+            self._apply_lycoris_to_model()
+
+    def _unload_all_loras(self):
+        """모든 LoRA 및 LyCORIS 언로드"""
+        # Diffusers LoRA 언로드
+        has_diffusers_lora = any(
+            info.get('type') == 'lora'
+            for info in self.loaded_loras.values()
+            if isinstance(info, dict)
+        )
+        if has_diffusers_lora:
+            try:
+                self.pipe.unload_lora_weights()
+            except Exception as e:
+                print(f"[LoRA] Unload warning: {e}")
+
+        # LyCORIS weight 복원
+        self._restore_original_weights()
+
+        # 상태 초기화
+        self.loaded_loras = {}
+        self._lycoris_deltas = {}
+
+    def _restore_original_weights(self):
+        """LyCORIS로 변경된 weight를 원본으로 복원"""
+        if not self._original_weights:
+            return
+
+        restored_count = 0
+        for full_key, original_weight in self._original_weights.items():
+            # full_key: "lora_unet_xxx.weight" 형태
+            prefix = full_key.replace('.weight', '')
+
+            try:
+                if prefix.startswith('lora_unet_'):
+                    module = self.pipe.unet
+                elif prefix.startswith('lora_te1_') or prefix.startswith('lora_te_'):
+                    module = self.pipe.text_encoder
+                elif prefix.startswith('lora_te2_'):
+                    module = self.pipe.text_encoder_2
+                else:
+                    continue
+
+                # weight 키 변환 및 레이어 접근
+                weight_key = self._lycoris_prefix_to_weight_key(prefix)
+                if weight_key is None:
+                    continue
+
+                parts = weight_key.replace('.weight', '').split('.')
+                target = module
+                for part in parts:
+                    if part.isdigit():
+                        target = target[int(part)]
+                    else:
+                        target = getattr(target, part)
+
+                target.weight.data = original_weight.clone()
+                restored_count += 1
+
+            except Exception as e:
+                print(f"[LyCORIS] Restore failed for {prefix}: {e}")
+
+        if restored_count > 0:
+            print(f"[LyCORIS] Restored {restored_count} original weights")
+
+        self._original_weights = {}
+
     def clear(self):
         if self.pipe is not None:
             del self.pipe
             self.pipe = None
         self.model_path = None
         self.loaded_loras = {}
+        self._original_weights = {}
+        self._lycoris_deltas = {}
         if torch is not None:
             torch.cuda.empty_cache()
 

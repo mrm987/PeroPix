@@ -316,64 +316,6 @@ def ensure_png_base64(base64_image: str, force_reencode: bool = False) -> str:
     return base64.b64encode(buffer.getvalue()).decode('utf-8')
 
 
-def process_character_reference_image(base64_image: str) -> str:
-    """Character Reference 이미지를 NAI API 형식으로 처리 (NAIS2 방식)
-
-    - 캔버스 크기: 1472x1472 (정사각형), 1536x1024 (가로), 1024x1536 (세로)
-    - 검은 배경 letterbox
-    - JPEG 95% 품질 출력
-
-    macOS/Windows Canvas toDataURL 차이로 인한 문제 해결을 위해
-    백엔드에서 일관된 처리 수행
-    """
-    from PIL import Image as PILImage
-
-    # 이미지 로드
-    image_data = base64.b64decode(base64_image)
-    pil_img = PILImage.open(io.BytesIO(image_data))
-
-    # RGB로 변환 (JPEG는 알파 채널 지원 안함)
-    if pil_img.mode == 'RGBA':
-        # 검은 배경에 합성
-        background = PILImage.new('RGB', pil_img.size, (0, 0, 0))
-        background.paste(pil_img, mask=pil_img.split()[3])
-        pil_img = background
-    elif pil_img.mode != 'RGB':
-        pil_img = pil_img.convert('RGB')
-
-    width, height = pil_img.size
-
-    # 캔버스 크기 선택 (NAIS2와 동일)
-    if width > height:
-        target_w, target_h = 1536, 1024
-    elif width < height:
-        target_w, target_h = 1024, 1536
-    else:
-        target_w, target_h = 1472, 1472
-
-    # 검은 배경 캔버스 생성
-    canvas = PILImage.new('RGB', (target_w, target_h), (0, 0, 0))
-
-    # 비율 유지하면서 리사이즈 계산
-    scale = min(target_w / width, target_h / height)
-    new_w = int(width * scale)
-    new_h = int(height * scale)
-
-    # 리사이즈 (LANCZOS 사용)
-    resized = pil_img.resize((new_w, new_h), PILImage.Resampling.LANCZOS)
-
-    # 중앙 배치
-    x = (target_w - new_w) // 2
-    y = (target_h - new_h) // 2
-    canvas.paste(resized, (x, y))
-
-    # JPEG 95% 품질로 저장
-    buffer = io.BytesIO()
-    canvas.save(buffer, format='JPEG', quality=95)
-
-    return base64.b64encode(buffer.getvalue()).decode('utf-8')
-
-
 def binarize_mask(base64_mask: str, threshold: int = 1) -> str:
     """마스크를 이진화하고 원본 PNG 형식 유지
 
@@ -1447,17 +1389,15 @@ async def call_nai_api(req: GenerateRequest):
         style_aware = req.character_reference.get("style_aware", True)
         caption_type = "character&style" if style_aware else "character"
 
-        # 백엔드에서 이미지 처리 (macOS/Windows Canvas 차이 문제 해결)
-        # 프론트엔드 처리 결과 대신 원본 이미지를 백엔드에서 일관되게 처리
-        raw_image = req.character_reference["image"]
+        # 프론트엔드에서 이미 Canvas로 처리된 이미지 (JPEG, 패딩 완료)
+        # 추가 처리 없이 그대로 사용
+        processed_image = req.character_reference["image"]
+        
         try:
-            orig_w, orig_h = get_image_size_from_base64(raw_image)
-            processed_image = process_character_reference_image(raw_image)
-            proc_w, proc_h = get_image_size_from_base64(processed_image)
-            print(f"[NAI] Character Reference: {orig_w}x{orig_h} -> {proc_w}x{proc_h} (processed by backend)")
+            w, h = get_image_size_from_base64(processed_image)
+            print(f"[NAI] Character Reference: {w}x{h} (pre-processed by frontend)")
         except Exception as e:
-            print(f"[NAI] Character Reference processing failed: {e}, using original")
-            processed_image = raw_image
+            print(f"[NAI] Character Reference: size check failed: {e}")
 
         # NAIS2 방식: director_reference_images 사용 (JPEG, 패딩된 이미지)
         params["director_reference_images"] = [processed_image]

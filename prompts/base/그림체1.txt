@@ -1,0 +1,7 @@
+1.1::artist:hasu (tako0980)::, 1.0::artist:gomennasai::, 0.9::artist:ronna::, 0.8::artist:henriiku (ahemaru)::, 0.7::artist:wagashi (dagashiya)::, 
+-1.5::artist collaboration::, -1.5::multiple views::, 
+1.1::masterpiece::, 1.1::best quality::, amazing quality, very aesthetic, absurdres, finely detailed, 1.1::beautiful eyes and detailed face::, detailed eyes, clean lineart, 2::detailed background::, 1.2::ultra detailed perfect piece::,
+-1.0::flat color::, -3.0::simple illustration::
+natural lighting, clean coloring, year 2024, vibrant colors, ::high saturation::,
+soft skin, 1.1::soft body::, body blush, 
+general, safe,, smile, very aesthetic, masterpiece, no text

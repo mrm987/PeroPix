@@ -508,6 +508,59 @@
             border-radius: 3px;
         }
 
+        /* 번역 모드 */
+        .translate-mode-btn {
+            background: var(--bg-lighter);
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+            padding: 2px 6px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            margin-right: 4px;
+        }
+        .translate-mode-btn:hover {
+            background: var(--bg-light);
+            border-color: var(--text-dim);
+        }
+        .translate-mode-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+
+        .prompt-highlight-overlay.translate-mode {
+            pointer-events: auto;
+            z-index: 3;
+        }
+        .prompt-highlight-container.translate-mode textarea {
+            pointer-events: none;
+        }
+        .prompt-highlight-overlay.translate-mode span.tag-segment {
+            cursor: help;
+            transition: background-color 0.15s;
+        }
+        .prompt-highlight-overlay.translate-mode span.tag-segment:hover {
+            outline: 1px solid var(--accent);
+            outline-offset: 1px;
+        }
+
+        .translate-tooltip {
+            position: fixed;
+            z-index: 10000;
+            background: var(--bg);
+            border: 1px solid var(--accent);
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 0.85rem;
+            color: var(--text);
+            box-shadow: var(--shadow-lg);
+            max-width: 300px;
+            word-wrap: break-word;
+            display: none;
+            pointer-events: none;
+        }
+
         .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
         
@@ -2143,7 +2196,16 @@
             border: none;
             background: var(--bg-light);
         }
-        
+
+        /* 슬롯 프롬프트 번역 모드 */
+        .slot-prompt .prompt-highlight-container.translate-mode textarea {
+            pointer-events: none;
+        }
+        .slot-prompt .prompt-highlight-overlay.translate-mode {
+            pointer-events: auto;
+            z-index: 3;
+        }
+
         .slot-images {
             flex: 1;
             overflow-y: auto;
@@ -4062,12 +4124,15 @@
                             <button type="button" id="modeToggle" class="mode-toggle" title="아니메 모드">🌸</button>
                             <label for="basePrompt" class="prompt-label">Base Prompt</label>
                         </div>
-                        <div class="prompt-preset-dropdown" data-category="base">
-                            <button type="button" class="prompt-preset-btn" title="프롬프트 프리셋">🔖 ▼</button>
-                            <div class="prompt-preset-menu">
-                                <div class="prompt-preset-list"></div>
-                                <div class="prompt-preset-actions">
-                                    <button type="button" class="prompt-preset-save-btn">+ Save Current</button>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <button type="button" class="translate-mode-btn" onclick="toggleTranslateMode()" title="번역 모드 (태그에 호버하면 번역 표시)">🌐</button>
+                            <div class="prompt-preset-dropdown" data-category="base">
+                                <button type="button" class="prompt-preset-btn" title="프롬프트 프리셋">🔖 ▼</button>
+                                <div class="prompt-preset-menu">
+                                    <div class="prompt-preset-list"></div>
+                                    <div class="prompt-preset-actions">
+                                        <button type="button" class="prompt-preset-save-btn">+ Save Current</button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -5497,6 +5562,9 @@
 
             // 태그 자동완성 설정
             setupTagAutocomplete(tagsTextarea);
+
+            // 프롬프트 하이라이팅 설정
+            setupPromptHighlighting(tagsTextarea);
 
             // 탭 키로 같은 타입 필드 간 이동
             const nameInput = slot.querySelector('.slot-name');
@@ -8736,7 +8804,7 @@
             // 토글 함수
             const toggleCollapse = (e) => {
                 // 프리셋 드롭다운 버튼, 기타 컨트롤 클릭은 무시
-                if (e && e.target.closest('.prompt-preset-dropdown, .add-char-btn, .section-toggle, .mode-toggle')) return;
+                if (e && e.target.closest('.prompt-preset-dropdown, .add-char-btn, .section-toggle, .mode-toggle, .translate-mode-btn')) return;
                 // 이벤트 버블링 방지
                 if (e) e.stopPropagation();
 
@@ -9466,6 +9534,127 @@
             }
         }
 
+        // ============================================================
+        // 번역 모드 (Translate Mode)
+        // ============================================================
+        let translateModeEnabled = false;
+        const translateCache = new Map(); // 번역 캐시
+
+        /**
+         * Google Translate 무료 API로 번역
+         * @param {string} text - 번역할 텍스트
+         * @param {string} sourceLang - 소스 언어 (auto, en, ko)
+         * @param {string} targetLang - 타겟 언어 (ko, en)
+         * @returns {Promise<string>} - 번역된 텍스트
+         */
+        async function translateText(text, sourceLang = 'auto', targetLang = 'ko') {
+            const cacheKey = `${text}|${sourceLang}|${targetLang}`;
+            if (translateCache.has(cacheKey)) {
+                return translateCache.get(cacheKey);
+            }
+
+            try {
+                const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
+                const response = await fetch(url);
+                const data = await response.json();
+
+                // 응답 형식: [[["번역결과","원문",null,null,10]],null,"en",...]
+                const translated = data[0].map(item => item[0]).join('');
+                translateCache.set(cacheKey, translated);
+                return translated;
+            } catch (e) {
+                console.error('[Translate] Error:', e);
+                return text; // 실패 시 원문 반환
+            }
+        }
+
+        /**
+         * 번역 모드 토글
+         */
+        function toggleTranslateMode() {
+            translateModeEnabled = !translateModeEnabled;
+
+            // 버튼 상태 업데이트
+            document.querySelectorAll('.translate-mode-btn').forEach(btn => {
+                btn.classList.toggle('active', translateModeEnabled);
+            });
+
+            // container와 overlay에 클래스 추가/제거
+            document.querySelectorAll('.prompt-highlight-container').forEach(container => {
+                container.classList.toggle('translate-mode', translateModeEnabled);
+            });
+
+            // 하이라이트 다시 렌더링 (hover 이벤트 추가/제거)
+            updatePromptHighlights();
+
+            if (translateModeEnabled) {
+                showToast('번역 모드 ON - 태그에 마우스를 올리면 번역이 표시됩니다', 'info');
+            } else {
+                hideTranslateTooltip();
+            }
+        }
+
+        /**
+         * 번역 툴팁 생성/표시
+         */
+        let translateTooltip = null;
+        function showTranslateTooltip(element, translatedText) {
+            if (!translateTooltip) {
+                translateTooltip = document.createElement('div');
+                translateTooltip.className = 'translate-tooltip';
+                document.body.appendChild(translateTooltip);
+            }
+
+            translateTooltip.textContent = translatedText;
+            translateTooltip.style.display = 'block';
+            translateTooltip.style.visibility = 'hidden'; // 위치 계산을 위해 숨김
+
+            // 위치 계산
+            const rect = element.getBoundingClientRect();
+            let top = rect.top - translateTooltip.offsetHeight - 5;
+            let left = rect.left;
+
+            // 위로 넘치면 아래에 표시
+            if (top < 5) {
+                top = rect.bottom + 5;
+            }
+
+            // 오른쪽으로 넘치면 조정
+            if (left + translateTooltip.offsetWidth > window.innerWidth - 10) {
+                left = window.innerWidth - translateTooltip.offsetWidth - 10;
+            }
+
+            // 왼쪽으로 넘치면 조정
+            if (left < 5) {
+                left = 5;
+            }
+
+            translateTooltip.style.left = left + 'px';
+            translateTooltip.style.top = top + 'px';
+            translateTooltip.style.visibility = 'visible';
+        }
+
+        function hideTranslateTooltip() {
+            if (translateTooltip) {
+                translateTooltip.style.display = 'none';
+            }
+        }
+
+        // ESC 키로 번역 모드 해제
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && translateModeEnabled) {
+                toggleTranslateMode();
+            }
+        });
+
+        // 허공 클릭 시 번역 모드 해제
+        document.addEventListener('click', (e) => {
+            if (!translateModeEnabled) return;
+            // 번역 버튼, 태그 세그먼트, 툴팁 클릭은 무시
+            if (e.target.closest('.translate-mode-btn, .tag-segment, .translate-tooltip')) return;
+            toggleTranslateMode();
+        });
+
         /**
          * 모든 프롬프트 필드의 하이라이트를 업데이트
          * (프로그래매틱하게 value를 변경한 후 호출)
@@ -9489,8 +9678,12 @@
             const text = textarea.value;
             if (!text) {
                 overlay.innerHTML = '';
+                overlay.classList.remove('translate-mode');
                 return;
             }
+
+            // 번역 모드 클래스 토글
+            overlay.classList.toggle('translate-mode', translateModeEnabled);
 
             // 하이라이트가 꺼져있으면 일반 텍스트만 표시
             if (!promptHighlightEnabled) {
@@ -9519,9 +9712,94 @@
             // 텍스트 파싱
             const parsed = parseFunction(text);
 
-            // HTML 생성
+            // HTML 생성 - 번역 모드일 때는 쉼표 기준 태그 세그먼트로 분리
             let html = '';
-            parsed.forEach(chunk => {
+
+            if (translateModeEnabled) {
+                // 번역 모드: 쉼표 기준으로 태그 세그먼트 분리
+                // 기존 파싱 결과를 유지하면서 쉼표를 기준으로 태그 단위로 묶기
+                let currentTag = [];
+                let currentTagText = '';
+
+                parsed.forEach((chunk, idx) => {
+                    const chunkText = chunk.text;
+
+                    // 쉼표가 포함된 청크 처리
+                    if (chunkText.includes(',')) {
+                        const parts = chunkText.split(/(?<=,)/); // 쉼표 뒤에서 분리 (쉼표 포함)
+
+                        parts.forEach((part, partIdx) => {
+                            if (part.endsWith(',')) {
+                                // 쉼표로 끝나면 현재 태그 완료
+                                currentTag.push({ text: part, level: chunk.level });
+                                currentTagText += part;
+                                html += renderTagSegment(currentTag, currentTagText.trim());
+                                currentTag = [];
+                                currentTagText = '';
+                            } else if (part) {
+                                // 쉼표 없는 부분은 다음 태그에 포함
+                                currentTag.push({ text: part, level: chunk.level });
+                                currentTagText += part;
+                            }
+                        });
+                    } else {
+                        currentTag.push(chunk);
+                        currentTagText += chunkText;
+                    }
+                });
+
+                // 마지막 태그 처리 (쉼표로 끝나지 않은 경우)
+                if (currentTag.length > 0) {
+                    html += renderTagSegment(currentTag, currentTagText.trim());
+                }
+            } else {
+                // 기존 하이라이트 모드
+                parsed.forEach(chunk => {
+                    const color = levelToColor(chunk.level);
+                    const escapedText = chunk.text
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;')
+                        .replace(/'/g, '&#039;');
+
+                    if (color === 'transparent' || !color) {
+                        html += escapedText;
+                    } else {
+                        html += `<span style="background-color: ${color};">${escapedText}</span>`;
+                    }
+                });
+            }
+
+            // 텍스트가 줄바꿈으로 끝나면 추가 공간 확보 (커서 위치 동기화)
+            if (text.endsWith('\n')) {
+                html += '\u00A0'; // non-breaking space
+            }
+
+            overlay.innerHTML = html;
+
+            // 번역 모드일 때 이벤트 바인딩
+            if (translateModeEnabled) {
+                overlay.querySelectorAll('.tag-segment').forEach(span => {
+                    span.addEventListener('mouseenter', handleTagHover);
+                    span.addEventListener('mouseleave', hideTranslateTooltip);
+                    span.addEventListener('click', handleTagClick);
+                });
+            }
+
+            // overlay 스크롤을 textarea와 동기화
+            overlay.scrollTop = textarea.scrollTop;
+            overlay.scrollLeft = textarea.scrollLeft;
+        }
+
+        /**
+         * 태그 세그먼트를 HTML로 렌더링 (번역 모드용)
+         * @param {Array} chunks - 파싱된 청크 배열
+         * @param {string} rawTag - 원본 태그 텍스트 (번역용)
+         */
+        function renderTagSegment(chunks, rawTag) {
+            let innerHtml = '';
+            chunks.forEach(chunk => {
                 const color = levelToColor(chunk.level);
                 const escapedText = chunk.text
                     .replace(/&/g, '&amp;')
@@ -9531,22 +9809,107 @@
                     .replace(/'/g, '&#039;');
 
                 if (color === 'transparent' || !color) {
-                    html += escapedText;
+                    innerHtml += escapedText;
                 } else {
-                    html += `<span style="background-color: ${color};">${escapedText}</span>`;
+                    innerHtml += `<span style="background-color: ${color};">${escapedText}</span>`;
                 }
             });
 
-            // 텍스트가 줄바꿈으로 끝나면 추가 공간 확보 (커서 위치 동기화)
-            if (text.endsWith('\n')) {
-                html += '\u00A0'; // non-breaking space
+            // 태그 텍스트에서 괄호와 가중치 제거하여 순수 태그만 추출
+            const pureTag = rawTag
+                .replace(/[\{\}\[\]]/g, '')  // NAI 괄호 제거
+                .replace(/\([^)]*:[^)]*\)/g, (m) => m.replace(/:[^)]*\)/, ')'))  // (tag:1.2) -> (tag)
+                .replace(/[()]/g, '')  // 일반 괄호 제거
+                .replace(/,\s*$/, '')  // 끝 쉼표 제거
+                .trim();
+
+            return `<span class="tag-segment" data-tag="${pureTag.replace(/"/g, '&quot;')}">${innerHtml}</span>`;
+        }
+
+        /**
+         * 한글 포함 여부 확인
+         */
+        function containsKorean(text) {
+            return /[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(text);
+        }
+
+        /**
+         * 태그 호버 시 번역 처리
+         */
+        let lastTranslatedTag = null;  // 마지막 번역 결과 저장
+        let lastTranslatedResult = null;
+
+        async function handleTagHover(e) {
+            const span = e.target.closest('.tag-segment');
+            if (!span) return;
+
+            const tag = span.dataset.tag;
+            if (!tag || tag.trim() === '' || tag === ',') return;
+
+            // 로딩 표시
+            showTranslateTooltip(span, '번역 중...');
+
+            // 한글이 포함되어 있으면 영어로, 아니면 한글로 번역
+            const isKorean = containsKorean(tag);
+            const sourceLang = isKorean ? 'ko' : 'en';
+            const targetLang = isKorean ? 'en' : 'ko';
+
+            const translated = await translateText(tag, sourceLang, targetLang);
+
+            // 번역 결과 저장 (클릭 시 사용)
+            lastTranslatedTag = tag;
+            lastTranslatedResult = translated;
+
+            // 여전히 호버 중인지 확인
+            if (span.matches(':hover')) {
+                showTranslateTooltip(span, translated);
+            }
+        }
+
+        /**
+         * 태그 클릭 시 번역 결과로 교체
+         */
+        async function handleTagClick(e) {
+            const span = e.target.closest('.tag-segment');
+            if (!span) return;
+
+            const tag = span.dataset.tag;
+            if (!tag || tag.trim() === '' || tag === ',') return;
+
+            // 번역 결과가 없으면 먼저 번역
+            let translated = lastTranslatedResult;
+            if (lastTranslatedTag !== tag || !translated) {
+                const isKorean = containsKorean(tag);
+                const sourceLang = isKorean ? 'ko' : 'en';
+                const targetLang = isKorean ? 'en' : 'ko';
+                translated = await translateText(tag, sourceLang, targetLang);
             }
 
-            overlay.innerHTML = html;
+            // 같은 텍스트면 교체 안함
+            if (translated === tag) return;
 
-            // overlay 스크롤을 textarea와 동기화
-            overlay.scrollTop = textarea.scrollTop;
-            overlay.scrollLeft = textarea.scrollLeft;
+            // overlay의 부모 container에서 textarea 찾기
+            const container = span.closest('.prompt-highlight-container');
+            if (!container) return;
+            const textarea = container.querySelector('textarea');
+            if (!textarea) return;
+
+            // textarea에서 해당 태그를 번역 결과로 교체
+            const text = textarea.value;
+            const escapedTag = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            // 태그 경계를 고려한 정규식 (쉼표, 시작, 끝, 괄호 등)
+            const regex = new RegExp(`(^|,\\s*|[{\\[\\(])${escapedTag}(\\s*,|\\s*$|[}\\]\\)])`, 'g');
+
+            const newText = text.replace(regex, (match, before, after) => {
+                return before + translated + after;
+            });
+
+            if (newText !== text) {
+                textarea.value = newText;
+                textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                hideTranslateTooltip();
+                showToast(`"${tag}" → "${translated}"`, 'success', 2000);
+            }
         }
 
         /**
@@ -9571,6 +9934,10 @@
             // Wrapper 생성
             const wrapper = document.createElement('div');
             wrapper.className = 'prompt-highlight-container';
+            // 번역 모드가 이미 켜져 있으면 클래스 추가
+            if (translateModeEnabled) {
+                wrapper.classList.add('translate-mode');
+            }
 
             // Overlay 생성
             const overlay = document.createElement('div');

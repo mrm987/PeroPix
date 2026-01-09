@@ -7275,9 +7275,10 @@
                 }
 
                 // Character Reference (V4.5 only)
+                // 백엔드에서 일관된 처리를 위해 원본 이미지 전송 (macOS/Windows Canvas 차이 문제 해결)
                 if (document.getElementById('enableCharRef').checked && charRefData) {
                     request.character_reference = {
-                        image: charRefData.processedImage || charRefData.image,  // Canvas 처리된 이미지 우선
+                        image: charRefData.image,  // 원본 이미지 (백엔드에서 처리)
                         fidelity: parseFloat(document.getElementById('charRefFidelity').value),
                         style_aware: document.getElementById('charRefStyleAware').checked
                     };

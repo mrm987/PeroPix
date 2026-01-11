@@ -3878,7 +3878,7 @@ def _install_base_environment_sync():
 
 
 def _install_local_environment_sync():
-    """로컬 생성 환경 설치 - torch CUDA + diffusers"""
+    """로컬 생성 환경 설치 - torch CUDA + local engine deps"""
     global install_status
 
     try:
@@ -5170,7 +5170,7 @@ if __name__ == "__main__":
         # 재시작 후 CUDA torch 설치 (서버 시작 전, torch 로드 전)
         print("\n" + "=" * 50)
         print("  🔥 CUDA PyTorch 설치를 시작합니다")
-        print("  (torch CUDA + diffusers, 약 5-10분 소요)")
+        print("  (torch CUDA + local engine deps, 약 5-10분 소요)")
         print("=" * 50 + "\n")
 
         success = _install_local_environment_sync()

@@ -13,6 +13,8 @@ from typing import Dict, Optional, List
 from pathlib import Path
 from safetensors.torch import load_file
 
+logger = logging.getLogger('peropix')
+
 
 # ============================================================
 # SDXL UNet Key Mapping (ComfyUI utils.py에서 포팅)
@@ -544,7 +546,7 @@ class LoRALoader:
     def build_key_map(self, model: nn.Module):
         """모델의 state_dict를 기반으로 키 매핑 테이블 구축"""
         self._key_map = build_lora_key_map(model.state_dict())
-        print(f"[LoRA] Built key map with {len(self._key_map)} entries")
+        logger.debug(f"[LoRA] Built key map with {len(self._key_map)} entries")
 
     def apply_lora_to_model(
         self,
@@ -577,7 +579,7 @@ class LoRALoader:
             lora_type = detect_lora_type(lora_sd)
             prefixes = get_lora_prefixes(lora_sd)
 
-            print(f"[LoRA] Loading '{lora_name}': type={lora_type}, prefixes={len(prefixes)}")
+            logger.info(f"[LoRA] Loading '{lora_name}': type={lora_type}, prefixes={len(prefixes)}")
 
             applied_count = 0
             skipped_count = 0
@@ -643,7 +645,7 @@ class LoRALoader:
                 'skipped_count': skipped_count
             }
 
-            print(f"[LoRA] Applied '{lora_name}': {applied_count} layers applied, "
+            logger.info(f"[LoRA] Applied '{lora_name}': {applied_count} layers applied, "
                   f"{skipped_count} skipped (no_mapping={no_mapping_count}, "
                   f"no_param={no_param_count}, no_delta={no_delta_count})")
             return applied_count > 0

@@ -49,3 +49,8 @@ test_data/
 DEV_backup/
 debug_*.png
 *_debug_*.json
+
+# Legacy backup files
+backend_diffusers_legacy.py
+*_backup.py
+*_original.py

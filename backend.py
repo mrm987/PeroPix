@@ -635,562 +635,10 @@ def read_metadata_from_image(image_bytes: bytes) -> dict:
     return metadata or {}
 
 
-# ============================================================
-# LyCORIS Loader (LokR/LoHa support)
-# Diffusers가 지원하지 않는 LyCORIS 형식을 직접 처리
-# 참고: ComfyUI weight_adapter 구현
-# ============================================================
-class LyCORISLoader:
-    """LyCORIS (LokR/LoHa) 전용 로더 - Diffusers와 독립적으로 동작"""
+# Note: LyCORISLoader and ModelCache classes were moved to backend_diffusers_legacy.py
+# The local engine now uses ComfyUI-ported samplers and doesn't need diffusers
 
-    SUPPORTED_TYPES = {'lokr', 'loha'}
 
-    @staticmethod
-    def detect_type(state_dict: dict) -> str | None:
-        """
-        LoRA 파일의 타입 감지
-        Returns: 'lokr', 'loha', or None (일반 LoRA)
-        """
-        for key in state_dict.keys():
-            # LokR 감지: lokr_w1, lokr_w2, lokr_w1_a 등
-            if '.lokr_w1' in key or '.lokr_w2' in key:
-                return 'lokr'
-            # LoHa 감지: hada_w1_a, hada_w1_b 등
-            if '.hada_w1_a' in key or '.hada_w2_a' in key:
-                return 'loha'
-        return None  # 일반 LoRA
-
-    @staticmethod
-    def get_layer_name_mapping(state_dict: dict, model_type: str = 'sdxl') -> dict:
-        """
-        LyCORIS 키를 모델 레이어 이름으로 매핑
-        Returns: {lycoris_prefix: model_layer_name}
-        """
-        # LyCORIS 키에서 고유 prefix 추출
-        prefixes = set()
-        for key in state_dict.keys():
-            # 예: lora_unet_down_blocks_0_attentions_0_transformer_blocks_0_attn1_to_q.lokr_w1
-            # prefix: lora_unet_down_blocks_0_attentions_0_transformer_blocks_0_attn1_to_q
-            for suffix in ['.lokr_w1', '.lokr_w2', '.lokr_w1_a', '.lokr_w1_b',
-                          '.lokr_w2_a', '.lokr_w2_b', '.lokr_t2', '.alpha',
-                          '.hada_w1_a', '.hada_w1_b', '.hada_w2_a', '.hada_w2_b',
-                          '.hada_t1', '.hada_t2']:
-                if key.endswith(suffix):
-                    prefixes.add(key[:-len(suffix)])
-                    break
-
-        # prefix를 모델 레이어 이름으로 변환
-        mapping = {}
-        for prefix in prefixes:
-            # lora_unet_xxx -> unet.xxx (언더스코어를 점으로)
-            # lora_te1_xxx -> text_encoder.xxx
-            # lora_te2_xxx -> text_encoder_2.xxx
-            layer_name = prefix
-
-            if layer_name.startswith('lora_unet_'):
-                layer_name = 'unet.' + layer_name[10:].replace('_', '.')
-            elif layer_name.startswith('lora_te1_'):
-                layer_name = 'text_encoder.' + layer_name[9:].replace('_', '.')
-            elif layer_name.startswith('lora_te2_'):
-                layer_name = 'text_encoder_2.' + layer_name[9:].replace('_', '.')
-            elif layer_name.startswith('lora_te_'):
-                layer_name = 'text_encoder.' + layer_name[8:].replace('_', '.')
-
-            # 숫자 패턴 수정: down.blocks.0 -> down_blocks.0 등
-            # Diffusers 모델 구조에 맞게 변환
-            import re
-            # blocks.0.attentions -> blocks[0].attentions 스타일이 아닌
-            # down_blocks.0 형태 유지
-            layer_name = re.sub(r'\.(\d+)\.', r'[\1].', layer_name)
-
-            mapping[prefix] = layer_name
-
-        return mapping
-
-    @staticmethod
-    def calculate_lokr_weight(
-        state_dict: dict,
-        prefix: str,
-        device: str,
-        dtype
-    ):
-        """
-        LokR weight delta 계산
-        delta = kron(w1, w2) * (alpha / dim)
-        """
-        lazy_imports()
-
-        # weight 키 이름들
-        w1_key = f"{prefix}.lokr_w1"
-        w2_key = f"{prefix}.lokr_w2"
-        w1_a_key = f"{prefix}.lokr_w1_a"
-        w1_b_key = f"{prefix}.lokr_w1_b"
-        w2_a_key = f"{prefix}.lokr_w2_a"
-        w2_b_key = f"{prefix}.lokr_w2_b"
-        t2_key = f"{prefix}.lokr_t2"
-        alpha_key = f"{prefix}.alpha"
-
-        # alpha 값
-        alpha = state_dict.get(alpha_key, torch.tensor(1.0)).item() if alpha_key in state_dict else 1.0
-
-        # w1 계산
-        if w1_key in state_dict:
-            w1 = state_dict[w1_key].to(device=device, dtype=dtype)
-            dim = w1.shape[0]  # 또는 다른 차원
-        elif w1_a_key in state_dict and w1_b_key in state_dict:
-            w1_a = state_dict[w1_a_key].to(device=device, dtype=dtype)
-            w1_b = state_dict[w1_b_key].to(device=device, dtype=dtype)
-            w1 = torch.mm(w1_a, w1_b)
-            dim = w1_b.shape[0]
-        else:
-            return None
-
-        # w2 계산
-        if w2_key in state_dict:
-            w2 = state_dict[w2_key].to(device=device, dtype=dtype)
-        elif w2_a_key in state_dict and w2_b_key in state_dict:
-            w2_a = state_dict[w2_a_key].to(device=device, dtype=dtype)
-            w2_b = state_dict[w2_b_key].to(device=device, dtype=dtype)
-
-            # Tucker decomposition 체크
-            if t2_key in state_dict:
-                t2 = state_dict[t2_key].to(device=device, dtype=dtype)
-                w2 = torch.einsum('i j k l, j r, i p -> p r k l', t2, w2_b, w2_a)
-            else:
-                w2 = torch.mm(w2_a, w2_b)
-            dim = w2_b.shape[0]
-        else:
-            return None
-
-        # Kronecker product 계산
-        # Conv2d의 경우 4D 처리
-        if len(w2.shape) == 4:
-            w1 = w1.unsqueeze(2).unsqueeze(2)
-
-        # alpha 스케일링
-        scale = alpha / dim if dim > 0 else 1.0
-
-        delta = torch.kron(w1, w2) * scale
-        return delta
-
-    @staticmethod
-    def calculate_loha_weight(
-        state_dict: dict,
-        prefix: str,
-        device: str,
-        dtype
-    ):
-        """
-        LoHa weight delta 계산
-        delta = (w1_a @ w1_b) * (w2_a @ w2_b) * (alpha / dim)
-        Hadamard product (element-wise multiplication)
-        """
-        lazy_imports()
-
-        # weight 키 이름들
-        w1_a_key = f"{prefix}.hada_w1_a"
-        w1_b_key = f"{prefix}.hada_w1_b"
-        w2_a_key = f"{prefix}.hada_w2_a"
-        w2_b_key = f"{prefix}.hada_w2_b"
-        t1_key = f"{prefix}.hada_t1"
-        t2_key = f"{prefix}.hada_t2"
-        alpha_key = f"{prefix}.alpha"
-
-        # 필수 키 체크
-        if w1_a_key not in state_dict or w1_b_key not in state_dict:
-            return None
-        if w2_a_key not in state_dict or w2_b_key not in state_dict:
-            return None
-
-        # alpha 값
-        alpha = state_dict.get(alpha_key, torch.tensor(1.0)).item() if alpha_key in state_dict else 1.0
-
-        w1_a = state_dict[w1_a_key].to(device=device, dtype=dtype)
-        w1_b = state_dict[w1_b_key].to(device=device, dtype=dtype)
-        w2_a = state_dict[w2_a_key].to(device=device, dtype=dtype)
-        w2_b = state_dict[w2_b_key].to(device=device, dtype=dtype)
-
-        dim = w1_b.shape[0]
-
-        # Tucker decomposition 체크
-        if t1_key in state_dict and t2_key in state_dict:
-            t1 = state_dict[t1_key].to(device=device, dtype=dtype)
-            t2 = state_dict[t2_key].to(device=device, dtype=dtype)
-            m1 = torch.einsum('i j k l, j r, i p -> p r k l', t1, w1_b, w1_a)
-            m2 = torch.einsum('i j k l, j r, i p -> p r k l', t2, w2_b, w2_a)
-        else:
-            m1 = torch.mm(w1_a, w1_b)
-            m2 = torch.mm(w2_a, w2_b)
-
-        # Hadamard product (element-wise)
-        scale = alpha / dim if dim > 0 else 1.0
-        delta = (m1 * m2) * scale
-
-        return delta
-
-
-class ModelCache:
-    def __init__(self):
-        self.pipe = None
-        self.model_path = None
-        self.loaded_loras = {}  # {name: {'type': 'lora'|'lokr'|'loha', 'scale': float, ...}}
-        self._device = None
-        self._dtype = None
-        # LyCORIS 적용을 위한 원본 weight 백업
-        self._original_weights = {}  # {layer_name: original_weight_tensor}
-        self._lycoris_deltas = {}    # {lora_name: {layer_name: delta_tensor}}
-    
-    @property
-    def device(self):
-        if self._device is None:
-            lazy_imports()
-            self._device = "cuda" if torch.cuda.is_available() else "cpu"
-        return self._device
-    
-    @property
-    def dtype(self):
-        if self._dtype is None:
-            lazy_imports()
-            # bfloat16 on Ampere+ (compute capability >= 8.0) for better VAE stability
-            if self.device == "cuda":
-                try:
-                    cc = torch.cuda.get_device_capability()
-                    if cc[0] >= 8:  # Ampere (RTX 30xx) or newer
-                        self._dtype = torch.bfloat16
-                        print(f"[GPU] Using bfloat16 (compute capability {cc[0]}.{cc[1]})")
-                    else:
-                        self._dtype = torch.float16
-                except:
-                    self._dtype = torch.float16
-            else:
-                self._dtype = torch.float32
-        return self._dtype
-    
-    def load_model(self, model_path: str):
-        lazy_imports()
-        
-        if self.model_path == model_path and self.pipe is not None:
-            print(f"[Cache] Using cached model: {model_path}")
-            return self.pipe
-        
-        print(f"[Load] Loading model: {model_path}")
-        
-        if self.pipe is not None:
-            del self.pipe
-            torch.cuda.empty_cache()
-        
-        from diffusers import StableDiffusionXLPipeline
-        
-        checkpoints_dir = Path(CONFIG.get("checkpoints_dir", CHECKPOINTS_DIR))
-        full_path = checkpoints_dir / model_path
-        
-        self.pipe = StableDiffusionXLPipeline.from_single_file(
-            str(full_path),
-            torch_dtype=self.dtype,
-            use_safetensors=True,
-        )
-        self.pipe.to(self.device)
-
-        if self.device == "cuda":
-            self.pipe.enable_attention_slicing()
-            self.pipe.enable_vae_tiling()
-            # xformers for memory efficient attention
-            try:
-                self.pipe.enable_xformers_memory_efficient_attention()
-            except:
-                pass
-        
-        self.model_path = model_path
-        self.loaded_loras = {}
-        
-        print(f"[Load] Model loaded: {model_path}")
-        return self.pipe
-    
-    def load_lora(self, lora_name: str, scale: float = 1.0):
-        if self.pipe is None:
-            raise ValueError("Model not loaded")
-
-        if lora_name in self.loaded_loras:
-            return
-
-        lora_dir = Path(CONFIG.get("lora_dir", LORA_DIR))
-        lora_path = lora_dir / lora_name
-
-        if not lora_path.exists():
-            raise ValueError(f"LoRA not found: {lora_path}")
-
-        # safetensors 파일 로드하여 타입 감지
-        from safetensors.torch import load_file
-        state_dict = load_file(str(lora_path))
-        lora_type = LyCORISLoader.detect_type(state_dict)
-
-        if lora_type in ('lokr', 'loha'):
-            # LyCORIS 형식 - 직접 처리
-            print(f"[Load] Loading {lora_type.upper()}: {lora_name} (scale={scale})")
-            self._load_lycoris(lora_name, state_dict, lora_type, scale)
-        else:
-            # 일반 LoRA - Diffusers 방식
-            # adapter_name에 '.'이 포함되면 PEFT에서 모듈 경로 파싱 오류 발생
-            safe_adapter_name = lora_name.replace(".", "_")
-            print(f"[Load] Loading LoRA: {lora_name} (scale={scale})")
-            self.pipe.load_lora_weights(str(lora_path), adapter_name=safe_adapter_name)
-            self.loaded_loras[lora_name] = {'type': 'lora', 'scale': scale}
-
-    def _load_lycoris(self, lora_name: str, state_dict: dict, lora_type: str, scale: float):
-        """LyCORIS (LokR/LoHa) weight를 모델에 직접 적용"""
-        # delta 계산 함수 선택
-        if lora_type == 'lokr':
-            calc_fn = LyCORISLoader.calculate_lokr_weight
-        else:  # loha
-            calc_fn = LyCORISLoader.calculate_loha_weight
-
-        # LyCORIS 키에서 prefix 추출
-        prefixes = set()
-        for key in state_dict.keys():
-            for suffix in ['.lokr_w1', '.lokr_w2', '.lokr_w1_a', '.lokr_w1_b',
-                          '.lokr_w2_a', '.lokr_w2_b', '.lokr_t2', '.alpha',
-                          '.hada_w1_a', '.hada_w1_b', '.hada_w2_a', '.hada_w2_b',
-                          '.hada_t1', '.hada_t2']:
-                if key.endswith(suffix):
-                    prefixes.add(key[:-len(suffix)])
-                    break
-
-        # 각 prefix에 대해 delta 계산 및 저장
-        deltas = {}
-        applied_count = 0
-        skipped_count = 0
-
-        for prefix in prefixes:
-            delta = calc_fn(state_dict, prefix, self.device, self.dtype)
-            if delta is not None:
-                deltas[prefix] = delta
-                applied_count += 1
-            else:
-                skipped_count += 1
-
-        self._lycoris_deltas[lora_name] = deltas
-        self.loaded_loras[lora_name] = {
-            'type': lora_type,
-            'scale': scale,
-            'prefixes': list(prefixes)
-        }
-
-        print(f"[Load] {lora_type.upper()} loaded: {applied_count} layers, {skipped_count} skipped")
-
-    def _apply_lycoris_to_model(self):
-        """저장된 LyCORIS delta들을 모델에 적용"""
-        if not self._lycoris_deltas:
-            return
-
-        # UNet과 Text Encoder의 state_dict 가져오기
-        unet_sd = self.pipe.unet.state_dict()
-        te1_sd = self.pipe.text_encoder.state_dict() if hasattr(self.pipe, 'text_encoder') else {}
-        te2_sd = self.pipe.text_encoder_2.state_dict() if hasattr(self.pipe, 'text_encoder_2') else {}
-
-        for lora_name, deltas in self._lycoris_deltas.items():
-            lora_info = self.loaded_loras.get(lora_name, {})
-            scale = lora_info.get('scale', 1.0)
-
-            for prefix, delta in deltas.items():
-                # prefix를 실제 weight 키로 변환
-                weight_key = self._lycoris_prefix_to_weight_key(prefix)
-                if weight_key is None:
-                    continue
-
-                # 해당 모듈 찾기 및 weight 업데이트
-                try:
-                    self._apply_delta_to_weight(prefix, weight_key, delta, scale)
-                except Exception as e:
-                    print(f"[LyCORIS] Failed to apply {prefix}: {e}")
-
-    def _lycoris_prefix_to_weight_key(self, prefix: str) -> str | None:
-        """LyCORIS prefix를 모델 weight 키로 변환"""
-        # lora_unet_down_blocks_0_attentions_0_transformer_blocks_0_attn1_to_q
-        # -> down_blocks.0.attentions.0.transformer_blocks.0.attn1.to_q.weight
-
-        if prefix.startswith('lora_unet_'):
-            key = prefix[10:]  # 'lora_unet_' 제거
-        elif prefix.startswith('lora_te1_'):
-            key = prefix[9:]
-        elif prefix.startswith('lora_te2_'):
-            key = prefix[9:]
-        elif prefix.startswith('lora_te_'):
-            key = prefix[8:]
-        else:
-            return None
-
-        # 언더스코어를 점으로 변환하되, 숫자 앞뒤는 유지
-        import re
-        # 패턴: word_word -> word.word, word_0_word -> word.0.word
-        parts = key.split('_')
-        result = []
-        i = 0
-        while i < len(parts):
-            part = parts[i]
-            result.append(part)
-            i += 1
-
-        return '.'.join(result) + '.weight'
-
-    def _apply_delta_to_weight(self, prefix: str, weight_key: str, delta, scale: float):
-        """delta를 실제 모델 weight에 적용"""
-        # 어떤 모듈에 적용할지 결정
-        if prefix.startswith('lora_unet_'):
-            module = self.pipe.unet
-            key_in_module = weight_key
-        elif prefix.startswith('lora_te1_') or prefix.startswith('lora_te_'):
-            module = self.pipe.text_encoder
-            key_in_module = weight_key
-        elif prefix.startswith('lora_te2_'):
-            module = self.pipe.text_encoder_2
-            key_in_module = weight_key
-        else:
-            return
-
-        # 해당 레이어 찾기
-        try:
-            # nested module 접근
-            parts = key_in_module.replace('.weight', '').split('.')
-            target = module
-            for part in parts:
-                if part.isdigit():
-                    target = target[int(part)]
-                else:
-                    target = getattr(target, part)
-
-            # 원본 백업 (최초 1회)
-            full_key = f"{prefix}.weight"
-            if full_key not in self._original_weights:
-                self._original_weights[full_key] = target.weight.data.clone()
-
-            # delta 적용
-            scaled_delta = delta * scale
-            if scaled_delta.shape != target.weight.data.shape:
-                scaled_delta = scaled_delta.reshape(target.weight.data.shape)
-
-            target.weight.data = self._original_weights[full_key] + scaled_delta.to(target.weight.data.dtype)
-
-        except Exception as e:
-            # 매핑 실패 - 디버그용 로그
-            print(f"[LyCORIS] Could not find layer for {prefix}: {e}")
-    
-    def set_lora_scales(self, lora_configs: List[dict]):
-        if not lora_configs:
-            # 모든 LoRA 언로드
-            self._unload_all_loras()
-            return
-
-        # 일반 LoRA와 LyCORIS 분리
-        diffusers_adapters = []  # (name, scale) for Diffusers
-        lycoris_configs = []     # (name, scale) for LyCORIS
-
-        for config in lora_configs:
-            name = config["name"]
-            scale = config.get("scale", 1.0)
-
-            if name not in self.loaded_loras:
-                self.load_lora(name, scale)
-
-            lora_info = self.loaded_loras.get(name, {})
-            lora_type = lora_info.get('type', 'lora')
-
-            if lora_type in ('lokr', 'loha'):
-                lycoris_configs.append((name, scale))
-                # scale 변경 시 업데이트
-                if lora_info.get('scale') != scale:
-                    self.loaded_loras[name]['scale'] = scale
-            else:
-                safe_adapter_name = name.replace(".", "_")
-                diffusers_adapters.append((safe_adapter_name, scale))
-
-        # Diffusers LoRA 적용
-        if diffusers_adapters:
-            adapter_names = [a[0] for a in diffusers_adapters]
-            adapter_weights = [a[1] for a in diffusers_adapters]
-            self.pipe.set_adapters(adapter_names, adapter_weights=adapter_weights)
-
-        # LyCORIS 적용 (scale 변경 포함)
-        if lycoris_configs:
-            self._apply_lycoris_to_model()
-
-    def _unload_all_loras(self):
-        """모든 LoRA 및 LyCORIS 언로드"""
-        # Diffusers LoRA 언로드
-        has_diffusers_lora = any(
-            info.get('type') == 'lora'
-            for info in self.loaded_loras.values()
-            if isinstance(info, dict)
-        )
-        if has_diffusers_lora:
-            try:
-                self.pipe.unload_lora_weights()
-            except Exception as e:
-                print(f"[LoRA] Unload warning: {e}")
-
-        # LyCORIS weight 복원
-        self._restore_original_weights()
-
-        # 상태 초기화
-        self.loaded_loras = {}
-        self._lycoris_deltas = {}
-
-    def _restore_original_weights(self):
-        """LyCORIS로 변경된 weight를 원본으로 복원"""
-        if not self._original_weights:
-            return
-
-        restored_count = 0
-        for full_key, original_weight in self._original_weights.items():
-            # full_key: "lora_unet_xxx.weight" 형태
-            prefix = full_key.replace('.weight', '')
-
-            try:
-                if prefix.startswith('lora_unet_'):
-                    module = self.pipe.unet
-                elif prefix.startswith('lora_te1_') or prefix.startswith('lora_te_'):
-                    module = self.pipe.text_encoder
-                elif prefix.startswith('lora_te2_'):
-                    module = self.pipe.text_encoder_2
-                else:
-                    continue
-
-                # weight 키 변환 및 레이어 접근
-                weight_key = self._lycoris_prefix_to_weight_key(prefix)
-                if weight_key is None:
-                    continue
-
-                parts = weight_key.replace('.weight', '').split('.')
-                target = module
-                for part in parts:
-                    if part.isdigit():
-                        target = target[int(part)]
-                    else:
-                        target = getattr(target, part)
-
-                target.weight.data = original_weight.clone()
-                restored_count += 1
-
-            except Exception as e:
-                print(f"[LyCORIS] Restore failed for {prefix}: {e}")
-
-        if restored_count > 0:
-            print(f"[LyCORIS] Restored {restored_count} original weights")
-
-        self._original_weights = {}
-
-    def clear(self):
-        if self.pipe is not None:
-            del self.pipe
-            self.pipe = None
-        self.model_path = None
-        self.loaded_loras = {}
-        self._original_weights = {}
-        self._lycoris_deltas = {}
-        if torch is not None:
-            torch.cuda.empty_cache()
-
-
-model_cache = ModelCache()
 
 
 # ============================================================
@@ -1202,35 +650,43 @@ class UpscaleModelCache:
         self.model_name = None
         self.scale = 2  # 기본값
         self.dtype = None  # lazy init
-    
+        self._device = None
+
+    @property
+    def device(self):
+        if self._device is None:
+            lazy_imports()
+            self._device = "cuda" if torch.cuda.is_available() else "cpu"
+        return self._device
+
     def load_model(self, model_name: str):
         lazy_imports()
-        
+
         if self.model_name == model_name and self.model is not None:
             print(f"[Cache] Using cached upscale model: {model_name}")
             # 캐시된 모델이 CPU에 있을 수 있으므로 GPU로 이동
-            self.model.to(model_cache.device)
+            self.model.to(self.device)
             return self.model
-        
+
         print(f"[Load] Loading upscale model: {model_name}")
-        
+
         if self.model is not None:
             del self.model
             torch.cuda.empty_cache()
-        
+
         from spandrel import ModelLoader
-        
+
         upscale_path = UPSCALE_DIR / model_name
         if not upscale_path.exists():
             raise ValueError(f"Upscale model not found: {upscale_path}")
-        
+
         model_desc = ModelLoader().load_from_file(str(upscale_path))
         self.scale = model_desc.scale if hasattr(model_desc, 'scale') else 2
-        
-        self.model = model_desc.to(model_cache.device)
-        
+
+        self.model = model_desc.to(self.device)
+
         # fp16 지원 여부 확인 후 변환
-        if model_cache.device == "cuda":
+        if self.device == "cuda":
             try:
                 self.model = self.model.half()
                 self.dtype = torch.float16
@@ -1991,7 +1447,7 @@ def call_local_engine(req: GenerateRequest):
 
     # 생성기 초기화 또는 재사용
     if _local_engine_generator is None or _local_engine_generator.model_path != str(model_path):
-        print(f"[LocalEngine] Loading model: {model_path}")
+        logger.info(f"[LocalEngine] Loading model: {model_path}")
         _local_engine_generator = SDXLGenerator(
             model_path=str(model_path),
             device=device,
@@ -2006,7 +1462,7 @@ def call_local_engine(req: GenerateRequest):
             lora_scale = lora_config.get("scale", 1.0)
             lora_path = LORA_DIR / lora_name
             if lora_path.exists():
-                print(f"[LocalEngine] Applying LoRA: {lora_name} (scale={lora_scale})")
+                logger.info(f"[LocalEngine] Applying LoRA: {lora_name} (scale={lora_scale})")
                 _local_engine_generator.apply_lora(str(lora_path), lora_scale)
 
     seed = req.seed if req.seed >= 0 else np.random.randint(0, 2**31 - 1)
@@ -2024,13 +1480,14 @@ def call_local_engine(req: GenerateRequest):
             mask = decode_base64_image(req.base_mask).convert("L")
             mask = mask.resize((req.width, req.height), Image.NEAREST)
 
-    print(f"[LocalEngine] Generating: {req.width}x{req.height}, steps={req.steps}, cfg={req.cfg}")
-    print(f"[LocalEngine] sampler={req.sampler}, scheduler={req.scheduler}, seed={seed}")
-    print(f"[LocalEngine] prompt={req.prompt[:50]}...")
+    logger.info(f"[LocalEngine] Generating: {req.width}x{req.height}, steps={req.steps}, cfg={req.cfg}, sampler={req.sampler}, seed={seed}")
 
-    # 진행률 콜백
+    # 진행률 콜백 (tqdm 프로그레스 바)
+    from tqdm import tqdm
+    pbar = tqdm(total=req.steps, desc="[LocalEngine]", ncols=80, leave=False)
+
     def progress_callback(step, total):
-        print(f"[LocalEngine] Step {step + 1}/{total}")
+        pbar.update(1)
 
     # 이미지 생성
     image, used_seed = _local_engine_generator.generate(
@@ -2048,257 +1505,39 @@ def call_local_engine(req: GenerateRequest):
         denoise=denoise,
         callback=progress_callback
     )
+    pbar.close()
 
-    print(f"[LocalEngine] Done, seed={used_seed}")
-    return image, int(used_seed)
+    logger.info(f"[LocalEngine] 1st pass done, seed={used_seed}")
 
-
-# ============================================================
-# Local Diffusers (Legacy)
-# ============================================================
-def call_local_diffusers(req: GenerateRequest):
-    lazy_imports()
-    
-    if not req.model:
-        raise HTTPException(status_code=400, detail="Model not specified")
-    
-    pipe = model_cache.load_model(req.model)
-    model_cache.set_lora_scales(req.loras)
-    
-    seed = req.seed if req.seed >= 0 else np.random.randint(0, 2**31 - 1)
-    
-    # CPU에서는 generator를 cpu로 설정
-    gen_device = "cpu"  # diffusers는 generator를 항상 cpu에서 생성
-    generator = torch.Generator(device=gen_device).manual_seed(int(seed))
-    
-    # KSampler -> diffusers scheduler 변환
-    scheduler_map = {
-        "euler": "EulerDiscreteScheduler",
-        "euler_ancestral": "EulerAncestralDiscreteScheduler",
-        "dpmpp_2m": "DPMSolverMultistepScheduler",
-        "dpmpp_2m_sde": "DPMSolverMultistepScheduler",
-        "dpmpp_sde": "DPMSolverSDEScheduler",
-        "dpmpp_3m_sde": "DPMSolverMultistepScheduler",
-        "dpmpp_2s_ancestral": "DPMSolverSinglestepScheduler",
-        "ddim": "DDIMScheduler",
-        "uni_pc": "UniPCMultistepScheduler",
-        "lcm": "LCMScheduler",
-    }
-    
-    from diffusers import schedulers
-
-    # use_karras_sigmas 지원 여부 확인
-    # EulerAncestralDiscreteScheduler는 karras 미지원 → EulerDiscreteScheduler로 대체
-    scheduler_name = scheduler_map.get(req.sampler, "EulerAncestralDiscreteScheduler")
-
-    # karras 스케줄 사용 시, 지원하지 않는 스케줄러는 대체
-    if req.scheduler == "karras" and scheduler_name == "EulerAncestralDiscreteScheduler":
-        scheduler_name = "EulerDiscreteScheduler"
-        print(f"[Generate] euler_ancestral + karras → EulerDiscreteScheduler 사용 (karras 지원)")
-
-    scheduler_class = getattr(schedulers, scheduler_name, None)
-    if scheduler_class:
-        try:
-            # noise schedule (karras, normal 등) 적용
-            scheduler_config = dict(pipe.scheduler.config)
-
-            # karras sigma 스케줄 적용 (지원하는 스케줄러만)
-            if req.scheduler == "karras":
-                scheduler_config["use_karras_sigmas"] = True
-            elif req.scheduler == "normal":
-                scheduler_config["use_karras_sigmas"] = False
-            # sgm_uniform, simple 등은 Diffusers에서 직접 지원 안 함
-
-            pipe.scheduler = scheduler_class.from_config(scheduler_config)
-            print(f"[Generate] Scheduler set: {scheduler_name}, noise_schedule={req.scheduler}, use_karras={scheduler_config.get('use_karras_sigmas', False)}")
-
-            # 디버그: 실제 sigma 값 확인
-            pipe.scheduler.set_timesteps(req.steps)
-            sigmas = pipe.scheduler.sigmas if hasattr(pipe.scheduler, 'sigmas') else None
-            if sigmas is not None:
-                print(f"[DEBUG] Sigmas (first 5): {sigmas[:5].tolist()}")
-                print(f"[DEBUG] Sigmas (last 5): {sigmas[-5:].tolist()}")
-        except Exception as e:
-            print(f"[Warning] Failed to set scheduler {scheduler_name}: {e}")
-
-    print(f"[Generate] sampler={req.sampler}, scheduler={req.scheduler}, steps={req.steps}, cfg={req.cfg}")
-    print(f"[Generate] prompt={req.prompt[:50]}..., size={req.width}x{req.height}")
-
-    # Compel로 프롬프트 인코딩 (긴 프롬프트 + 가중치 지원)
-    try:
-        from compel import Compel, ReturnedEmbeddingsType
-
-        compel = Compel(
-            tokenizer=[pipe.tokenizer, pipe.tokenizer_2],
-            text_encoder=[pipe.text_encoder, pipe.text_encoder_2],
-            returned_embeddings_type=ReturnedEmbeddingsType.PENULTIMATE_HIDDEN_STATES_NON_NORMALIZED,
-            requires_pooled=[False, True],
-            truncate_long_prompts=False,  # 긴 프롬프트 지원
-        )
-        prompt_embeds, pooled_prompt_embeds = compel(req.prompt)
-        negative_embeds, negative_pooled_embeds = compel(req.negative_prompt)
-
-        # prompt_embeds와 negative_embeds 길이 맞추기 (패딩)
-        # SDXL은 두 임베딩의 sequence length가 같아야 함
-        max_len = max(prompt_embeds.shape[1], negative_embeds.shape[1])
-        if prompt_embeds.shape[1] < max_len:
-            padding = torch.zeros(
-                (prompt_embeds.shape[0], max_len - prompt_embeds.shape[1], prompt_embeds.shape[2]),
-                dtype=prompt_embeds.dtype, device=prompt_embeds.device
-            )
-            prompt_embeds = torch.cat([prompt_embeds, padding], dim=1)
-        if negative_embeds.shape[1] < max_len:
-            padding = torch.zeros(
-                (negative_embeds.shape[0], max_len - negative_embeds.shape[1], negative_embeds.shape[2]),
-                dtype=negative_embeds.dtype, device=negative_embeds.device
-            )
-            negative_embeds = torch.cat([negative_embeds, padding], dim=1)
-
-        use_compel = True
-        print(f"[Generate] Using Compel for long prompt support (seq_len={max_len})")
-    except Exception as e:
-        print(f"[Warning] Compel failed, using default encoding: {e}")
-        prompt_embeds = None
-        pooled_prompt_embeds = None
-        negative_embeds = None
-        negative_pooled_embeds = None
-        use_compel = False
-
-    # Base Image 처리 (img2img / inpaint)
-    if req.base_image:
-        base_img = decode_base64_image(req.base_image)
-
-        if req.base_mode == "inpaint" and req.base_mask:
-            # Inpaint 모드
-            from diffusers import AutoPipelineForInpainting
-
-            mask_img = decode_base64_image(req.base_mask)
-            # 마스크를 그레이스케일로 변환 (흰색 = 인페인트 영역)
-            mask_img = mask_img.convert("L")
-
-            inpaint_pipe = AutoPipelineForInpainting.from_pipe(pipe)
-            print(f"[Generate] Inpaint mode, strength={req.base_strength}")
-
-            if use_compel:
-                result = inpaint_pipe(
-                    prompt_embeds=prompt_embeds,
-                    pooled_prompt_embeds=pooled_prompt_embeds,
-                    negative_prompt_embeds=negative_embeds,
-                    negative_pooled_prompt_embeds=negative_pooled_embeds,
-                    image=base_img,
-                    mask_image=mask_img,
-                    width=req.width,
-                    height=req.height,
-                    num_inference_steps=req.steps,
-                    guidance_scale=req.cfg,
-                    strength=req.base_strength,
-                    generator=generator,
-                )
-            else:
-                result = inpaint_pipe(
-                    prompt=req.prompt,
-                    negative_prompt=req.negative_prompt,
-                    image=base_img,
-                    mask_image=mask_img,
-                    width=req.width,
-                    height=req.height,
-                    num_inference_steps=req.steps,
-                    guidance_scale=req.cfg,
-                    strength=req.base_strength,
-                    generator=generator,
-                )
-        else:
-            # Img2Img 모드
-            from diffusers import AutoPipelineForImage2Image
-
-            # 베이스 이미지를 타겟 크기로 리사이즈
-            base_img = base_img.resize((req.width, req.height), Image.LANCZOS)
-
-            img2img_pipe = AutoPipelineForImage2Image.from_pipe(pipe)
-            print(f"[Generate] Img2Img mode, strength={req.base_strength}")
-
-            if use_compel:
-                result = img2img_pipe(
-                    prompt_embeds=prompt_embeds,
-                    pooled_prompt_embeds=pooled_prompt_embeds,
-                    negative_prompt_embeds=negative_embeds,
-                    negative_pooled_prompt_embeds=negative_pooled_embeds,
-                    image=base_img,
-                    num_inference_steps=req.steps,
-                    guidance_scale=req.cfg,
-                    strength=req.base_strength,
-                    generator=generator,
-                )
-            else:
-                result = img2img_pipe(
-                    prompt=req.prompt,
-                    negative_prompt=req.negative_prompt,
-                    image=base_img,
-                    num_inference_steps=req.steps,
-                    guidance_scale=req.cfg,
-                    strength=req.base_strength,
-                    generator=generator,
-                )
-
-        image = result.images[0]
-        print(f"[Generate] Done (base image mode), seed={seed}")
-    else:
-        # 일반 txt2img 생성
-        if use_compel:
-            result = pipe(
-                prompt_embeds=prompt_embeds,
-                pooled_prompt_embeds=pooled_prompt_embeds,
-                negative_prompt_embeds=negative_embeds,
-                negative_pooled_prompt_embeds=negative_pooled_embeds,
-                width=req.width,
-                height=req.height,
-                num_inference_steps=req.steps,
-                guidance_scale=req.cfg,
-                generator=generator,
-            )
-        else:
-            result = pipe(
-                prompt=req.prompt,
-                negative_prompt=req.negative_prompt,
-                width=req.width,
-                height=req.height,
-                num_inference_steps=req.steps,
-                guidance_scale=req.cfg,
-                generator=generator,
-            )
-
-        image = result.images[0]
-        print(f"[Generate] 1st pass done, seed={seed}")
-    
     # 2nd pass - 업스케일 (옵션)
     if req.enable_upscale and req.upscale_model:
-        print(f"[Upscale] Starting 2-pass upscale with {req.upscale_model}")
-        
+        logger.info(f"[LocalEngine Upscale] Starting 2-pass upscale with {req.upscale_model}")
+
         # 1. 업스케일 모델로 확대 (타일링 처리)
         upscale_model = upscale_cache.load_model(req.upscale_model)
-        
+
         # PIL -> Tensor (BCHW) - 모델의 dtype에 맞춤
         img_tensor = torch.from_numpy(np.array(image)).permute(2, 0, 1).unsqueeze(0).float() / 255.0
-        img_tensor = img_tensor.to(device=model_cache.device, dtype=upscale_cache.dtype)
-        
+        img_tensor = img_tensor.to(device=_local_engine_generator.device, dtype=upscale_cache.dtype)
+
         # 타일링 업스케일 (OOM 방지)
         with torch.no_grad():
             upscaled_tensor = tiled_upscale(upscale_model, img_tensor, tile_size=512, overlap=32)
-        
+
         # 업스케일 모델 VRAM 해제
         upscale_cache.model.to("cpu")
         torch.cuda.empty_cache()
-        
+
         upscaled_np = (upscaled_tensor.squeeze(0).permute(1, 2, 0).cpu().float().numpy() * 255).clip(0, 255).astype(np.uint8)
         upscaled_image = Image.fromarray(upscaled_np)
-        
+
         upscaled_w, upscaled_h = upscaled_image.size
-        print(f"[Upscale] Upscaled to {upscaled_w}x{upscaled_h}")
-        
+        logger.info(f"[LocalEngine Upscale] Upscaled to {upscaled_w}x{upscaled_h}")
+
         # 2. Downscale + Size alignment (2nd pass 전에!)
         target_w = int(upscaled_w * req.downscale_ratio)
         target_h = int(upscaled_h * req.downscale_ratio)
-        
+
         # 정렬 적용
         if req.size_alignment == "64":
             target_w = ((target_w + 32) // 64) * 64
@@ -2310,31 +1549,28 @@ def call_local_diffusers(req: GenerateRequest):
             target_h = ((target_h + 4) // 8) * 8
             target_w = max(8, target_w)
             target_h = max(8, target_h)
-        
+
         resized_image = upscaled_image.resize((target_w, target_h), Image.LANCZOS)
-        print(f"[Upscale] Resized to {target_w}x{target_h}")
-        
-        # 3. 2nd pass img2img
-        from diffusers import AutoPipelineForImage2Image
-        
-        img2img_pipe = AutoPipelineForImage2Image.from_pipe(pipe)
-        generator2 = torch.Generator(device="cpu").manual_seed(int(seed) + 1)
-        
-        result2 = img2img_pipe(
+        logger.info(f"[LocalEngine Upscale] Resized to {target_w}x{target_h}")
+
+        # 3. 2nd pass - 로컬 엔진 img2img
+        image, _ = _local_engine_generator.generate(
             prompt=req.prompt,
             negative_prompt=req.negative_prompt,
-            image=resized_image,
-            num_inference_steps=req.upscale_steps,
-            guidance_scale=req.upscale_cfg,
-            strength=req.upscale_denoise,
-            generator=generator2,
+            width=target_w,
+            height=target_h,
+            steps=req.upscale_steps,
+            cfg_scale=req.upscale_cfg,
+            seed=used_seed + 1,
+            sampler=req.sampler,
+            scheduler=req.scheduler,
+            base_image=resized_image,
+            denoise=req.upscale_denoise
         )
-        
-        image = result2.images[0]
-        print(f"[Upscale] 2nd pass done, final size={image.size[0]}x{image.size[1]}")
-    
-    print(f"[Generate] Done, seed={seed}")
-    return image, int(seed)
+        logger.info(f"[LocalEngine Upscale] 2nd pass done, final size={image.size[0]}x{image.size[1]}")
+
+    logger.info(f"[LocalEngine] Done, seed={used_seed}")
+    return image, int(used_seed)
 
 
 def tiled_upscale(model, img_tensor, tile_size=512, overlap=32):
@@ -2402,10 +1638,9 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(open_browser_delayed())
     
     yield
-    
+
     # 종료 시 태스크 취소
     queue_task.cancel()
-    model_cache.clear()
     upscale_cache.clear()
 
 
@@ -2660,7 +1895,10 @@ async def process_job(job):
                 image, actual_seed = await call_nai_api(single_req)
             else:
                 # ComfyUI 포팅 로컬 엔진 사용
-                image, actual_seed = call_local_engine(single_req)
+                # 동기 함수를 executor에서 실행하여 이벤트 루프 블로킹 방지
+                import asyncio
+                loop = asyncio.get_event_loop()
+                image, actual_seed = await loop.run_in_executor(None, call_local_engine, single_req)
             image_time = time.time() - image_start_time
             
             # 파일명용 태그 결정: name > 첫 태그 (sanitize_filename 사용)
@@ -3923,16 +3161,23 @@ async def get_queue():
 
 @app.post("/api/cache/clear")
 async def clear_cache():
-    model_cache.clear()
+    global _local_engine_generator
+    if _local_engine_generator is not None:
+        _local_engine_generator.unload()
+        _local_engine_generator = None
+    upscale_cache.clear()
     return {"success": True}
 
 
 @app.get("/api/status")
 async def status():
+    lazy_imports()
+    local_model = _local_engine_generator.model_path if _local_engine_generator else None
+    local_loras = list(_local_engine_generator.loaded_loras.keys()) if _local_engine_generator else []
     return {
-        "device": model_cache.device if torch else "unknown",
-        "cached_model": model_cache.model_path,
-        "loaded_loras": list(model_cache.loaded_loras.keys()),
+        "device": "cuda" if (torch and torch.cuda.is_available()) else "cpu",
+        "cached_model": local_model,
+        "loaded_loras": local_loras,
         "nai_available": bool(CONFIG.get("nai_token")),
     }
 
@@ -4205,9 +3450,12 @@ def _check_ultralytics_installed():
     """ultralytics 설치 여부 실제 확인"""
     return (_get_site_packages_dir() / "ultralytics").exists()
 
-def _check_diffusers_installed():
-    """diffusers 설치 여부 실제 확인 (로컬 생성용)"""
-    return (_get_site_packages_dir() / "diffusers").exists()
+def _check_local_deps_installed():
+    """로컬 생성 의존성 설치 여부 확인 (einops, tqdm, spandrel)"""
+    site_packages = _get_site_packages_dir()
+    # 필수 의존성: einops, tqdm, spandrel (transformers, safetensors는 torch와 함께 설치됨)
+    required = ["einops", "tqdm", "spandrel"]
+    return all((site_packages / pkg).exists() for pkg in required)
 
 def _detect_install_status():
     """실제 파일 시스템을 스캔하여 설치 상태 감지 (느림)"""
@@ -4215,7 +3463,7 @@ def _detect_install_status():
         "python": _check_python_installed(),
         "torch": _check_torch_version(),
         "censor": _check_ultralytics_installed(),
-        "local": _check_diffusers_installed()
+        "local": _check_local_deps_installed()
     }
 
 def load_install_status():
@@ -4664,18 +3912,18 @@ def _install_local_environment_sync():
         if ret != 0:
             raise Exception(f"PyTorch CUDA installation failed with code {ret}")
         
-        # diffusers 등 설치 (50% -> 80%)
-        install_status["message"] = "Installing diffusers..."
+        # 로컬 엔진 의존성 설치 (50% -> 80%)
+        install_status["message"] = "Installing local engine dependencies..."
         install_status["progress"] = 50
-        
+
         ret = _run_uv_install(
             uv_exe, python_exe,
-            ["diffusers", "transformers", "accelerate", "safetensors", "peft", "spandrel"],
+            ["transformers", "safetensors", "einops", "tqdm", "spandrel"],
             progress_base=50,
             progress_end=80
         )
         if ret != 0:
-            raise Exception(f"diffusers installation failed with code {ret}")
+            raise Exception(f"Local engine dependencies installation failed with code {ret}")
 
         # ultralytics가 없으면 설치 (80% -> 90%)
         current_status = get_install_status()
@@ -4841,13 +4089,13 @@ async def uninstall_local():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"삭제 중 오류: {e}")
 
-    # install_status.json 업데이트 (torch/diffusers 제거 반영)
+    # install_status.json 업데이트 (로컬 엔진 의존성 제거 반영)
     # 기본 환경(ultralytics 등)은 유지하므로 censor는 True로 유지
     save_install_status({
         "python": True,
         "torch": "cpu",  # CUDA torch 제거됨, 기본 환경 재설치 시 CPU로
         "censor": True,
-        "local": False   # diffusers 제거됨
+        "local": False   # 로컬 엔진 의존성 제거됨
     })
 
     if errors:

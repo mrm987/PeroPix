@@ -4,7 +4,9 @@ ComfyUI 스케줄러 포팅
 원본: ComfyUI/comfy/samplers.py, ComfyUI/comfy/k_diffusion/sampling.py
 """
 
+import math
 import torch
+import numpy as np
 from .utils import append_zero
 
 
@@ -19,8 +21,6 @@ def normal_scheduler(model_sampling, steps, sgm=False, floor=False):
     이것이 Diffusers와의 핵심 차이점입니다.
     Diffusers는 sigma 공간에서 직접 선형 보간합니다.
     """
-    import math
-
     s = model_sampling
     start = s.timestep(s.sigma_max)
     end = s.timestep(s.sigma_min)
@@ -82,9 +82,63 @@ def get_sigmas_karras(n, sigma_min, sigma_max, rho=7., device='cpu'):
 
 def get_sigmas_exponential(n, sigma_min, sigma_max, device='cpu'):
     """Exponential 노이즈 스케줄"""
-    import math
     sigmas = torch.linspace(math.log(sigma_max), math.log(sigma_min), n, device=device).exp()
     return append_zero(sigmas)
+
+
+def ddim_scheduler(model_sampling, steps):
+    """
+    DDIM Uniform 스케줄러
+
+    ComfyUI 원본: 균등하게 간격을 둔 시그마 값들을 역순으로 정렬
+    """
+    s = model_sampling
+    sigs = []
+    x = 1
+    if math.isclose(float(s.sigmas[x]), 0, abs_tol=0.00001):
+        steps += 1
+        sigs = []
+    else:
+        sigs = [0.0]
+
+    ss = max(len(s.sigmas) // steps, 1)
+    while x < len(s.sigmas):
+        sigs.append(float(s.sigmas[x]))
+        x += ss
+    sigs = sigs[::-1]
+    return torch.FloatTensor(sigs)
+
+
+def beta_scheduler(model_sampling, steps, alpha=0.6, beta=0.6):
+    """
+    Beta 스케줄러
+
+    ComfyUI 원본: 베타 분포의 역누적분포함수를 이용해 시간 단계를 샘플링
+    scipy 없이 numpy로 근사 구현
+    """
+    try:
+        from scipy.stats import beta as beta_dist
+        has_scipy = True
+    except ImportError:
+        has_scipy = False
+
+    total_timesteps = len(model_sampling.sigmas) - 1
+    ts = 1 - np.linspace(0, 1, steps, endpoint=False)
+
+    if has_scipy:
+        ts = np.rint(beta_dist.ppf(ts, alpha, beta) * total_timesteps)
+    else:
+        # scipy 없으면 simple 스케줄러로 폴백
+        ts = np.rint(ts * total_timesteps)
+
+    sigs = []
+    last_t = -1
+    for t in ts:
+        if t != last_t:
+            sigs.append(float(model_sampling.sigmas[int(t)]))
+        last_t = t
+    sigs.append(0.0)
+    return torch.FloatTensor(sigs)
 
 
 # 스케줄러 레지스트리
@@ -92,6 +146,8 @@ SCHEDULERS = {
     "normal": lambda ms, steps: normal_scheduler(ms, steps, sgm=False),
     "sgm_uniform": lambda ms, steps: normal_scheduler(ms, steps, sgm=True),
     "simple": simple_scheduler,
+    "ddim_uniform": ddim_scheduler,
+    "beta": beta_scheduler,
     "karras": None,  # 별도 처리 필요 (sigma_min/max 필요)
     "exponential": None,  # 별도 처리 필요
 }

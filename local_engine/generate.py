@@ -12,8 +12,10 @@ from pathlib import Path
 from typing import Optional, Tuple, List, Dict, Any
 import logging
 
+logger = logging.getLogger('peropix')
+
 from .model_sampling import ModelSamplingDiscrete, EPS
-from .samplers import sample_euler, sample_euler_ancestral, SAMPLERS
+from .samplers import SAMPLERS, get_sampler
 from .schedulers import get_sigmas, SCHEDULERS
 from .model_loader import load_sdxl_model, get_model_cache
 from .lora import LoRALoader
@@ -91,6 +93,23 @@ class SDXLGenerator:
         # LoRA 로더 (UNet과 CLIP 각각 별도 - 키 맵이 다르므로)
         self.unet_lora_loader = LoRALoader(device=device, dtype=dtype)
         self.clip_lora_loader = LoRALoader(device=device, dtype=dtype)
+
+    @property
+    def loaded_loras(self) -> dict:
+        """로드된 LoRA 목록 반환"""
+        return self.unet_lora_loader._loaded_loras
+
+    def unload(self):
+        """모델 언로드 및 VRAM 해제"""
+        del self.unet
+        del self.vae
+        del self.clip
+        del self.model_sampling
+        self.unet = None
+        self.vae = None
+        self.clip = None
+        self.model_sampling = None
+        torch.cuda.empty_cache()
 
     def apply_lora(self, lora_path: str, scale: float = 1.0):
         """LoRA 적용 (UNet + CLIP)"""
@@ -343,7 +362,9 @@ class SDXLGenerator:
             latent = encode_image(self.vae, image_tensor, self.device, self.dtype)
 
             # denoise에 따라 시그마 조정
-            denoise_steps = int(steps * denoise)
+            # denoise=0.7, steps=28 -> 실제 20 스텝 실행
+            denoise_steps = max(1, int(steps * denoise))
+            logger.debug(f"[Generate] i2i: denoise={denoise}, steps={steps}, denoise_steps={denoise_steps}")
             if denoise_steps < steps:
                 sigmas = sigmas[-(denoise_steps + 1):]
                 # denoise < 1.0이면 max_denoise가 아님
@@ -379,10 +400,8 @@ class SDXLGenerator:
         )
 
         # 샘플러 선택
-        if sampler == "euler_ancestral":
-            sampler_fn = sample_euler_ancestral
-        else:
-            sampler_fn = sample_euler
+        sampler_fn = get_sampler(sampler)
+        logger.debug(f"[Generate] Using sampler: {sampler} -> {sampler_fn.__name__}")
 
         # 콜백 래퍼
         def step_callback(info):

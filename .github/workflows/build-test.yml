@@ -57,6 +57,7 @@ jobs:
           Copy-Item -Recurse "assets" -Destination "dist/PeroPix/"
           Copy-Item -Recurse "scripts" -Destination "dist/PeroPix/"
           Copy-Item -Recurse "data" -Destination "dist/PeroPix/"
+          Copy-Item -Recurse "local_engine" -Destination "dist/PeroPix/"
           New-Item -ItemType Directory -Force -Path "dist/PeroPix/models/censor"
           Copy-Item "models/censor/*" -Destination "dist/PeroPix/models/censor/"
           New-Item -ItemType Directory -Force -Path "dist/PeroPix/models/checkpoints"
@@ -121,6 +122,7 @@ jobs:
           cp -r assets dist/PeroPix/
           cp -r scripts dist/PeroPix/
           cp -r data dist/PeroPix/
+          cp -r local_engine dist/PeroPix/
           mkdir -p dist/PeroPix/models/censor
           cp models/censor/* dist/PeroPix/models/censor/
           mkdir -p dist/PeroPix/models/checkpoints

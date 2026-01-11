@@ -4418,7 +4418,7 @@
                                         </div>
                                     </div>
                                     <div style="margin-bottom: 8px;">
-                                        <label>Strength: <span id="baseImageStrengthValue">0.7</span></label>
+                                        <label><span id="baseImageStrengthLabel">Strength</span>: <span id="baseImageStrengthValue">0.7</span></label>
                                         <input type="range" id="baseImageStrength" min="0" max="1" step="0.05" value="0.7" style="width: 100%;">
                                     </div>
                                     <div id="baseImageNoiseContainer">
@@ -6555,13 +6555,6 @@
             { value: 'euler_ancestral', label: 'Euler Ancestral' },
             { value: 'euler', label: 'Euler' },
             { value: 'dpmpp_2m', label: 'DPM++ 2M' },
-            { value: 'dpmpp_2m_sde', label: 'DPM++ 2M SDE' },
-            { value: 'dpmpp_sde', label: 'DPM++ SDE' },
-            { value: 'dpmpp_3m_sde', label: 'DPM++ 3M SDE' },
-            { value: 'dpmpp_2s_ancestral', label: 'DPM++ 2S Ancestral' },
-            { value: 'ddim', label: 'DDIM' },
-            { value: 'uni_pc', label: 'UniPC' },
-            { value: 'lcm', label: 'LCM' },
         ];
         const LOCAL_SCHEDULERS = [
             { value: 'normal', label: 'Normal' },
@@ -6640,6 +6633,7 @@
                 
                 updateAnlasVisibility();
                 updateProviderLabels();
+                updateBaseImageNoiseVisibility();
                 autoSaveSettings();
             });
         });
@@ -13164,11 +13158,22 @@
             reader.readAsDataURL(file);
         }
 
-        // Noise 슬라이더 가시성 업데이트 (인페인트는 noise 없음)
+        // Noise 슬라이더 가시성 및 라벨 업데이트
+        // - 인페인트: Noise 숨김
+        // - 로컬 엔진: Noise 숨김, Strength → Denoise
         function updateBaseImageNoiseVisibility() {
             const noiseContainer = document.getElementById('baseImageNoiseContainer');
+            const strengthLabel = document.getElementById('baseImageStrengthLabel');
             const mode = document.getElementById('baseImageMode').value;
-            noiseContainer.style.display = mode === 'inpaint' ? 'none' : 'block';
+
+            // 로컬 엔진이거나 인페인트 모드면 Noise 숨김
+            const hideNoise = currentProvider === 'local' || mode === 'inpaint';
+            noiseContainer.style.display = hideNoise ? 'none' : 'block';
+
+            // 로컬 엔진: Strength → Denoise 라벨 변경
+            if (strengthLabel) {
+                strengthLabel.textContent = currentProvider === 'local' ? 'Denoise' : 'Strength';
+            }
         }
 
         // Inpaint용 이미지 설정 함수 (외부에서 호출)

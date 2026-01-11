@@ -10569,8 +10569,8 @@
                 varietyPlus: document.getElementById('varietyPlus').checked,
                 enableVibeTransfer: document.getElementById('enableVibeTransfer').checked,
                 vibeList: vibeList,
-                enableCharRef: document.getElementById('enableCharRef').checked,
-                charRefData: charRefData,
+                // CharRef: 이미지 데이터는 저장 안 함 (NAI 웹처럼 재실행 시 초기화)
+                // enableCharRef, charRefData는 저장하지 않음
                 charRefFidelity: document.getElementById('charRefFidelity').value,
                 charRefStyleAware: document.getElementById('charRefStyleAware').checked,
                 
@@ -10742,16 +10742,8 @@
                     vibeList = settings.vibeList;
                     renderVibeList();
                 }
-                if (settings.enableCharRef !== undefined) {
-                    document.getElementById('enableCharRef').checked = settings.enableCharRef;
-                    document.getElementById('charRefSettings').style.display = settings.enableCharRef ? 'block' : 'none';
-                }
-                if (settings.charRefData) {
-                    charRefData = settings.charRefData;
-                    document.getElementById('charRefImage').src = 'data:image/png;base64,' + charRefData.image;
-                    document.getElementById('charRefPreview').style.display = 'block';
-                    document.getElementById('uploadCharRefBtn').textContent = '이미지 변경';
-                }
+                // CharRef: enableCharRef, charRefData는 복원 안 함 (재실행 시 초기화)
+                // fidelity, styleAware 설정값만 복원
                 if (settings.charRefFidelity !== undefined) {
                     const charRefFidelityEl = document.getElementById('charRefFidelity');
                     charRefFidelityEl.value = settings.charRefFidelity;
@@ -10999,16 +10991,8 @@
                             vibeList = naiSettings.vibeList;
                             renderVibeList();
                         }
-                        if (naiSettings.enableCharRef !== undefined) {
-                            document.getElementById('enableCharRef').checked = naiSettings.enableCharRef;
-                            document.getElementById('charRefSettings').style.display = naiSettings.enableCharRef ? 'block' : 'none';
-                        }
-                        if (naiSettings.charRefData) {
-                            charRefData = naiSettings.charRefData;
-                            document.getElementById('charRefImage').src = 'data:image/png;base64,' + charRefData.image;
-                            document.getElementById('charRefPreview').style.display = 'block';
-                            document.getElementById('uploadCharRefBtn').textContent = '이미지 변경';
-                        }
+                        // CharRef: enableCharRef, charRefData는 복원 안 함 (재실행 시 초기화)
+                        // fidelity, styleAware 설정값만 복원
                         if (naiSettings.charRefFidelity !== undefined) {
                             const charRefFidelityEl = document.getElementById('charRefFidelity');
                             charRefFidelityEl.value = naiSettings.charRefFidelity;

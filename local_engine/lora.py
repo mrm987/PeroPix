@@ -2,17 +2,318 @@
 LoRA/LyCORIS 로더
 
 ComfyUI 방식의 LoRA 적용
-기존 backend.py의 LyCORISLoader를 기반으로 구현
+- SDXL UNet 키 매핑 테이블 기반
+- lora_unet_xxx 형식의 LoRA 키를 ComfyUI 모델 키로 변환
 """
 
 import torch
 import torch.nn as nn
 import logging
-import re
-from typing import Dict, Optional, Tuple, List, Any
+from typing import Dict, Optional, List
 from pathlib import Path
 from safetensors.torch import load_file
 
+
+# ============================================================
+# SDXL UNet Key Mapping (ComfyUI utils.py에서 포팅)
+# ============================================================
+
+# Transformer block 내부 레이어들
+TRANSFORMER_BLOCKS = {
+    "norm1.weight",
+    "norm1.bias",
+    "norm2.weight",
+    "norm2.bias",
+    "norm3.weight",
+    "norm3.bias",
+    "attn1.to_q.weight",
+    "attn1.to_k.weight",
+    "attn1.to_v.weight",
+    "attn1.to_out.0.weight",
+    "attn1.to_out.0.bias",
+    "attn2.to_q.weight",
+    "attn2.to_k.weight",
+    "attn2.to_v.weight",
+    "attn2.to_out.0.weight",
+    "attn2.to_out.0.bias",
+    "ff.net.0.proj.weight",
+    "ff.net.0.proj.bias",
+    "ff.net.2.weight",
+    "ff.net.2.bias",
+}
+
+# Attention 레이어들
+UNET_MAP_ATTENTIONS = {
+    "proj_in.weight",
+    "proj_in.bias",
+    "proj_out.weight",
+    "proj_out.bias",
+    "norm.weight",
+    "norm.bias",
+}
+
+# ResNet 레이어 매핑 (Diffusers -> ComfyUI)
+UNET_MAP_RESNET = {
+    "in_layers.2.weight": "conv1.weight",
+    "in_layers.2.bias": "conv1.bias",
+    "emb_layers.1.weight": "time_emb_proj.weight",
+    "emb_layers.1.bias": "time_emb_proj.bias",
+    "out_layers.3.weight": "conv2.weight",
+    "out_layers.3.bias": "conv2.bias",
+    "skip_connection.weight": "conv_shortcut.weight",
+    "skip_connection.bias": "conv_shortcut.bias",
+    "in_layers.0.weight": "norm1.weight",
+    "in_layers.0.bias": "norm1.bias",
+    "out_layers.0.weight": "norm2.weight",
+    "out_layers.0.bias": "norm2.bias",
+}
+
+# 기본 레이어 매핑 (ComfyUI -> Diffusers)
+UNET_MAP_BASIC = {
+    ("label_emb.0.0.weight", "class_embedding.linear_1.weight"),
+    ("label_emb.0.0.bias", "class_embedding.linear_1.bias"),
+    ("label_emb.0.2.weight", "class_embedding.linear_2.weight"),
+    ("label_emb.0.2.bias", "class_embedding.linear_2.bias"),
+    ("label_emb.0.0.weight", "add_embedding.linear_1.weight"),
+    ("label_emb.0.0.bias", "add_embedding.linear_1.bias"),
+    ("label_emb.0.2.weight", "add_embedding.linear_2.weight"),
+    ("label_emb.0.2.bias", "add_embedding.linear_2.bias"),
+    ("input_blocks.0.0.weight", "conv_in.weight"),
+    ("input_blocks.0.0.bias", "conv_in.bias"),
+    ("out.0.weight", "conv_norm_out.weight"),
+    ("out.0.bias", "conv_norm_out.bias"),
+    ("out.2.weight", "conv_out.weight"),
+    ("out.2.bias", "conv_out.bias"),
+    ("time_embed.0.weight", "time_embedding.linear_1.weight"),
+    ("time_embed.0.bias", "time_embedding.linear_1.bias"),
+    ("time_embed.2.weight", "time_embedding.linear_2.weight"),
+    ("time_embed.2.bias", "time_embedding.linear_2.bias")
+}
+
+# CLIP 레이어 매핑
+LORA_CLIP_MAP = {
+    "mlp.fc1": "mlp_fc1",
+    "mlp.fc2": "mlp_fc2",
+    "self_attn.k_proj": "self_attn_k_proj",
+    "self_attn.q_proj": "self_attn_q_proj",
+    "self_attn.v_proj": "self_attn_v_proj",
+    "self_attn.out_proj": "self_attn_out_proj",
+}
+
+
+def unet_to_diffusers(unet_config: dict) -> Dict[str, str]:
+    """
+    Diffusers LoRA 키 -> ComfyUI UNet 키 매핑 테이블 생성
+
+    ComfyUI comfy/utils.py:unet_to_diffusers 포팅
+
+    Returns:
+        {diffusers_key: comfyui_key} 매핑 딕셔너리
+    """
+    if "num_res_blocks" not in unet_config:
+        return {}
+
+    num_res_blocks = unet_config["num_res_blocks"]
+    channel_mult = unet_config["channel_mult"]
+    transformer_depth = unet_config["transformer_depth"][:]
+    transformer_depth_output = unet_config["transformer_depth_output"][:]
+    num_blocks = len(channel_mult)
+
+    transformers_mid = unet_config.get("transformer_depth_middle", None)
+
+    diffusers_unet_map = {}
+
+    # Down blocks (input_blocks)
+    for x in range(num_blocks):
+        n = 1 + (num_res_blocks[x] + 1) * x
+        for i in range(num_res_blocks[x]):
+            # ResNet 레이어
+            for b in UNET_MAP_RESNET:
+                diffusers_unet_map["down_blocks.{}.resnets.{}.{}".format(x, i, UNET_MAP_RESNET[b])] = "input_blocks.{}.0.{}".format(n, b)
+
+            # Transformer 레이어
+            num_transformers = transformer_depth.pop(0)
+            if num_transformers > 0:
+                for b in UNET_MAP_ATTENTIONS:
+                    diffusers_unet_map["down_blocks.{}.attentions.{}.{}".format(x, i, b)] = "input_blocks.{}.1.{}".format(n, b)
+                for t in range(num_transformers):
+                    for b in TRANSFORMER_BLOCKS:
+                        diffusers_unet_map["down_blocks.{}.attentions.{}.transformer_blocks.{}.{}".format(x, i, t, b)] = "input_blocks.{}.1.transformer_blocks.{}.{}".format(n, t, b)
+            n += 1
+
+        # Downsampler
+        for k in ["weight", "bias"]:
+            diffusers_unet_map["down_blocks.{}.downsamplers.0.conv.{}".format(x, k)] = "input_blocks.{}.0.op.{}".format(n, k)
+
+    # Mid block (middle_block)
+    i = 0
+    for b in UNET_MAP_ATTENTIONS:
+        diffusers_unet_map["mid_block.attentions.{}.{}".format(i, b)] = "middle_block.1.{}".format(b)
+
+    for t in range(transformers_mid):
+        for b in TRANSFORMER_BLOCKS:
+            diffusers_unet_map["mid_block.attentions.{}.transformer_blocks.{}.{}".format(i, t, b)] = "middle_block.1.transformer_blocks.{}.{}".format(t, b)
+
+    for i, n in enumerate([0, 2]):
+        for b in UNET_MAP_RESNET:
+            diffusers_unet_map["mid_block.resnets.{}.{}".format(i, UNET_MAP_RESNET[b])] = "middle_block.{}.{}".format(n, b)
+
+    # Up blocks (output_blocks)
+    num_res_blocks = list(reversed(num_res_blocks))
+    for x in range(num_blocks):
+        n = (num_res_blocks[x] + 1) * x
+        l = num_res_blocks[x] + 1
+        for i in range(l):
+            c = 0
+            for b in UNET_MAP_RESNET:
+                diffusers_unet_map["up_blocks.{}.resnets.{}.{}".format(x, i, UNET_MAP_RESNET[b])] = "output_blocks.{}.0.{}".format(n, b)
+            c += 1
+            num_transformers = transformer_depth_output.pop()
+            if num_transformers > 0:
+                c += 1
+                for b in UNET_MAP_ATTENTIONS:
+                    diffusers_unet_map["up_blocks.{}.attentions.{}.{}".format(x, i, b)] = "output_blocks.{}.1.{}".format(n, b)
+                for t in range(num_transformers):
+                    for b in TRANSFORMER_BLOCKS:
+                        diffusers_unet_map["up_blocks.{}.attentions.{}.transformer_blocks.{}.{}".format(x, i, t, b)] = "output_blocks.{}.1.transformer_blocks.{}.{}".format(n, t, b)
+            if i == l - 1:
+                for k in ["weight", "bias"]:
+                    diffusers_unet_map["up_blocks.{}.upsamplers.0.conv.{}".format(x, k)] = "output_blocks.{}.{}.conv.{}".format(n, c, k)
+            n += 1
+
+    # Basic layers
+    for k in UNET_MAP_BASIC:
+        diffusers_unet_map[k[1]] = k[0]
+
+    return diffusers_unet_map
+
+
+# SDXL UNet config
+SDXL_UNET_CONFIG = {
+    "num_res_blocks": [2, 2, 2],
+    "channel_mult": [1, 2, 4],
+    "transformer_depth": [0, 0, 2, 2, 10, 10],
+    "transformer_depth_middle": 10,
+    "transformer_depth_output": [0, 0, 0, 2, 2, 2, 10, 10, 10],
+}
+
+
+def build_lora_key_map(model_state_dict: Dict[str, torch.Tensor]) -> Dict[str, str]:
+    """
+    LoRA 키 -> 모델 키 매핑 테이블 구축
+
+    ComfyUI comfy/lora.py:model_lora_keys_unet + model_lora_keys_clip 포팅
+
+    Args:
+        model_state_dict: 모델의 state_dict
+
+    Returns:
+        {lora_key: model_key} 매핑 딕셔너리
+    """
+    key_map = {}
+    sdk = set(model_state_dict.keys())
+
+    # ============================================================
+    # UNet 키 매핑
+    # ============================================================
+
+    # 1. 직접 매핑 (접두사 없는 ComfyUI 스타일: input_blocks.xxx)
+    # PeroPix UNet은 diffusion_model. 접두사 없이 직접 input_blocks/middle_block/output_blocks 사용
+    for k in sdk:
+        if k.endswith(".weight"):
+            # input_blocks, middle_block, output_blocks로 시작하는 키들
+            if k.startswith("input_blocks.") or k.startswith("middle_block.") or k.startswith("output_blocks."):
+                key_lora = k[:-len(".weight")].replace(".", "_")
+                key_map["lora_unet_{}".format(key_lora)] = k
+                # Generic 형식
+                key_map["{}".format(k[:-len(".weight")])] = k
+            # 기타 키들 (time_embed, label_emb, out 등)
+            elif k.startswith("time_embed.") or k.startswith("label_emb.") or k.startswith("out."):
+                key_lora = k[:-len(".weight")].replace(".", "_")
+                key_map["lora_unet_{}".format(key_lora)] = k
+
+    # 2. ComfyUI 네이티브 형식: diffusion_model.xxx -> lora_unet_xxx
+    for k in sdk:
+        if k.startswith("diffusion_model.") or k.startswith("model.diffusion_model."):
+            # diffusion_model 접두사 제거
+            if k.startswith("model.diffusion_model."):
+                base_key = k[len("model.diffusion_model."):]
+            else:
+                base_key = k[len("diffusion_model."):]
+
+            if k.endswith(".weight"):
+                key_lora = base_key[:-len(".weight")].replace(".", "_")
+                key_map["lora_unet_{}".format(key_lora)] = k
+                # Generic 형식도 지원
+                key_map["{}".format(k[:-len(".weight")])] = k
+
+    # 3. Diffusers 형식 지원 (unet_to_diffusers 매핑 사용)
+    diffusers_keys = unet_to_diffusers(SDXL_UNET_CONFIG)
+    for diffusers_key, comfyui_key in diffusers_keys.items():
+        # 먼저 접두사 없는 형식 시도 (PeroPix UNet)
+        unet_key = comfyui_key
+        if unet_key not in sdk:
+            # ComfyUI 모델은 diffusion_model. 접두사 사용
+            unet_key = "diffusion_model.{}".format(comfyui_key)
+        if unet_key not in sdk:
+            unet_key = "model.diffusion_model.{}".format(comfyui_key)
+
+        if unet_key in sdk:
+            if diffusers_key.endswith(".weight"):
+                key_lora = diffusers_key[:-len(".weight")].replace(".", "_")
+                key_map["lora_unet_{}".format(key_lora)] = unet_key
+
+                # Diffusers lora 형식들
+                for prefix in ["", "unet."]:
+                    diffusers_lora_key = "{}{}".format(prefix, diffusers_key[:-len(".weight")].replace(".to_", ".processor.to_"))
+                    if diffusers_lora_key.endswith(".to_out.0"):
+                        diffusers_lora_key = diffusers_lora_key[:-2]
+                    key_map[diffusers_lora_key] = unet_key
+
+    # ============================================================
+    # CLIP 키 매핑
+    # ============================================================
+
+    text_model_lora_key = "lora_te_text_model_encoder_layers_{}_{}"
+    clip_l_present = False
+    clip_g_present = False
+
+    for b in range(32):
+        for c, lora_c in LORA_CLIP_MAP.items():
+            # CLIP-L
+            k = "clip_l.transformer.text_model.encoder.layers.{}.{}.weight".format(b, c)
+            if k in sdk:
+                clip_l_present = True
+                key_map[text_model_lora_key.format(b, lora_c)] = k
+                key_map["lora_te1_text_model_encoder_layers_{}_{}".format(b, lora_c)] = k
+                key_map["text_encoder.text_model.encoder.layers.{}.{}".format(b, c)] = k
+
+            # CLIP-G
+            k = "clip_g.transformer.text_model.encoder.layers.{}.{}.weight".format(b, c)
+            if k in sdk:
+                clip_g_present = True
+                if clip_l_present:
+                    key_map["lora_te2_text_model_encoder_layers_{}_{}".format(b, lora_c)] = k
+                    key_map["text_encoder_2.text_model.encoder.layers.{}.{}".format(b, c)] = k
+                else:
+                    key_map["lora_te_text_model_encoder_layers_{}_{}".format(b, lora_c)] = k
+                    key_map["text_encoder.text_model.encoder.layers.{}.{}".format(b, c)] = k
+
+    # Text projection
+    k = "clip_g.transformer.text_projection.weight"
+    if k in sdk:
+        key_map["lora_te2_text_projection"] = k
+
+    k = "clip_l.transformer.text_projection.weight"
+    if k in sdk:
+        key_map["lora_te1_text_projection"] = k
+
+    return key_map
+
+
+# ============================================================
+# LoRA Weight Calculation
+# ============================================================
 
 def detect_lora_type(state_dict: Dict[str, torch.Tensor]) -> str:
     """
@@ -24,13 +325,32 @@ def detect_lora_type(state_dict: Dict[str, torch.Tensor]) -> str:
         'lora': 일반 LoRA
     """
     for key in state_dict.keys():
-        # LokR 감지
         if '.lokr_w1' in key or '.lokr_w2' in key:
             return 'lokr'
-        # LoHa 감지
         if '.hada_w1_a' in key or '.hada_w2_a' in key:
             return 'loha'
     return 'lora'
+
+
+def get_lora_prefixes(state_dict: Dict[str, torch.Tensor]) -> List[str]:
+    """state_dict에서 고유한 LoRA prefix들을 추출"""
+    prefixes = set()
+
+    suffixes = [
+        '.lora_down.weight', '.lora_up.weight',
+        '.lokr_w1', '.lokr_w2', '.lokr_w1_a', '.lokr_w1_b',
+        '.lokr_w2_a', '.lokr_w2_b', '.lokr_t2',
+        '.hada_w1_a', '.hada_w1_b', '.hada_w2_a', '.hada_w2_b',
+        '.hada_t1', '.hada_t2', '.alpha'
+    ]
+
+    for key in state_dict.keys():
+        for suffix in suffixes:
+            if key.endswith(suffix):
+                prefixes.add(key[:-len(suffix)])
+                break
+
+    return list(prefixes)
 
 
 def calculate_lora_weight(
@@ -39,11 +359,7 @@ def calculate_lora_weight(
     device: str,
     dtype: torch.dtype
 ) -> Optional[torch.Tensor]:
-    """
-    일반 LoRA weight delta 계산
-
-    delta = (up @ down) * (alpha / rank)
-    """
+    """일반 LoRA weight delta 계산: delta = (up @ down) * (alpha / rank)"""
     lora_down_key = f"{prefix}.lora_down.weight"
     lora_up_key = f"{prefix}.lora_up.weight"
     alpha_key = f"{prefix}.alpha"
@@ -56,10 +372,9 @@ def calculate_lora_weight(
 
     rank = lora_down.shape[0]
     alpha = state_dict.get(alpha_key, torch.tensor(rank)).item()
-
     scale = alpha / rank
 
-    # Conv2d의 경우 4D
+    # Conv2d (4D) vs Linear (2D)
     if len(lora_down.shape) == 4:
         delta = torch.einsum('oihw,kihw->okhw', lora_up, lora_down) * scale
     else:
@@ -74,11 +389,7 @@ def calculate_lokr_weight(
     device: str,
     dtype: torch.dtype
 ) -> Optional[torch.Tensor]:
-    """
-    LokR weight delta 계산
-
-    delta = kron(w1, w2) * (alpha / dim)
-    """
+    """LokR weight delta 계산: delta = kron(w1, w2) * (alpha / dim)"""
     w1_key = f"{prefix}.lokr_w1"
     w2_key = f"{prefix}.lokr_w2"
     w1_a_key = f"{prefix}.lokr_w1_a"
@@ -118,7 +429,6 @@ def calculate_lokr_weight(
     else:
         return None
 
-    # Conv2d의 경우 4D 처리
     if len(w2.shape) == 4:
         w1 = w1.unsqueeze(2).unsqueeze(2)
 
@@ -134,11 +444,7 @@ def calculate_loha_weight(
     device: str,
     dtype: torch.dtype
 ) -> Optional[torch.Tensor]:
-    """
-    LoHa weight delta 계산
-
-    delta = (w1_a @ w1_b) * (w2_a @ w2_b) * (alpha / dim)
-    """
+    """LoHa weight delta 계산: delta = (w1_a @ w1_b) * (w2_a @ w2_b) * (alpha / dim)"""
     w1_a_key = f"{prefix}.hada_w1_a"
     w1_b_key = f"{prefix}.hada_w1_b"
     w2_a_key = f"{prefix}.hada_w2_a"
@@ -176,61 +482,9 @@ def calculate_loha_weight(
     return delta
 
 
-def get_lora_prefixes(state_dict: Dict[str, torch.Tensor]) -> List[str]:
-    """state_dict에서 고유한 LoRA prefix들을 추출"""
-    prefixes = set()
-
-    suffixes = [
-        '.lora_down.weight', '.lora_up.weight',
-        '.lokr_w1', '.lokr_w2', '.lokr_w1_a', '.lokr_w1_b',
-        '.lokr_w2_a', '.lokr_w2_b', '.lokr_t2',
-        '.hada_w1_a', '.hada_w1_b', '.hada_w2_a', '.hada_w2_b',
-        '.hada_t1', '.hada_t2', '.alpha'
-    ]
-
-    for key in state_dict.keys():
-        for suffix in suffixes:
-            if key.endswith(suffix):
-                prefixes.add(key[:-len(suffix)])
-                break
-
-    return list(prefixes)
-
-
-def lora_key_to_model_key(lora_key: str) -> str:
-    """
-    LoRA 키를 모델 레이어 키로 변환
-
-    예: lora_unet_down_blocks_0_attentions_0_transformer_blocks_0_attn1_to_q
-        -> model.diffusion_model.input_blocks.1.1.transformer_blocks.0.attn1.to_q
-    """
-    key = lora_key
-
-    # UNet 변환
-    if key.startswith('lora_unet_'):
-        key = key[10:]  # 'lora_unet_' 제거
-
-        # 언더스코어를 점으로 변환하되, 숫자 앞의 언더스코어는 유지
-        # down_blocks_0 -> input_blocks.1
-        # mid_block -> middle_block
-        # up_blocks_0 -> output_blocks.0
-
-        # 일단 모든 언더스코어를 점으로
-        key = key.replace('_', '.')
-
-        # 숫자 패턴 수정: blocks.0.attentions.0 -> blocks[0].attentions[0]
-        # 하지만 ComfyUI 스타일은 input_blocks.1.1 형태 유지
-
-    # CLIP 변환
-    elif key.startswith('lora_te1_') or key.startswith('lora_te_'):
-        prefix_len = 9 if key.startswith('lora_te1_') else 8
-        key = 'clip_l.transformer.text_model.' + key[prefix_len:].replace('_', '.')
-
-    elif key.startswith('lora_te2_'):
-        key = 'clip_g.transformer.text_model.' + key[9:].replace('_', '.')
-
-    return key
-
+# ============================================================
+# LoRA Loader Class
+# ============================================================
 
 class LoRALoader:
     """LoRA/LyCORIS 로더 및 적용기"""
@@ -240,6 +494,7 @@ class LoRALoader:
         self.dtype = dtype
         self._loaded_loras: Dict[str, Dict] = {}
         self._original_weights: Dict[str, torch.Tensor] = {}
+        self._key_map: Dict[str, str] = {}
 
     def load_lora(self, path: str) -> Dict[str, torch.Tensor]:
         """LoRA 파일 로드"""
@@ -250,34 +505,10 @@ class LoRALoader:
         else:
             return torch.load(path, map_location='cpu')
 
-    def calculate_deltas(
-        self,
-        lora_sd: Dict[str, torch.Tensor],
-        scale: float = 1.0
-    ) -> Dict[str, torch.Tensor]:
-        """
-        LoRA state_dict에서 weight delta 계산
-
-        Returns:
-            {model_key: delta_tensor}
-        """
-        lora_type = detect_lora_type(lora_sd)
-        prefixes = get_lora_prefixes(lora_sd)
-        deltas = {}
-
-        for prefix in prefixes:
-            if lora_type == 'lokr':
-                delta = calculate_lokr_weight(lora_sd, prefix, self.device, self.dtype)
-            elif lora_type == 'loha':
-                delta = calculate_loha_weight(lora_sd, prefix, self.device, self.dtype)
-            else:
-                delta = calculate_lora_weight(lora_sd, prefix, self.device, self.dtype)
-
-            if delta is not None:
-                model_key = lora_key_to_model_key(prefix)
-                deltas[model_key] = delta * scale
-
-        return deltas
+    def build_key_map(self, model: nn.Module):
+        """모델의 state_dict를 기반으로 키 매핑 테이블 구축"""
+        self._key_map = build_lora_key_map(model.state_dict())
+        logging.info(f"Built LoRA key map with {len(self._key_map)} entries")
 
     def apply_lora_to_model(
         self,
@@ -301,38 +532,78 @@ class LoRALoader:
         if lora_name is None:
             lora_name = Path(lora_path).stem
 
+        # 키 맵이 없으면 구축
+        if not self._key_map:
+            self.build_key_map(model)
+
         try:
             lora_sd = self.load_lora(lora_path)
-            deltas = self.calculate_deltas(lora_sd, scale)
+            lora_type = detect_lora_type(lora_sd)
+            prefixes = get_lora_prefixes(lora_sd)
+
+            logging.info(f"Loading LoRA '{lora_name}': type={lora_type}, prefixes={len(prefixes)}")
 
             applied_count = 0
+            skipped_count = 0
+            model_sd = model.state_dict()
 
-            for name, param in model.named_parameters():
-                # LoRA 키와 매칭되는지 확인
-                for delta_key, delta in deltas.items():
-                    if self._key_matches(name, delta_key):
-                        # 원본 백업
-                        if name not in self._original_weights:
-                            self._original_weights[name] = param.data.clone()
+            for prefix in prefixes:
+                # Delta 계산
+                if lora_type == 'lokr':
+                    delta = calculate_lokr_weight(lora_sd, prefix, self.device, self.dtype)
+                elif lora_type == 'loha':
+                    delta = calculate_loha_weight(lora_sd, prefix, self.device, self.dtype)
+                else:
+                    delta = calculate_lora_weight(lora_sd, prefix, self.device, self.dtype)
 
-                        # delta 적용
-                        if delta.shape == param.data.shape:
-                            param.data += delta.to(param.device, param.dtype)
-                            applied_count += 1
-                        else:
-                            logging.warning(f"Shape mismatch for {name}: {param.shape} vs {delta.shape}")
+                if delta is None:
+                    continue
+
+                # LoRA prefix -> 모델 키 변환
+                model_key = self._key_map.get(prefix)
+
+                if model_key is None:
+                    # 키 맵에 없으면 스킵
+                    skipped_count += 1
+                    continue
+
+                # 모델에서 해당 파라미터 찾기
+                param = None
+                for name, p in model.named_parameters():
+                    if name == model_key:
+                        param = p
+                        break
+
+                if param is None:
+                    skipped_count += 1
+                    continue
+
+                # 원본 백업
+                if model_key not in self._original_weights:
+                    self._original_weights[model_key] = param.data.clone()
+
+                # Shape 확인 및 적용
+                if delta.shape == param.data.shape:
+                    param.data += (delta * scale).to(param.device, param.dtype)
+                    applied_count += 1
+                else:
+                    logging.warning(f"Shape mismatch for {model_key}: {param.shape} vs {delta.shape}")
+                    skipped_count += 1
 
             self._loaded_loras[lora_name] = {
                 'path': lora_path,
                 'scale': scale,
-                'applied_count': applied_count
+                'applied_count': applied_count,
+                'skipped_count': skipped_count
             }
 
-            logging.info(f"Applied LoRA '{lora_name}' with scale {scale}, {applied_count} layers")
-            return True
+            logging.info(f"Applied LoRA '{lora_name}': {applied_count} layers applied, {skipped_count} skipped")
+            return applied_count > 0
 
         except Exception as e:
-            logging.error(f"Failed to apply LoRA: {e}")
+            logging.error(f"Failed to apply LoRA '{lora_name}': {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def remove_lora(self, model: nn.Module, lora_name: Optional[str] = None):
@@ -354,17 +625,7 @@ class LoRALoader:
             self._loaded_loras.clear()
             self._original_weights.clear()
 
-    def _key_matches(self, model_key: str, lora_key: str) -> bool:
-        """모델 키와 LoRA 키가 매칭되는지 확인"""
-        # 간단한 매칭: 키 끝부분 비교
-        model_parts = model_key.split('.')
-        lora_parts = lora_key.split('.')
-
-        # 마지막 몇 개 부분만 비교
-        for i in range(1, min(len(model_parts), len(lora_parts)) + 1):
-            if model_parts[-i] != lora_parts[-i]:
-                return False
-        return True
+        logging.info(f"Removed LoRA: {lora_name if lora_name else 'all'}")
 
 
 def apply_lora(

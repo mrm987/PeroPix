@@ -1998,9 +1998,9 @@ def call_local_engine(req: GenerateRequest):
             dtype=dtype
         )
 
-    # LoRA 적용
+    # LoRA 적용 (항상 먼저 제거 후 다시 적용)
+    _local_engine_generator.remove_loras()
     if req.loras:
-        _local_engine_generator.remove_loras()
         for lora_config in req.loras:
             lora_name = lora_config.get("name", "")
             lora_scale = lora_config.get("scale", 1.0)

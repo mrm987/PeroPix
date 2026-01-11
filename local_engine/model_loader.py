@@ -280,25 +280,19 @@ class SDXLModelLoader:
         else:
             logging.info("Attention backend: PyTorch SDPA (scaled_dot_product_attention)")
 
-        # 워밍업: CUDA 커널 컴파일을 위한 더미 forward pass
+        # 워밍업: CUDA 커널 컴파일을 위한 더미 forward pass (최소한만)
         if self.device == "cuda":
             logging.info("UNet warmup...")
             with torch.no_grad():
-                # 일반적인 SDXL 해상도의 latent 크기들 (height/8 x width/8)
-                # 1024x1024 -> 128x128, 1216x832 -> 152x104, 832x1216 -> 104x152
-                latent_sizes = [(128, 128), (152, 104), (104, 152)]
-                # 다양한 context 길이 (77, 154, 231, 308, 462, 616)
-                # 462 = LCM(154, 231), 616 = LCM(154, 308) 등 긴 프롬프트 조합
-                ctx_lengths = [77, 154, 231, 308, 462, 616]
-
-                for h, w in latent_sizes:
-                    for ctx_len in ctx_lengths:
-                        dummy_x = torch.zeros(2, 4, h, w, device=self.device, dtype=self.dtype)
-                        dummy_t = torch.zeros(2, device=self.device, dtype=self.dtype)
-                        dummy_c = torch.zeros(2, ctx_len, 2048, device=self.device, dtype=self.dtype)
-                        dummy_y = torch.zeros(2, 2816, device=self.device, dtype=self.dtype)
-                        _ = unet(dummy_x, timesteps=dummy_t, context=dummy_c, y=dummy_y)
-                torch.cuda.synchronize()
+                # 기본 해상도만 워밍업 (1024x1024 -> 128x128, context 77)
+                dummy_x = torch.zeros(2, 4, 128, 128, device=self.device, dtype=self.dtype)
+                dummy_t = torch.zeros(2, device=self.device, dtype=self.dtype)
+                dummy_c = torch.zeros(2, 77, 2048, device=self.device, dtype=self.dtype)
+                dummy_y = torch.zeros(2, 2816, device=self.device, dtype=self.dtype)
+                _ = unet(dummy_x, timesteps=dummy_t, context=dummy_c, y=dummy_y)
+                # 워밍업 텐서 즉시 해제
+                del dummy_x, dummy_t, dummy_c, dummy_y
+                torch.cuda.empty_cache()
             logging.info("UNet warmup done")
 
         return unet
@@ -325,15 +319,15 @@ class SDXLModelLoader:
         vae = vae.to(device=self.device, dtype=self.dtype)
         vae.eval()
 
-        # 워밍업: CUDA 커널 컴파일을 위한 더미 forward pass
+        # 워밍업: CUDA 커널 컴파일을 위한 더미 forward pass (최소한만)
         if self.device == "cuda":
             logging.info("VAE warmup...")
             with torch.no_grad():
-                # 일반적인 SDXL 해상도의 latent 크기들
-                for h, w in [(128, 128), (152, 104), (104, 152)]:
-                    dummy_latent = torch.zeros(1, 4, h, w, device=self.device, dtype=self.dtype)
-                    _ = vae.decode(dummy_latent)
-                torch.cuda.synchronize()
+                # 기본 해상도만 워밍업 (1024x1024 -> 128x128)
+                dummy_latent = torch.zeros(1, 4, 128, 128, device=self.device, dtype=self.dtype)
+                _ = vae.decode(dummy_latent)
+                del dummy_latent
+                torch.cuda.empty_cache()
             logging.info("VAE warmup done")
 
         return vae

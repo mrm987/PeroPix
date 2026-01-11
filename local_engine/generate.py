@@ -8,6 +8,7 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 from PIL import Image
+from pathlib import Path
 from typing import Optional, Tuple, List, Dict, Any
 import logging
 
@@ -87,16 +88,22 @@ class SDXLGenerator:
         self.model_sampling = ModelSamplingDiscrete().to(device)
         self.eps = EPS()
 
-        # LoRA 로더
-        self.lora_loader = LoRALoader(device=device, dtype=dtype)
+        # LoRA 로더 (UNet과 CLIP 각각 별도 - 키 맵이 다르므로)
+        self.unet_lora_loader = LoRALoader(device=device, dtype=dtype)
+        self.clip_lora_loader = LoRALoader(device=device, dtype=dtype)
 
     def apply_lora(self, lora_path: str, scale: float = 1.0):
-        """LoRA 적용"""
-        self.lora_loader.apply_lora_to_model(self.unet, lora_path, scale)
+        """LoRA 적용 (UNet + CLIP)"""
+        lora_name = Path(lora_path).stem
+        # UNet에 LoRA 적용
+        self.unet_lora_loader.apply_lora_to_model(self.unet, lora_path, scale, lora_name=lora_name)
+        # CLIP에도 LoRA 적용 (스타일 LoRA는 CLIP 가중치가 중요)
+        self.clip_lora_loader.apply_lora_to_model(self.clip, lora_path, scale, lora_name=lora_name)
 
     def remove_loras(self):
-        """모든 LoRA 제거"""
-        self.lora_loader.remove_lora(self.unet)
+        """모든 LoRA 제거 (UNet + CLIP)"""
+        self.unet_lora_loader.remove_lora(self.unet)
+        self.clip_lora_loader.remove_lora(self.clip)
 
     def encode_prompt(
         self,
@@ -400,6 +407,17 @@ class SDXLGenerator:
         image = decode_latent(self.vae, samples, self.dtype)
 
         pil_image = tensor_to_pil(image)
+
+        # 중간 텐서 해제 (VRAM 절약)
+        del cond, cond_pooled, uncond, uncond_pooled
+        del sigmas, x, samples, image
+        if latent_mask is not None:
+            del latent_mask
+        if original_latent is not None:
+            del original_latent
+
+        # GPU 캐시 정리
+        torch.cuda.empty_cache()
 
         return pil_image, seed
 

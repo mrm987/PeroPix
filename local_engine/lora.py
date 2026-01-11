@@ -359,7 +359,11 @@ def calculate_lora_weight(
     device: str,
     dtype: torch.dtype
 ) -> Optional[torch.Tensor]:
-    """일반 LoRA weight delta 계산: delta = (up @ down) * (alpha / rank)"""
+    """
+    일반 LoRA weight delta 계산: delta = (up @ down) * (alpha / rank)
+
+    ComfyUI 방식: float32로 계산 후 최종 dtype으로 변환
+    """
     lora_down_key = f"{prefix}.lora_down.weight"
     lora_up_key = f"{prefix}.lora_up.weight"
     alpha_key = f"{prefix}.alpha"
@@ -367,20 +371,28 @@ def calculate_lora_weight(
     if lora_down_key not in state_dict or lora_up_key not in state_dict:
         return None
 
-    lora_down = state_dict[lora_down_key].to(device=device, dtype=dtype)
-    lora_up = state_dict[lora_up_key].to(device=device, dtype=dtype)
+    # ComfyUI 방식: float32로 계산 (정밀도 유지)
+    calc_dtype = torch.float32
+    lora_down = state_dict[lora_down_key].to(device=device, dtype=calc_dtype)
+    lora_up = state_dict[lora_up_key].to(device=device, dtype=calc_dtype)
 
     rank = lora_down.shape[0]
     alpha = state_dict.get(alpha_key, torch.tensor(rank)).item()
     scale = alpha / rank
 
-    # Conv2d (4D) vs Linear (2D)
+    # ComfyUI 방식: 2D로 펼쳐서 matmul 후 reshape
+    # lora_down: (rank, in_features) 또는 (rank, in_ch, kh, kw)
+    # lora_up: (out_features, rank) 또는 (out_ch, rank, 1, 1)
     if len(lora_down.shape) == 4:
-        delta = torch.einsum('oihw,kihw->okhw', lora_up, lora_down) * scale
+        # Conv2d: 2D로 펼침
+        down_flat = lora_down.flatten(1)  # (rank, in_ch*kh*kw)
+        up_flat = lora_up.flatten(1)      # (out_ch, rank*1*1) = (out_ch, rank)
+        delta = (up_flat @ down_flat) * scale  # (out_ch, in_ch*kh*kw)
     else:
         delta = (lora_up @ lora_down) * scale
 
-    return delta
+    # 최종 dtype으로 변환
+    return delta.to(dtype=dtype)
 
 
 def calculate_lokr_weight(
@@ -389,7 +401,11 @@ def calculate_lokr_weight(
     device: str,
     dtype: torch.dtype
 ) -> Optional[torch.Tensor]:
-    """LokR weight delta 계산: delta = kron(w1, w2) * (alpha / dim)"""
+    """
+    LokR weight delta 계산: delta = kron(w1, w2) * (alpha / dim)
+
+    ComfyUI 방식: intermediate_dtype=float32로 계산 후 변환
+    """
     w1_key = f"{prefix}.lokr_w1"
     w2_key = f"{prefix}.lokr_w2"
     w1_a_key = f"{prefix}.lokr_w1_a"
@@ -400,14 +416,17 @@ def calculate_lokr_weight(
     alpha_key = f"{prefix}.alpha"
 
     alpha = state_dict.get(alpha_key, torch.tensor(1.0)).item() if alpha_key in state_dict else 1.0
+    dim = None
+
+    # ComfyUI 방식: float32로 연산 (FP16에서 overflow 방지)
+    calc_dtype = torch.float32
 
     # w1 계산
     if w1_key in state_dict:
-        w1 = state_dict[w1_key].to(device=device, dtype=dtype)
-        dim = w1.shape[0]
+        w1 = state_dict[w1_key].to(device=device, dtype=calc_dtype)
     elif w1_a_key in state_dict and w1_b_key in state_dict:
-        w1_a = state_dict[w1_a_key].to(device=device, dtype=dtype)
-        w1_b = state_dict[w1_b_key].to(device=device, dtype=dtype)
+        w1_a = state_dict[w1_a_key].to(device=device, dtype=calc_dtype)
+        w1_b = state_dict[w1_b_key].to(device=device, dtype=calc_dtype)
         w1 = torch.mm(w1_a, w1_b)
         dim = w1_b.shape[0]
     else:
@@ -415,13 +434,13 @@ def calculate_lokr_weight(
 
     # w2 계산
     if w2_key in state_dict:
-        w2 = state_dict[w2_key].to(device=device, dtype=dtype)
+        w2 = state_dict[w2_key].to(device=device, dtype=calc_dtype)
     elif w2_a_key in state_dict and w2_b_key in state_dict:
-        w2_a = state_dict[w2_a_key].to(device=device, dtype=dtype)
-        w2_b = state_dict[w2_b_key].to(device=device, dtype=dtype)
+        w2_a = state_dict[w2_a_key].to(device=device, dtype=calc_dtype)
+        w2_b = state_dict[w2_b_key].to(device=device, dtype=calc_dtype)
 
         if t2_key in state_dict:
-            t2 = state_dict[t2_key].to(device=device, dtype=dtype)
+            t2 = state_dict[t2_key].to(device=device, dtype=calc_dtype)
             w2 = torch.einsum('i j k l, j r, i p -> p r k l', t2, w2_b, w2_a)
         else:
             w2 = torch.mm(w2_a, w2_b)
@@ -432,10 +451,16 @@ def calculate_lokr_weight(
     if len(w2.shape) == 4:
         w1 = w1.unsqueeze(2).unsqueeze(2)
 
-    scale = alpha / dim if dim > 0 else 1.0
+    # ComfyUI 방식: alpha / dim 스케일
+    if alpha is not None and dim is not None and dim > 0:
+        scale = alpha / dim
+    else:
+        scale = 1.0
+
     delta = torch.kron(w1, w2) * scale
 
-    return delta
+    # 최종 dtype으로 변환
+    return delta.to(dtype=dtype)
 
 
 def calculate_loha_weight(
@@ -444,7 +469,11 @@ def calculate_loha_weight(
     device: str,
     dtype: torch.dtype
 ) -> Optional[torch.Tensor]:
-    """LoHa weight delta 계산: delta = (w1_a @ w1_b) * (w2_a @ w2_b) * (alpha / dim)"""
+    """
+    LoHa weight delta 계산: delta = (w1_a @ w1_b) * (w2_a @ w2_b) * (alpha / dim)
+
+    ComfyUI 방식: float32로 계산 후 변환
+    """
     w1_a_key = f"{prefix}.hada_w1_a"
     w1_b_key = f"{prefix}.hada_w1_b"
     w2_a_key = f"{prefix}.hada_w2_a"
@@ -460,16 +489,19 @@ def calculate_loha_weight(
 
     alpha = state_dict.get(alpha_key, torch.tensor(1.0)).item() if alpha_key in state_dict else 1.0
 
-    w1_a = state_dict[w1_a_key].to(device=device, dtype=dtype)
-    w1_b = state_dict[w1_b_key].to(device=device, dtype=dtype)
-    w2_a = state_dict[w2_a_key].to(device=device, dtype=dtype)
-    w2_b = state_dict[w2_b_key].to(device=device, dtype=dtype)
+    # ComfyUI 방식: float32로 연산
+    calc_dtype = torch.float32
+
+    w1_a = state_dict[w1_a_key].to(device=device, dtype=calc_dtype)
+    w1_b = state_dict[w1_b_key].to(device=device, dtype=calc_dtype)
+    w2_a = state_dict[w2_a_key].to(device=device, dtype=calc_dtype)
+    w2_b = state_dict[w2_b_key].to(device=device, dtype=calc_dtype)
 
     dim = w1_b.shape[0]
 
     if t1_key in state_dict and t2_key in state_dict:
-        t1 = state_dict[t1_key].to(device=device, dtype=dtype)
-        t2 = state_dict[t2_key].to(device=device, dtype=dtype)
+        t1 = state_dict[t1_key].to(device=device, dtype=calc_dtype)
+        t2 = state_dict[t2_key].to(device=device, dtype=calc_dtype)
         m1 = torch.einsum('i j k l, j r, i p -> p r k l', t1, w1_b, w1_a)
         m2 = torch.einsum('i j k l, j r, i p -> p r k l', t2, w2_b, w2_a)
     else:
@@ -479,7 +511,8 @@ def calculate_loha_weight(
     scale = alpha / dim if dim > 0 else 1.0
     delta = (m1 * m2) * scale
 
-    return delta
+    # 최종 dtype으로 변환
+    return delta.to(dtype=dtype)
 
 
 # ============================================================
@@ -487,13 +520,16 @@ def calculate_loha_weight(
 # ============================================================
 
 class LoRALoader:
-    """LoRA/LyCORIS 로더 및 적용기"""
+    """LoRA/LyCORIS 로더 및 적용기
+
+    VRAM 최적화: delta를 저장하지 않고, 제거 시 LoRA 파일에서 다시 계산하여 빼기
+    (ComfyUI 방식과 유사)
+    """
 
     def __init__(self, device: str = "cuda", dtype: torch.dtype = torch.float16):
         self.device = device
         self.dtype = dtype
-        self._loaded_loras: Dict[str, Dict] = {}
-        self._original_weights: Dict[str, torch.Tensor] = {}
+        self._loaded_loras: Dict[str, Dict] = {}  # {name: {path, scale, applied_count}}
         self._key_map: Dict[str, str] = {}
 
     def load_lora(self, path: str) -> Dict[str, torch.Tensor]:
@@ -508,7 +544,7 @@ class LoRALoader:
     def build_key_map(self, model: nn.Module):
         """모델의 state_dict를 기반으로 키 매핑 테이블 구축"""
         self._key_map = build_lora_key_map(model.state_dict())
-        logging.info(f"Built LoRA key map with {len(self._key_map)} entries")
+        print(f"[LoRA] Built key map with {len(self._key_map)} entries")
 
     def apply_lora_to_model(
         self,
@@ -541,11 +577,17 @@ class LoRALoader:
             lora_type = detect_lora_type(lora_sd)
             prefixes = get_lora_prefixes(lora_sd)
 
-            logging.info(f"Loading LoRA '{lora_name}': type={lora_type}, prefixes={len(prefixes)}")
+            print(f"[LoRA] Loading '{lora_name}': type={lora_type}, prefixes={len(prefixes)}")
 
             applied_count = 0
             skipped_count = 0
+            no_mapping_count = 0
+            no_param_count = 0
+            no_delta_count = 0
             model_sd = model.state_dict()
+
+            # 모델 파라미터 이름 -> 파라미터 매핑 (효율성)
+            param_dict = {name: p for name, p in model.named_parameters()}
 
             for prefix in prefixes:
                 # Delta 계산
@@ -557,6 +599,7 @@ class LoRALoader:
                     delta = calculate_lora_weight(lora_sd, prefix, self.device, self.dtype)
 
                 if delta is None:
+                    no_delta_count += 1
                     continue
 
                 # LoRA prefix -> 모델 키 변환
@@ -564,31 +607,34 @@ class LoRALoader:
 
                 if model_key is None:
                     # 키 맵에 없으면 스킵
+                    no_mapping_count += 1
                     skipped_count += 1
                     continue
 
                 # 모델에서 해당 파라미터 찾기
-                param = None
-                for name, p in model.named_parameters():
-                    if name == model_key:
-                        param = p
-                        break
+                param = param_dict.get(model_key)
 
                 if param is None:
+                    no_param_count += 1
                     skipped_count += 1
                     continue
 
-                # 원본 백업
-                if model_key not in self._original_weights:
-                    self._original_weights[model_key] = param.data.clone()
+                # Shape 맞추기 (LokR/LoHa의 경우 reshape 필요)
+                if delta.shape != param.data.shape:
+                    try:
+                        delta = delta.reshape(param.data.shape)
+                    except RuntimeError:
+                        logging.warning(f"Cannot reshape {model_key}: {delta.shape} -> {param.shape}")
+                        skipped_count += 1
+                        continue
 
-                # Shape 확인 및 적용
-                if delta.shape == param.data.shape:
-                    param.data += (delta * scale).to(param.device, param.dtype)
-                    applied_count += 1
-                else:
-                    logging.warning(f"Shape mismatch for {model_key}: {param.shape} vs {delta.shape}")
-                    skipped_count += 1
+                # delta 적용 (delta는 이미 alpha/rank 스케일 적용됨, 여기서 user scale 적용)
+                scaled_delta = (delta * scale).to(param.device, param.dtype)
+                param.data += scaled_delta
+                applied_count += 1
+
+                # delta 메모리 즉시 해제
+                del scaled_delta
 
             self._loaded_loras[lora_name] = {
                 'path': lora_path,
@@ -597,7 +643,9 @@ class LoRALoader:
                 'skipped_count': skipped_count
             }
 
-            logging.info(f"Applied LoRA '{lora_name}': {applied_count} layers applied, {skipped_count} skipped")
+            print(f"[LoRA] Applied '{lora_name}': {applied_count} layers applied, "
+                  f"{skipped_count} skipped (no_mapping={no_mapping_count}, "
+                  f"no_param={no_param_count}, no_delta={no_delta_count})")
             return applied_count > 0
 
         except Exception as e:
@@ -608,24 +656,94 @@ class LoRALoader:
 
     def remove_lora(self, model: nn.Module, lora_name: Optional[str] = None):
         """
-        LoRA 제거 (원본 가중치 복원)
+        LoRA 제거 (LoRA 파일에서 delta를 다시 계산하여 빼기)
+
+        VRAM 최적화: delta를 저장하지 않고 필요시 재계산
+        (약간의 CPU/디스크 오버헤드 대신 VRAM 절약)
 
         Args:
             model: 타겟 모델
             lora_name: 제거할 LoRA 이름 (None이면 전체 제거)
         """
-        for name, param in model.named_parameters():
-            if name in self._original_weights:
-                param.data = self._original_weights[name].clone()
+        if not self._loaded_loras:
+            return
 
+        # 키 맵이 없으면 구축
+        if not self._key_map:
+            self.build_key_map(model)
+
+        param_dict = {name: p for name, p in model.named_parameters()}
+
+        # 제거할 LoRA 목록
+        loras_to_remove = []
+        if lora_name:
+            if lora_name in self._loaded_loras:
+                loras_to_remove.append((lora_name, self._loaded_loras[lora_name]))
+        else:
+            loras_to_remove = list(self._loaded_loras.items())
+
+        # 각 LoRA에 대해 delta를 다시 계산하여 빼기
+        for name, info in loras_to_remove:
+            lora_path = info['path']
+            scale = info['scale']
+
+            try:
+                lora_sd = self.load_lora(lora_path)
+                lora_type = detect_lora_type(lora_sd)
+                prefixes = get_lora_prefixes(lora_sd)
+
+                for prefix in prefixes:
+                    # Delta 계산
+                    if lora_type == 'lokr':
+                        delta = calculate_lokr_weight(lora_sd, prefix, self.device, self.dtype)
+                    elif lora_type == 'loha':
+                        delta = calculate_loha_weight(lora_sd, prefix, self.device, self.dtype)
+                    else:
+                        delta = calculate_lora_weight(lora_sd, prefix, self.device, self.dtype)
+
+                    if delta is None:
+                        continue
+
+                    model_key = self._key_map.get(prefix)
+                    if model_key is None:
+                        continue
+
+                    param = param_dict.get(model_key)
+                    if param is None:
+                        continue
+
+                    # Shape 맞추기
+                    if delta.shape != param.data.shape:
+                        try:
+                            delta = delta.reshape(param.data.shape)
+                        except RuntimeError:
+                            continue
+
+                    # delta 빼기
+                    scaled_delta = (delta * scale).to(param.device, param.dtype)
+                    param.data -= scaled_delta
+                    del scaled_delta, delta
+
+                del lora_sd
+                logging.info(f"Removed LoRA: {name}")
+
+            except Exception as e:
+                logging.error(f"Failed to remove LoRA '{name}': {e}")
+
+        # 제거된 LoRA 정보 삭제
         if lora_name:
             if lora_name in self._loaded_loras:
                 del self._loaded_loras[lora_name]
         else:
             self._loaded_loras.clear()
-            self._original_weights.clear()
 
-        logging.info(f"Removed LoRA: {lora_name if lora_name else 'all'}")
+        # GPU 메모리 정리
+        import gc
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+        logging.info(f"LoRA removal complete. Remaining: {list(self._loaded_loras.keys())}")
 
 
 def apply_lora(

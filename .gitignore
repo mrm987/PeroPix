@@ -28,6 +28,7 @@ models/checkpoints/*.ckpt
 models/loras/*.safetensors
 models/upscale_models/*.pth
 models/upscale_models/*.safetensors
+models/censor/wenaka_yolov8s-seg.pt
 
 # IDE
 .idea/

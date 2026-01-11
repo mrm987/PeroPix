@@ -10,10 +10,18 @@ aiofiles>=23.0.0
 websockets>=11.0.0
 piexif>=1.1.3
 
-# Local generation (optional - only needed for Local mode)
+# Local generation - Core (required for both engines)
 torch>=2.0.0
-diffusers>=0.25.0
 transformers>=4.35.0
-accelerate>=0.25.0
 safetensors>=0.4.0
+einops>=0.7.0
+
+# Local generation - ComfyUI Engine (new, minimal dependencies)
+# No additional deps needed - uses torch/transformers/safetensors
+
+# Local generation - Diffusers Engine (legacy, optional)
+# Enable these if using use_comfy_engine: false in config.json
+diffusers>=0.25.0
+accelerate>=0.25.0
 peft>=0.7.0
+compel>=2.0.0

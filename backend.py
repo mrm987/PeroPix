@@ -30,6 +30,10 @@ if getattr(sys, 'frozen', False):
 else:
     APP_DIR = Path(__file__).parent
 
+# local_engine 모듈 경로 추가
+if str(APP_DIR) not in sys.path:
+    sys.path.insert(0, str(APP_DIR))
+
 MODELS_DIR = APP_DIR / "models"
 CHECKPOINTS_DIR = MODELS_DIR / "checkpoints"
 LORA_DIR = MODELS_DIR / "loras"
@@ -886,15 +890,10 @@ class ModelCache:
             use_safetensors=True,
         )
         self.pipe.to(self.device)
-        
+
         if self.device == "cuda":
             self.pipe.enable_attention_slicing()
-            # VAE tiling for faster decode (new API)
-            try:
-                self.pipe.vae.enable_tiling()
-                print(f"[Load] VAE tiling enabled")
-            except Exception as e:
-                print(f"[Load] VAE tiling not available: {e}")
+            self.pipe.enable_vae_tiling()
             # xformers for memory efficient attention
             try:
                 self.pipe.enable_xformers_memory_efficient_attention()
@@ -1956,7 +1955,106 @@ async def call_nai_api(req: GenerateRequest):
 
 
 # ============================================================
-# Local Diffusers
+# Local Engine (ComfyUI-based)
+# ============================================================
+
+# 로컬 엔진 캐시
+_local_engine_generator = None
+
+def get_local_engine_generator():
+    """로컬 엔진 생성기 인스턴스 가져오기 (싱글톤)"""
+    global _local_engine_generator
+    return _local_engine_generator
+
+def call_local_engine(req: GenerateRequest):
+    """
+    ComfyUI 기반 로컬 엔진으로 이미지 생성
+
+    Diffusers 대신 ComfyUI의 샘플링 코드를 사용하여
+    동일한 모델/프롬프트/시드/세팅에서 ComfyUI와 동일한 결과물 생성
+    """
+    global _local_engine_generator
+
+    import torch
+    from local_engine import SDXLGenerator
+
+    if not req.model:
+        raise HTTPException(status_code=400, detail="Model not specified")
+
+    model_path = CHECKPOINTS_DIR / req.model
+    if not model_path.exists():
+        raise HTTPException(status_code=400, detail=f"Model not found: {req.model}")
+
+    # dtype/device 설정
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    dtype = torch.float16 if device == "cuda" else torch.float32
+
+    # 생성기 초기화 또는 재사용
+    if _local_engine_generator is None or _local_engine_generator.model_path != str(model_path):
+        print(f"[LocalEngine] Loading model: {model_path}")
+        _local_engine_generator = SDXLGenerator(
+            model_path=str(model_path),
+            device=device,
+            dtype=dtype
+        )
+
+    # LoRA 적용
+    if req.loras:
+        _local_engine_generator.remove_loras()
+        for lora_config in req.loras:
+            lora_name = lora_config.get("name", "")
+            lora_scale = lora_config.get("scale", 1.0)
+            lora_path = LORA_DIR / lora_name
+            if lora_path.exists():
+                print(f"[LocalEngine] Applying LoRA: {lora_name} (scale={lora_scale})")
+                _local_engine_generator.apply_lora(str(lora_path), lora_scale)
+
+    seed = req.seed if req.seed >= 0 else np.random.randint(0, 2**31 - 1)
+
+    # Base Image 처리 (img2img / inpaint)
+    base_image = None
+    mask = None
+    denoise = req.base_strength if req.base_strength else 1.0
+
+    if req.base_image:
+        base_image = decode_base64_image(req.base_image)
+        base_image = base_image.resize((req.width, req.height), Image.LANCZOS)
+
+        if req.base_mode == "inpaint" and req.base_mask:
+            mask = decode_base64_image(req.base_mask).convert("L")
+            mask = mask.resize((req.width, req.height), Image.NEAREST)
+
+    print(f"[LocalEngine] Generating: {req.width}x{req.height}, steps={req.steps}, cfg={req.cfg}")
+    print(f"[LocalEngine] sampler={req.sampler}, scheduler={req.scheduler}, seed={seed}")
+    print(f"[LocalEngine] prompt={req.prompt[:50]}...")
+
+    # 진행률 콜백
+    def progress_callback(step, total):
+        print(f"[LocalEngine] Step {step + 1}/{total}")
+
+    # 이미지 생성
+    image, used_seed = _local_engine_generator.generate(
+        prompt=req.prompt,
+        negative_prompt=req.negative_prompt,
+        width=req.width,
+        height=req.height,
+        steps=req.steps,
+        cfg_scale=req.cfg,
+        seed=seed,
+        sampler=req.sampler,
+        scheduler=req.scheduler,
+        base_image=base_image,
+        mask=mask,
+        denoise=denoise,
+        callback=progress_callback
+    )
+
+    print(f"[LocalEngine] Done, seed={used_seed}")
+    return image, int(used_seed)
+
+
+# ============================================================
+# Local Diffusers (Legacy)
 # ============================================================
 def call_local_diffusers(req: GenerateRequest):
     lazy_imports()
@@ -1988,15 +2086,83 @@ def call_local_diffusers(req: GenerateRequest):
     }
     
     from diffusers import schedulers
+
+    # use_karras_sigmas 지원 여부 확인
+    # EulerAncestralDiscreteScheduler는 karras 미지원 → EulerDiscreteScheduler로 대체
     scheduler_name = scheduler_map.get(req.sampler, "EulerAncestralDiscreteScheduler")
+
+    # karras 스케줄 사용 시, 지원하지 않는 스케줄러는 대체
+    if req.scheduler == "karras" and scheduler_name == "EulerAncestralDiscreteScheduler":
+        scheduler_name = "EulerDiscreteScheduler"
+        print(f"[Generate] euler_ancestral + karras → EulerDiscreteScheduler 사용 (karras 지원)")
+
     scheduler_class = getattr(schedulers, scheduler_name, None)
     if scheduler_class:
         try:
-            pipe.scheduler = scheduler_class.from_config(pipe.scheduler.config)
+            # noise schedule (karras, normal 등) 적용
+            scheduler_config = dict(pipe.scheduler.config)
+
+            # karras sigma 스케줄 적용 (지원하는 스케줄러만)
+            if req.scheduler == "karras":
+                scheduler_config["use_karras_sigmas"] = True
+            elif req.scheduler == "normal":
+                scheduler_config["use_karras_sigmas"] = False
+            # sgm_uniform, simple 등은 Diffusers에서 직접 지원 안 함
+
+            pipe.scheduler = scheduler_class.from_config(scheduler_config)
+            print(f"[Generate] Scheduler set: {scheduler_name}, noise_schedule={req.scheduler}, use_karras={scheduler_config.get('use_karras_sigmas', False)}")
+
+            # 디버그: 실제 sigma 값 확인
+            pipe.scheduler.set_timesteps(req.steps)
+            sigmas = pipe.scheduler.sigmas if hasattr(pipe.scheduler, 'sigmas') else None
+            if sigmas is not None:
+                print(f"[DEBUG] Sigmas (first 5): {sigmas[:5].tolist()}")
+                print(f"[DEBUG] Sigmas (last 5): {sigmas[-5:].tolist()}")
         except Exception as e:
             print(f"[Warning] Failed to set scheduler {scheduler_name}: {e}")
-    
-    print(f"[Generate] prompt={req.prompt[:50]}..., size={req.width}x{req.height}, steps={req.steps}")
+
+    print(f"[Generate] sampler={req.sampler}, scheduler={req.scheduler}, steps={req.steps}, cfg={req.cfg}")
+    print(f"[Generate] prompt={req.prompt[:50]}..., size={req.width}x{req.height}")
+
+    # Compel로 프롬프트 인코딩 (긴 프롬프트 + 가중치 지원)
+    try:
+        from compel import Compel, ReturnedEmbeddingsType
+
+        compel = Compel(
+            tokenizer=[pipe.tokenizer, pipe.tokenizer_2],
+            text_encoder=[pipe.text_encoder, pipe.text_encoder_2],
+            returned_embeddings_type=ReturnedEmbeddingsType.PENULTIMATE_HIDDEN_STATES_NON_NORMALIZED,
+            requires_pooled=[False, True],
+            truncate_long_prompts=False,  # 긴 프롬프트 지원
+        )
+        prompt_embeds, pooled_prompt_embeds = compel(req.prompt)
+        negative_embeds, negative_pooled_embeds = compel(req.negative_prompt)
+
+        # prompt_embeds와 negative_embeds 길이 맞추기 (패딩)
+        # SDXL은 두 임베딩의 sequence length가 같아야 함
+        max_len = max(prompt_embeds.shape[1], negative_embeds.shape[1])
+        if prompt_embeds.shape[1] < max_len:
+            padding = torch.zeros(
+                (prompt_embeds.shape[0], max_len - prompt_embeds.shape[1], prompt_embeds.shape[2]),
+                dtype=prompt_embeds.dtype, device=prompt_embeds.device
+            )
+            prompt_embeds = torch.cat([prompt_embeds, padding], dim=1)
+        if negative_embeds.shape[1] < max_len:
+            padding = torch.zeros(
+                (negative_embeds.shape[0], max_len - negative_embeds.shape[1], negative_embeds.shape[2]),
+                dtype=negative_embeds.dtype, device=negative_embeds.device
+            )
+            negative_embeds = torch.cat([negative_embeds, padding], dim=1)
+
+        use_compel = True
+        print(f"[Generate] Using Compel for long prompt support (seq_len={max_len})")
+    except Exception as e:
+        print(f"[Warning] Compel failed, using default encoding: {e}")
+        prompt_embeds = None
+        pooled_prompt_embeds = None
+        negative_embeds = None
+        negative_pooled_embeds = None
+        use_compel = False
 
     # Base Image 처리 (img2img / inpaint)
     if req.base_image:
@@ -2013,18 +2179,34 @@ def call_local_diffusers(req: GenerateRequest):
             inpaint_pipe = AutoPipelineForInpainting.from_pipe(pipe)
             print(f"[Generate] Inpaint mode, strength={req.base_strength}")
 
-            result = inpaint_pipe(
-                prompt=req.prompt,
-                negative_prompt=req.negative_prompt,
-                image=base_img,
-                mask_image=mask_img,
-                width=req.width,
-                height=req.height,
-                num_inference_steps=req.steps,
-                guidance_scale=req.cfg,
-                strength=req.base_strength,
-                generator=generator,
-            )
+            if use_compel:
+                result = inpaint_pipe(
+                    prompt_embeds=prompt_embeds,
+                    pooled_prompt_embeds=pooled_prompt_embeds,
+                    negative_prompt_embeds=negative_embeds,
+                    negative_pooled_prompt_embeds=negative_pooled_embeds,
+                    image=base_img,
+                    mask_image=mask_img,
+                    width=req.width,
+                    height=req.height,
+                    num_inference_steps=req.steps,
+                    guidance_scale=req.cfg,
+                    strength=req.base_strength,
+                    generator=generator,
+                )
+            else:
+                result = inpaint_pipe(
+                    prompt=req.prompt,
+                    negative_prompt=req.negative_prompt,
+                    image=base_img,
+                    mask_image=mask_img,
+                    width=req.width,
+                    height=req.height,
+                    num_inference_steps=req.steps,
+                    guidance_scale=req.cfg,
+                    strength=req.base_strength,
+                    generator=generator,
+                )
         else:
             # Img2Img 모드
             from diffusers import AutoPipelineForImage2Image
@@ -2035,29 +2217,55 @@ def call_local_diffusers(req: GenerateRequest):
             img2img_pipe = AutoPipelineForImage2Image.from_pipe(pipe)
             print(f"[Generate] Img2Img mode, strength={req.base_strength}")
 
-            result = img2img_pipe(
-                prompt=req.prompt,
-                negative_prompt=req.negative_prompt,
-                image=base_img,
-                num_inference_steps=req.steps,
-                guidance_scale=req.cfg,
-                strength=req.base_strength,
-                generator=generator,
-            )
+            if use_compel:
+                result = img2img_pipe(
+                    prompt_embeds=prompt_embeds,
+                    pooled_prompt_embeds=pooled_prompt_embeds,
+                    negative_prompt_embeds=negative_embeds,
+                    negative_pooled_prompt_embeds=negative_pooled_embeds,
+                    image=base_img,
+                    num_inference_steps=req.steps,
+                    guidance_scale=req.cfg,
+                    strength=req.base_strength,
+                    generator=generator,
+                )
+            else:
+                result = img2img_pipe(
+                    prompt=req.prompt,
+                    negative_prompt=req.negative_prompt,
+                    image=base_img,
+                    num_inference_steps=req.steps,
+                    guidance_scale=req.cfg,
+                    strength=req.base_strength,
+                    generator=generator,
+                )
 
         image = result.images[0]
         print(f"[Generate] Done (base image mode), seed={seed}")
     else:
         # 일반 txt2img 생성
-        result = pipe(
-            prompt=req.prompt,
-            negative_prompt=req.negative_prompt,
-            width=req.width,
-            height=req.height,
-            num_inference_steps=req.steps,
-            guidance_scale=req.cfg,
-            generator=generator,
-        )
+        if use_compel:
+            result = pipe(
+                prompt_embeds=prompt_embeds,
+                pooled_prompt_embeds=pooled_prompt_embeds,
+                negative_prompt_embeds=negative_embeds,
+                negative_pooled_prompt_embeds=negative_pooled_embeds,
+                width=req.width,
+                height=req.height,
+                num_inference_steps=req.steps,
+                guidance_scale=req.cfg,
+                generator=generator,
+            )
+        else:
+            result = pipe(
+                prompt=req.prompt,
+                negative_prompt=req.negative_prompt,
+                width=req.width,
+                height=req.height,
+                num_inference_steps=req.steps,
+                guidance_scale=req.cfg,
+                generator=generator,
+            )
 
         image = result.images[0]
         print(f"[Generate] 1st pass done, seed={seed}")
@@ -2451,7 +2659,8 @@ async def process_job(job):
             if req.provider == "nai":
                 image, actual_seed = await call_nai_api(single_req)
             else:
-                image, actual_seed = call_local_diffusers(single_req)
+                # ComfyUI 포팅 로컬 엔진 사용
+                image, actual_seed = call_local_engine(single_req)
             image_time = time.time() - image_start_time
             
             # 파일명용 태그 결정: name > 첫 태그 (sanitize_filename 사용)
@@ -3580,8 +3789,9 @@ async def generate(req: GenerateRequest):
         if req.provider == "nai":
             image, seed = await call_nai_api(req)
         else:
-            image, seed = call_local_diffusers(req)
-        
+            # ComfyUI 포팅 로컬 엔진 사용
+            image, seed = call_local_engine(req)
+
         return {
             "success": True,
             "image": image_to_base64(image),

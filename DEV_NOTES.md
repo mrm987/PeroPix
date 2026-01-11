@@ -216,3 +216,72 @@ OUTPUT_DIR  = APP_DIR / "outputs"
 1. **슬롯 안보임** → JavaScript 콘솔 확인
 2. **API 실패** → 네트워크 탭 확인
 3. **스타일 깨짐** → CSS overflow, z-index 확인
+
+---
+
+## 로컬 엔진 (ComfyUI 포팅)
+
+### 7. 로컬 엔진 성능 문제 (2026-01-11)
+
+**증상**: 20 steps 생성에 85초 이상 소요 (정상: 4-5초)
+
+**발견된 문제들**:
+
+#### 7-1. CLIP 인코딩에 `torch.no_grad()` 누락 ⭐ **핵심 원인**
+- **위치**: `local_engine/clip/sdxl_clip.py`
+- **문제**: 그래디언트 계산으로 ~7.6GB 추가 VRAM 사용
+- **해결**: `encode_chunks()`, `encode()`에 `@torch.no_grad()` 데코레이터 추가
+```python
+@torch.no_grad()
+def encode_chunks(self, chunks_l, chunks_g):
+    ...
+```
+
+#### 7-2. 체크포인트 3번 로드
+- **위치**: `local_engine/model_loader.py`
+- **문제**: `load_unet()`, `load_vae()`, `load_clip()` 각각 체크포인트 로드 (~6.5GB × 3)
+- **해결**: `load_all()`에서 1회만 로드 후 state_dict 분리
+```python
+def load_all(self, path):
+    sd = self.load_checkpoint(path)  # 1회만 로드
+    unet_sd = extract_unet_state_dict(sd)
+    vae_sd = extract_vae_state_dict(sd)
+    clip_l_sd, clip_g_sd = extract_clip_state_dicts(sd)
+    del sd  # 즉시 해제
+```
+
+#### 7-3. 과도한 워밍업
+- **위치**: `local_engine/model_loader.py`
+- **문제**: 3 해상도 × 6 context 길이 = 18회 UNet forward
+- **해결**: 1회로 축소 (128×128 latent, 77 tokens)
+
+#### 7-4. 모델 언로드 시 VRAM 미해제
+- **위치**: `local_engine/model_loader.py` `ModelCache.unload()`
+- **문제**: `_models.clear()`만 호출, GPU 텐서 미해제
+- **해결**: CPU로 이동 후 `gc.collect()` + `empty_cache()`
+```python
+def unload(self):
+    for path, models in self._models.items():
+        unet, vae, clip = models
+        if unet: unet.to("cpu"); del unet
+        ...
+    gc.collect()
+    torch.cuda.empty_cache()
+```
+
+#### 7-5. Debug print 문
+- **위치**: `local_engine/generate.py`, `local_engine/samplers.py`
+- **문제**: `print()` 호출 시 암묵적 GPU 동기화 발생
+- **해결**: 모든 debug print 제거
+
+### 로컬 엔진 성능 결과
+| 측정 | 수정 전 | 수정 후 |
+|------|---------|---------|
+| 20 steps | 85초+ | 4.4초 |
+| step당 | 4초+ | ~220ms |
+| VRAM (CLIP 후) | 16GB | ~9GB |
+
+### 로컬 엔진 주의사항
+- 첫 생성은 CUDA 커널 컴파일로 느림 (정상)
+- "torch version too old for priority" 로그는 PyTorch 버전 문제 (성능 영향 미미)
+- xformers 미설치 시 PyTorch SDPA 사용 (정상 동작)

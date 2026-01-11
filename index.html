@@ -3877,7 +3877,6 @@
 
         /* Load settings button */
         .slot-image-card .load-settings-btn,
-        .slot-image-card .apply-seed-btn,
         .slot-image-card .inpaint-btn,
         .slot-image-card .enhance-btn,
         .slot-image-card .clear-card-btn {
@@ -3896,11 +3895,6 @@
             color: white;
             border-color: var(--primary);
         }
-        .slot-image-card .apply-seed-btn:hover {
-            background: var(--accent-gold);
-            color: black;
-            border-color: var(--accent-gold);
-        }
         .slot-image-card .inpaint-btn:hover {
             background: #9b59b6;
             color: white;
@@ -3913,6 +3907,22 @@
             background: var(--danger);
             color: white;
             border-color: var(--danger);
+        }
+        .slot-image-card .delete-file-btn {
+            background: var(--bg-lighter);
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+            padding: 2px 6px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+        .slot-image-card .delete-file-btn:hover {
+            background: #c0392b;
+            color: white;
+            border-color: #c0392b;
         }
 
         /* Settings Modal */
@@ -4306,77 +4316,83 @@
                 <!-- Local Settings -->
                 <div class="provider-section" data-provider="local">
                     <div class="section">
-                        <div class="section-title">Local Settings</div>
-                        
-                        <div class="lora-header">
-                            <label>Model</label>
-                            <button type="button" class="folder-btn" id="openCheckpointsFolderBtn" title="체크포인트 폴더 열기">📁</button>
+                        <div class="section-title">
+                            <button type="button" class="collapse-toggle" data-target="localSettingsContent" title="접기/펼치기">▼</button>
+                            <span>Local Settings</span>
                         </div>
-                        <select id="localModel" style="width: 100%; margin-bottom: 12px;">
-                            <option value="">-- Select Model --</option>
-                        </select>
+                        <div id="localSettingsContent" class="collapsible-content">
+                            <div class="lora-header">
+                                <label>Model</label>
+                                <button type="button" class="folder-btn" id="openCheckpointsFolderBtn" title="체크포인트 폴더 열기">📁</button>
+                            </div>
+                            <select id="localModel" style="width: 100%; margin-bottom: 12px;">
+                                <option value="">-- Select Model --</option>
+                            </select>
 
-                        <div class="lora-header">
-                            <label>LoRAs</label>
-                            <button type="button" class="lora-add-btn" id="addLoraSlotBtn" title="LoRA 슬롯 추가">+ Add</button>
-                            <button type="button" class="folder-btn" id="openLorasFolderBtn" title="LoRA 폴더 열기">📁</button>
-                        </div>
-                        <div class="lora-list" id="loraList">
-                            <div class="lora-empty">+ 버튼으로 LoRA 추가</div>
+                            <div class="lora-header">
+                                <label>LoRAs</label>
+                                <button type="button" class="lora-add-btn" id="addLoraSlotBtn" title="LoRA 슬롯 추가">+ Add</button>
+                                <button type="button" class="folder-btn" id="openLorasFolderBtn" title="LoRA 폴더 열기">📁</button>
+                            </div>
+                            <div class="lora-list" id="loraList">
+                                <div class="lora-empty">+ 버튼으로 LoRA 추가</div>
+                            </div>
                         </div>
                     </div>
-                    
+
                     <div class="section">
                         <div class="section-title">
+                            <button type="button" class="collapse-toggle" data-target="upscaleContent" title="접기/펼치기">▼</button>
                             <span>Upscale</span>
                             <label class="section-toggle">
                                 <input type="checkbox" id="enableUpscale">
                                 <span>Active</span>
                             </label>
                         </div>
-                        
-                        <div id="upscaleSettings" style="display: none;">
-                            <label>Upscale Model</label>
-                            <select id="upscaleModel">
-                                <option value="">-- Select Model --</option>
-                            </select>
-                            <small>Place .pth files in models/upscale_models/</small>
-                            
-                            <div class="row" style="margin-top: 8px;">
-                                <div>
-                                    <label>Final Scale</label>
-                                    <input type="number" id="downscaleRatio" value="0.7" step="0.05" min="0.3" max="1.0">
-                                    <small>×2 upscale × ratio</small>
+                        <div id="upscaleContent" class="collapsible-content">
+                            <div id="upscaleSettings">
+                                <label>Upscale Model</label>
+                                <select id="upscaleModel">
+                                    <option value="">-- Select Model --</option>
+                                </select>
+                                <small>Place .pth files in models/upscale_models/</small>
+
+                                <div class="row" style="margin-top: 8px;">
+                                    <div>
+                                        <label>Final Scale</label>
+                                        <input type="number" id="downscaleRatio" value="0.7" step="0.05" min="0.3" max="1.0">
+                                        <small>×2 upscale × ratio</small>
+                                    </div>
+                                    <div>
+                                        <label>Alignment</label>
+                                        <select id="sizeAlignment">
+                                            <option value="none">None</option>
+                                            <option value="8">8px</option>
+                                            <option value="64" selected>64px</option>
+                                        </select>
+                                    </div>
                                 </div>
-                                <div>
-                                    <label>Alignment</label>
-                                    <select id="sizeAlignment">
-                                        <option value="none">None</option>
-                                        <option value="8">8px</option>
-                                        <option value="64" selected>64px</option>
-                                    </select>
+
+                                <div class="row">
+                                    <div>
+                                        <label>Steps</label>
+                                        <input type="number" id="upscaleSteps" value="15" min="5" max="50">
+                                    </div>
+                                    <div>
+                                        <label>CFG</label>
+                                        <input type="number" id="upscaleCfg" value="5.0" step="0.1" min="1" max="20">
+                                    </div>
                                 </div>
-                            </div>
-                            
-                            <div class="row">
-                                <div>
-                                    <label>Steps</label>
-                                    <input type="number" id="upscaleSteps" value="15" min="5" max="50">
-                                </div>
-                                <div>
-                                    <label>CFG</label>
-                                    <input type="number" id="upscaleCfg" value="5.0" step="0.1" min="1" max="20">
-                                </div>
-                            </div>
-                            
-                            <div class="row">
-                                <div style="flex: 1;">
-                                    <label>Denoise</label>
-                                    <input type="range" id="upscaleDenoise" value="0.5" min="0.1" max="1.0" step="0.05" style="width: 100%;">
-                                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-dim);">
-                                        <span>0.1</span>
-                                        <span id="upscaleDenoiseValue">0.5</span>
-                                        <span>1.0</span>
+
+                                <div class="row">
+                                    <div style="flex: 1;">
+                                        <label>Denoise</label>
+                                        <input type="range" id="upscaleDenoise" value="0.5" min="0.1" max="1.0" step="0.05" style="width: 100%;">
+                                        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-dim);">
+                                            <span>0.1</span>
+                                            <span id="upscaleDenoiseValue">0.5</span>
+                                            <span>1.0</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -5752,10 +5768,10 @@
                 <div class="info">
                     <div class="info-row">
                         <button type="button" class="clear-card-btn" title="미리보기 지우기">🧹</button>
+                        <button type="button" class="delete-file-btn" title="파일 삭제">🗑️</button>
                         <div class="filename" title="${data.filename}">${data.filename}</div>
                         <button type="button" class="inpaint-btn" title="Inpaint">🎨</button>
                         <button type="button" class="enhance-btn" title="Enhance (NAI)" style="display: none;">✨</button>
-                        <button type="button" class="apply-seed-btn" title="이 시드 적용">🎲</button>
                         <button type="button" class="load-settings-btn" title="전체 설정 불러오기">📋</button>
                     </div>
                     <div class="seed">${data.metadata ? 'Seed: ' + data.seed : '메타데이터 없음'}</div>
@@ -5834,19 +5850,6 @@
                     }
                 } catch (err) {
                     showToast('저장 오류: ' + err.message, 'error');
-                }
-            };
-
-            // 시드 적용 버튼
-            const applySeedBtn = card.querySelector('.apply-seed-btn');
-            applySeedBtn.onclick = (e) => {
-                e.stopPropagation();
-                const seed = card._imageData.seed;
-                if (seed !== undefined && seed !== null) {
-                    document.getElementById('seed').value = seed;
-                    showToast(`시드 ${seed} 적용됨`, 'success');
-                } else {
-                    showToast('시드 정보가 없습니다', 'error');
                 }
             };
 
@@ -5941,6 +5944,37 @@
             clearCardBtn.onclick = (e) => {
                 e.stopPropagation();
                 card.remove();
+            };
+
+            // 파일 삭제 버튼
+            const deleteFileBtn = card.querySelector('.delete-file-btn');
+            deleteFileBtn.onclick = async (e) => {
+                e.stopPropagation();
+                const imagePath = card._imageData?.image_path;
+                const filename = card._imageData?.filename;
+
+                if (!imagePath) {
+                    showToast('파일 경로 정보가 없습니다', 'error');
+                    return;
+                }
+
+                if (!confirm(`파일을 삭제하시겠습니까?\n${filename}`)) return;
+
+                try {
+                    const response = await fetch(`${API_BASE}/api/outputs/${encodeURIComponent(imagePath)}`, {
+                        method: 'DELETE'
+                    });
+                    const result = await response.json();
+
+                    if (result.success) {
+                        card.remove();
+                        showToast('파일이 삭제되었습니다', 'success');
+                    } else {
+                        showToast('삭제 실패: ' + (result.error || 'Unknown error'), 'error');
+                    }
+                } catch (err) {
+                    showToast('삭제 오류: ' + err.message, 'error');
+                }
             };
 
             // 드래그와 클릭 구분
@@ -6638,11 +6672,49 @@
             });
         });
 
-        // Provider별 라벨 업데이트
+        // Provider별 라벨 및 제한값 업데이트
         function updateProviderLabels() {
             const cfgLabel = document.getElementById('cfgLabel');
-            if (cfgLabel) {
-                cfgLabel.textContent = currentProvider === 'nai' ? 'Prompt Guidance' : 'CFG';
+            const stepsInput = document.getElementById('steps');
+            const cfgInput = document.getElementById('cfg');
+
+            if (currentProvider === 'nai') {
+                if (cfgLabel) cfgLabel.textContent = 'Prompt Guidance';
+                // NAI 제한: steps 최대 50, cfg 최대 10
+                if (stepsInput) {
+                    stepsInput.max = 50;
+                    if (parseInt(stepsInput.value) > 50) stepsInput.value = 50;
+                }
+                if (cfgInput) {
+                    cfgInput.max = 10;
+                    if (parseFloat(cfgInput.value) > 10) cfgInput.value = 10;
+                }
+            } else {
+                if (cfgLabel) cfgLabel.textContent = 'CFG';
+                // Local: 제한 해제
+                if (stepsInput) stepsInput.removeAttribute('max');
+                if (cfgInput) cfgInput.removeAttribute('max');
+            }
+        }
+
+        // NAI 제한값 강제 적용 (입력 이벤트)
+        function enforceNaiLimits() {
+            const stepsInput = document.getElementById('steps');
+            const cfgInput = document.getElementById('cfg');
+
+            if (stepsInput) {
+                stepsInput.addEventListener('input', () => {
+                    if (currentProvider === 'nai' && parseInt(stepsInput.value) > 50) {
+                        stepsInput.value = 50;
+                    }
+                });
+            }
+            if (cfgInput) {
+                cfgInput.addEventListener('input', () => {
+                    if (currentProvider === 'nai' && parseFloat(cfgInput.value) > 10) {
+                        cfgInput.value = 10;
+                    }
+                });
             }
         }
         
@@ -7440,7 +7512,12 @@
                 const response = await fetch(`${API_BASE}/api/cancel-current`, { method: 'POST' });
                 const result = await response.json();
                 if (result.success) {
-                    showToast('현재 이미지 완료 후 취소됩니다', 'warning');
+                    // 로컬 생성은 즉시 취소, NAI는 현재 이미지 완료 후 취소
+                    if (currentProvider === 'local') {
+                        showToast('취소 중...', 'warning');
+                    } else {
+                        showToast('현재 이미지 완료 후 취소됩니다', 'warning');
+                    }
                 } else {
                     showToast('진행 중인 작업이 없습니다', 'error');
                 }
@@ -7619,7 +7696,7 @@
                     break;
 
                 case 'job_cancelled':
-                    console.log(`[WS] Job cancelled: ${data.job_id}`);
+                    console.log(`[WS] Job cancelled: ${data.job_id}, immediate: ${data.immediate}`);
                     updateProgressFromServer(data.progress);
                     // 큐가 비었으면 상태 초기화
                     if (!data.progress || data.progress.total === 0 || data.progress.queue_length === 0) {
@@ -7629,7 +7706,10 @@
                     }
                     // 실제로 취소된 이미지가 있을 때만 토스트 표시
                     if (data.cancelled_images > 0) {
-                        showToast(`작업 취소됨 (${data.cancelled_images}장 취소)`, 'warning');
+                        const msg = data.immediate
+                            ? `즉시 취소됨 (${data.cancelled_images}장 취소)`
+                            : `작업 취소됨 (${data.cancelled_images}장 취소)`;
+                        showToast(msg, 'warning');
                     }
                     break;
 
@@ -8385,54 +8465,84 @@
             // 순수 NAI 이미지 여부 확인 (peropix 확장이 없으면 순수 NAI)
             const isPureNai = !meta.peropix;
 
+            // 슬롯 프롬프트 (PeroPix v2+ 이미지에서 사용)
+            let slotPrompt = ppx.slot_prompt || '';
+
             // 순수 NAI 이미지면 프롬프트에서 퀄리티 태그/UC 프리셋 태그 제거 (중복 방지)
             let prompt = meta.prompt || '';
             let negativePrompt = meta.uc || '';
 
-            if (isPureNai) {
-                // V4.5 Quality Tags 제거 (프롬프트 끝에 추가된 태그)
-                const v45QualityTagsPatterns = [
-                    ", very aesthetic, masterpiece, no text, -2::upscaled, blurry::,", // Enhance
-                    ", very aesthetic, masterpiece, no text" // 일반
-                ];
+            // V4.5 Quality Tags 패턴
+            const v45QualityTagsPatterns = [
+                ", very aesthetic, masterpiece, no text, -2::upscaled, blurry::,", // Enhance
+                ", very aesthetic, masterpiece, no text" // 일반
+            ];
 
+            // V4.5 UC 프리셋 정의
+            const v45UcPresets = {
+                'Heavy': 'nsfw, lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negative space, blank page',
+                'Light': 'nsfw, lowres, artistic error, scan artifacts, worst quality, bad quality, jpeg artifacts, multiple views, very displeasing, too many watermarks, negative space, blank page',
+                'Furry Focus': 'nsfw, {worst quality}, distracting watermark, unfinished, bad quality, {widescreen}, upscale, {sequence}, {{grandfathered content}}, blurred foreground, chromatic aberration, sketch, everyone, [sketch background], simple, [flat colors], ych (character), outline, multiple scenes, [[horror (theme)]], comic',
+                'Human Focus': 'nsfw, lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negative space, blank page, @_@, mismatched pupils, glowing eyes, bad anatomy'
+            };
+
+            if (isPureNai) {
+                // 순수 NAI 이미지: 프롬프트 끝에서 퀄리티 태그 제거
                 let tagRemoved = false;
                 for (const pattern of v45QualityTagsPatterns) {
                     if (prompt.endsWith(pattern)) {
                         prompt = prompt.slice(0, -pattern.length);
-                        qualityTags = true; // 제거했으므로 옵션을 켜서 다시 추가되도록 함
+                        qualityTags = true;
                         tagRemoved = true;
                         break;
                     }
                 }
-
                 if (!tagRemoved) {
-                    qualityTags = false; // 퀄리티 태그가 없으면 옵션 끄기
+                    qualityTags = false;
                 }
 
-                // V4.5 UC 프리셋 태그 제거 (네거티브 프롬프트 앞에 추가된 태그)
-                const v45UcPresets = {
-                    'Heavy': 'nsfw, lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negative space, blank page',
-                    'Light': 'nsfw, lowres, artistic error, scan artifacts, worst quality, bad quality, jpeg artifacts, multiple views, very displeasing, too many watermarks, negative space, blank page',
-                    'Furry Focus': 'nsfw, {worst quality}, distracting watermark, unfinished, bad quality, {widescreen}, upscale, {sequence}, {{grandfathered content}}, blurred foreground, chromatic aberration, sketch, everyone, [sketch background], simple, [flat colors], ych (character), outline, multiple scenes, [[horror (theme)]], comic',
-                    'Human Focus': 'nsfw, lowres, artistic error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negative space, blank page, @_@, mismatched pupils, glowing eyes, bad anatomy'
-                };
-
-                // 실제 네거티브 프롬프트에서 UC 프리셋 감지 및 제거
+                // UC 프리셋 감지 및 제거
                 let foundPreset = false;
                 for (const [presetName, presetTags] of Object.entries(v45UcPresets)) {
                     if (negativePrompt.startsWith(presetTags)) {
                         ucPreset = presetName;
                         negativePrompt = negativePrompt.slice(presetTags.length);
-                        // 앞에 ", " 가 남아있으면 제거
                         negativePrompt = negativePrompt.replace(/^,\s*/, '');
                         foundPreset = true;
                         break;
                     }
                 }
-                // UC 프리셋 태그가 없으면 None으로 설정
                 if (!foundPreset) {
                     ucPreset = 'None';
+                }
+            }
+
+            // PeroPix 이미지: base_prompt가 있으면 직접 사용 (v3+)
+            // 없으면 기존 로직으로 슬롯 프롬프트 제거 시도 (v2 하위호환)
+            if (!isPureNai) {
+                if (ppx.base_prompt !== undefined) {
+                    // v3+: base_prompt 직접 사용
+                    prompt = ppx.base_prompt || '';
+                } else if (slotPrompt) {
+                    // v2 하위호환: 슬롯 프롬프트 수동 제거
+                    // 1) 퀄리티 태그 제거 (끝에 있을 수 있음)
+                    for (const pattern of v45QualityTagsPatterns) {
+                        if (prompt.endsWith(pattern)) {
+                            prompt = prompt.slice(0, -pattern.length);
+                            qualityTags = true;
+                            break;
+                        }
+                    }
+
+                    // 2) 슬롯 프롬프트 제거
+                    const slotSuffix = ', ' + slotPrompt;
+                    if (prompt.endsWith(slotSuffix)) {
+                        prompt = prompt.slice(0, -slotSuffix.length);
+                    } else if (prompt.endsWith(',' + slotPrompt)) {
+                        prompt = prompt.slice(0, -(slotPrompt.length + 1));
+                    } else if (prompt.endsWith(slotPrompt)) {
+                        prompt = prompt.slice(0, -slotPrompt.length).replace(/,\s*$/, '');
+                    }
                 }
             }
 
@@ -8462,6 +8572,7 @@
                 prompt: prompt,
                 negative_prompt: negativePrompt,
                 character_prompts: charPrompts,
+                slot_prompt: slotPrompt,
                 seed: meta.seed,
                 width: meta.width,
                 height: meta.height,
@@ -8528,6 +8639,18 @@
                 updateCharacterNumbers();
             }
 
+            // 슬롯 프롬프트 복원 (첫 번째 슬롯에)
+            if (metadata.slot_prompt) {
+                const slots = document.querySelectorAll('#slotsContainer .slot');
+                if (slots.length > 0) {
+                    const firstSlotTags = slots[0].querySelector('.slot-tags');
+                    if (firstSlotTags) {
+                        firstSlotTags.value = metadata.slot_prompt;
+                        firstSlotTags.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                }
+            }
+
             // 시드
             if (metadata.seed) document.getElementById('seed').value = metadata.seed;
 
@@ -8562,6 +8685,19 @@
                     }
                 });
                 updateCharacterNumbers();
+            }
+
+            // 슬롯 프롬프트 복원 (첫 번째 슬롯에)
+            if (metadata.slot_prompt) {
+                const slots = document.querySelectorAll('#slotsContainer .slot');
+                if (slots.length > 0) {
+                    const firstSlotTags = slots[0].querySelector('.slot-tags');
+                    if (firstSlotTags) {
+                        firstSlotTags.value = metadata.slot_prompt;
+                        // 하이라이팅 오버레이 갱신을 위해 input 이벤트 트리거
+                        firstSlotTags.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                }
             }
 
             // 크기
@@ -8868,11 +9004,6 @@
         widthInput.onchange = checkCustomSize;
         heightInput.onchange = checkCustomSize;
         
-        // Upscale toggle
-        document.getElementById('enableUpscale').onchange = function() {
-            document.getElementById('upscaleSettings').style.display = this.checked ? 'block' : 'none';
-        };
-
         // Upscale denoise slider value display
         document.getElementById('upscaleDenoise').oninput = function() {
             document.getElementById('upscaleDenoiseValue').textContent = this.value;
@@ -13480,6 +13611,7 @@
         setupBaseImageEvents();
         updateBaseImageNoiseVisibility();
         updateProviderLabels();
+        enforceNaiLimits();
 
         // 시작 시 업데이트 자동 확인 (조용하게)
         (async function checkUpdateOnStart() {

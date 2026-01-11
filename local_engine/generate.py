@@ -403,12 +403,16 @@ class SDXLGenerator:
         sampler_fn = get_sampler(sampler)
         logger.debug(f"[Generate] Using sampler: {sampler} -> {sampler_fn.__name__}")
 
-        # 콜백 래퍼
+        # 콜백 래퍼 (취소 체크 포함)
         def step_callback(info):
             if callback:
                 step = info.get("i", 0)
                 total = len(sigmas) - 1
-                callback(step, total)
+                callback(step, total)  # 여기서 취소 예외가 발생할 수 있음
+
+        # 샘플링 시작 전 취소 체크 (CLIP 인코딩 후)
+        if callback:
+            callback(0, steps)  # step 0에서 취소 체크
 
         # 샘플링
         samples = sampler_fn(

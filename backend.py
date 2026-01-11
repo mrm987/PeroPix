@@ -48,6 +48,11 @@ CENSOR_MODELS_DIR = MODELS_DIR / "censor"  # 검열 모델 (YOLO)
 CENSORING_DIR = APP_DIR / "censoring"  # 검열 작업 폴더 (레거시, 더 이상 사용 안함)
 UNCENSORED_DIR = CENSORING_DIR / "uncensored"  # 검열 전 이미지 (레거시, 더 이상 사용 안함)
 CENSORED_DIR = OUTPUT_DIR / "censored"  # 검열 후 이미지 (새 경로: outputs/censored)
+
+# 생성 취소 예외
+class GenerationCancelled(Exception):
+    """로컬 생성 취소 시 발생하는 예외"""
+    pass
 LOGS_DIR = APP_DIR / "logs"
 VERSION_FILE = APP_DIR / "version.json"
 
@@ -1422,12 +1427,16 @@ def get_local_engine_generator():
     global _local_engine_generator
     return _local_engine_generator
 
-def call_local_engine(req: GenerateRequest):
+def call_local_engine(req: GenerateRequest, cancel_check=None):
     """
     ComfyUI 기반 로컬 엔진으로 이미지 생성
 
     Diffusers 대신 ComfyUI의 샘플링 코드를 사용하여
     동일한 모델/프롬프트/시드/세팅에서 ComfyUI와 동일한 결과물 생성
+
+    Args:
+        req: GenerateRequest 객체
+        cancel_check: 취소 상태를 확인하는 함수 (callable). True를 반환하면 취소
     """
     global _local_engine_generator
 
@@ -1482,12 +1491,16 @@ def call_local_engine(req: GenerateRequest):
 
     logger.info(f"[LocalEngine] Generating: {req.width}x{req.height}, steps={req.steps}, cfg={req.cfg}, sampler={req.sampler}, seed={seed}")
 
-    # 진행률 콜백 (tqdm 프로그레스 바)
+    # 진행률 콜백 (tqdm 프로그레스 바 + 취소 체크)
     from tqdm import tqdm
     pbar = tqdm(total=req.steps, desc="[LocalEngine]", ncols=80, leave=False)
 
     def progress_callback(step, total):
         pbar.update(1)
+        # 취소 체크
+        if cancel_check and cancel_check():
+            pbar.close()
+            raise GenerationCancelled("Generation cancelled by user")
 
     # 이미지 생성
     image, used_seed = _local_engine_generator.generate(
@@ -1898,16 +1911,17 @@ async def process_job(job):
                 # 동기 함수를 executor에서 실행하여 이벤트 루프 블로킹 방지
                 import asyncio
                 loop = asyncio.get_event_loop()
-                image, actual_seed = await loop.run_in_executor(None, call_local_engine, single_req)
+                # cancel_check 함수를 전달하여 각 step에서 취소 상태 확인
+                image, actual_seed = await loop.run_in_executor(
+                    None,
+                    lambda: call_local_engine(single_req, cancel_check=lambda: gen_queue.cancel_current)
+                )
             image_time = time.time() - image_start_time
             
-            # 파일명용 태그 결정: name > 첫 태그 (sanitize_filename 사용)
+            # 파일명용 태그 결정: name만 사용 (sanitize_filename 사용)
             file_tag = ""
             if prompt_name:
                 file_tag = sanitize_filename(prompt_name, max_length=100)
-            elif extra_prompt:
-                tag = extra_prompt.split(",")[0].strip()
-                file_tag = sanitize_filename(tag, max_length=100)
             
             image_idx += 1
 
@@ -1970,13 +1984,15 @@ async def process_job(job):
 
             # PeroPix 확장 필드
             peropix_ext = {
-                "version": 1,
+                "version": 3,
                 "provider": req.provider,
                 "character_prompts": req.character_prompts or [],
                 "variety_plus": req.variety_plus,
                 "furry_mode": req.furry_mode,
                 "local_model": req.model if req.provider == 'local' else "",
-                "vibe_transfer": vibe_info if vibe_info else None
+                "vibe_transfer": vibe_info if vibe_info else None,
+                "base_prompt": req.base_prompt,
+                "slot_prompt": extra_prompt if extra_prompt else None
             }
 
             if existing_comment:
@@ -2081,6 +2097,24 @@ async def process_job(job):
             print(f"[Generate] Image {image_idx}/{total_images} completed - {image_time:.1f}s - {filename}")
             await gen_queue.broadcast(image_data)
             
+        except GenerationCancelled:
+            # 로컬 생성이 즉시 취소됨
+            print(f"[Generate] Cancelled immediately during generation")
+            cancelled_images = total_images - image_idx
+            gen_queue.total_images -= cancelled_images
+            gen_queue.cancel_current = False  # 취소 플래그 리셋
+            await gen_queue.broadcast({
+                "type": "job_cancelled",
+                "job_id": job_id,
+                "cancelled_images": cancelled_images,
+                "immediate": True,
+                "progress": {
+                    "completed": gen_queue.completed_images,
+                    "total": gen_queue.total_images,
+                    "queue_length": len(gen_queue.queue)
+                }
+            })
+            return  # 이 잡 종료
         except Exception as e:
             import traceback
             print(f"[Error] Generation failed: {e}")
@@ -2513,6 +2547,28 @@ async def delete_gallery_image(filename: str, folder: str = ""):
                     return {"success": False, "error": str(e)}
 
     return {"success": False, "error": "Image not found"}
+
+
+@app.delete("/api/outputs/{filepath:path}")
+async def delete_output_image(filepath: str):
+    """출력 이미지 파일 삭제"""
+    file_path = OUTPUT_DIR / filepath
+    # 경로 검증 (보안)
+    try:
+        file_path = file_path.resolve()
+        if not str(file_path).startswith(str(OUTPUT_DIR.resolve())):
+            return {"success": False, "error": "Invalid path"}
+    except Exception:
+        return {"success": False, "error": "Invalid path"}
+
+    if not file_path.exists() or not file_path.is_file():
+        return {"success": False, "error": "File not found"}
+
+    try:
+        file_path.unlink()
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 
 @app.post("/api/gallery/{filename}/move")

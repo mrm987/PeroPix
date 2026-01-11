@@ -1630,7 +1630,7 @@ async def lifespan(app: FastAPI):
     # 큐 처리 백그라운드 태스크 시작
     queue_task = asyncio.create_task(process_queue())
 
-    # 서버 준비 완료 후 브라우저 열기 (짧은 지연으로 서버가 완전히 시작되도록)
+    # 서버 준비 완료 후 브라우저 열기
     async def open_browser_delayed():
         await asyncio.sleep(0.5)
         import webbrowser
@@ -3572,29 +3572,11 @@ def get_uv_download_url():
 
 
 def is_local_env_installed():
-    """로컬 환경 설치 여부 확인 - torch와 diffusers 둘 다 필요"""
-    if platform.system() == "Windows":
-        # Windows embedded Python: python/python.exe
-        python_exe = PYTHON_ENV_DIR / "python.exe"
-        site_packages = PYTHON_ENV_DIR / "Lib" / "site-packages"
-    else:
-        # macOS/Linux: python-build-standalone
-        python_exe = PYTHON_ENV_DIR / "python" / "bin" / "python3"
-        site_packages = PYTHON_ENV_DIR / "python" / "lib" / f"python{PYTHON_VERSION[:4]}" / "site-packages"
-
-    torch_check = site_packages / "torch"
-    diffusers_check = site_packages / "diffusers"
-
-    python_exists = python_exe.exists()
-    torch_exists = torch_check.exists()
-    diffusers_exists = diffusers_check.exists()
-
-    print(f"[Local Env Check] Python: {python_exe} exists={python_exists}")
-    print(f"[Local Env Check] Torch: {torch_check} exists={torch_exists}")
-    print(f"[Local Env Check] Diffusers: {diffusers_check} exists={diffusers_exists}")
-
-    # torch와 diffusers 둘 다 있어야 설치된 것으로 인정
-    return python_exists and torch_exists and diffusers_exists
+    """로컬 환경 설치 여부 확인 - install_status.json 기반"""
+    status = get_install_status()
+    installed = status.get("local", False)
+    print(f"[Local Env Check] install_status.local={installed}")
+    return installed
 
 
 def download_file(url: str, dest: Path, progress_callback=None):
@@ -4114,12 +4096,11 @@ async def restart_server():
     """서버 재시작 (embedded Python으로 전환)"""
     import subprocess
     import sys
-    
+
     if platform.system() == "Windows":
         # Windows: 새 CMD 창에서 bat 파일 실행
         bat_file = APP_DIR / "PeroPix.bat"
         if bat_file.exists():
-            # start cmd /c: 새 창에서 실행
             subprocess.Popen(
                 f'start cmd /c "{bat_file}"',
                 shell=True,
@@ -4127,8 +4108,8 @@ async def restart_server():
             )
         else:
             # bat 파일이 없으면 직접 Python 실행
-            embedded_python = PYTHON_ENV_DIR / "python" / "python.exe"
-            python_to_use = str(embedded_python) if embedded_python.exists() else sys.executable
+            python_exe = PYTHON_ENV_DIR / "python.exe"
+            python_to_use = str(python_exe) if python_exe.exists() else sys.executable
             subprocess.Popen(
                 f'start cmd /k "{python_to_use}" backend.py',
                 shell=True,

@@ -8109,21 +8109,14 @@
         }
 
         async function autoRestart() {
-            // 자동 재시작 (토스트 알림만 표시)
-            showToast('⏳ 재시작 중... 잠시만 기다려주세요.', 'info', 0);
-
+            // 자동 재시작 - 현재 탭 닫기 (서버가 새 브라우저를 열어줌)
+            window.isIntentionalClose = true;  // beforeunload 경고 비활성화
             try {
-                // 서버에 재시작 요청
                 await fetch(`${API_BASE}/api/restart`, { method: 'POST' });
             } catch (e) {
                 // 서버가 종료되면서 연결이 끊어질 수 있음
             }
-
-            // 서버가 다시 올라올 때까지 대기 후 페이지 새로고침
-            await waitForServer();
-
-            // 페이지 새로고침
-            window.location.reload();
+            window.close();
         }
 
         async function confirmRestart() {
@@ -8131,20 +8124,14 @@
             btn.textContent = '⏳ 재시작 중...';
             btn.disabled = true;
             btn.style.opacity = '0.5';
+            window.isIntentionalClose = true;  // beforeunload 경고 비활성화
 
             try {
-                // 서버에 재시작 요청
                 await fetch(`${API_BASE}/api/restart`, { method: 'POST' });
             } catch (e) {
                 // 서버가 종료되면서 연결이 끊어질 수 있음
             }
-
-            // 서버가 다시 올라올 때까지 대기 후 페이지 새로고침
-            btn.textContent = '⏳ 서버 대기 중...';
-            await waitForServer();
-
-            // 페이지 새로고침
-            window.location.reload();
+            window.close();
         }
         
         async function waitForServer(maxAttempts = 30) {
@@ -11429,11 +11416,14 @@
         setTimeout(updateScrollGradients, 100);
         
         // 페이지 떠날 때 저장 및 경고
+        window.isIntentionalClose = false;  // 재시작 등 의도적 종료 플래그 (전역)
         window.addEventListener('beforeunload', (e) => {
             saveAppSettings();
-            // 브라우저 기본 확인 팝업 표시
-            e.preventDefault();
-            e.returnValue = '';
+            // 의도적 종료가 아닌 경우에만 경고 표시
+            if (!window.isIntentionalClose) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
         });
 
         // ============================================================

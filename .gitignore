@@ -49,6 +49,7 @@ dist/
 
 # Test/Debug data
 test_data/
+test_*.py
 DEV_backup/
 debug_*.png
 *_debug_*.json

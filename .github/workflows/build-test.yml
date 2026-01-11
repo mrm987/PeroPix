@@ -65,8 +65,6 @@ jobs:
           New-Item -ItemType Directory -Force -Path "dist/PeroPix/models/upscale_models"
           New-Item -ItemType Directory -Force -Path "dist/PeroPix/outputs"
           New-Item -ItemType Directory -Force -Path "dist/PeroPix/presets"
-          New-Item -ItemType Directory -Force -Path "dist/PeroPix/censoring/uncensored"
-          New-Item -ItemType Directory -Force -Path "dist/PeroPix/censoring/censored"
           Copy-Item "README.md" -Destination "dist/PeroPix/" -ErrorAction SilentlyContinue
           Copy-Item "LICENSE" -Destination "dist/PeroPix/" -ErrorAction SilentlyContinue
       - name: Create ZIP Archive
@@ -130,8 +128,6 @@ jobs:
           mkdir -p dist/PeroPix/models/upscale_models
           mkdir -p dist/PeroPix/outputs
           mkdir -p dist/PeroPix/presets
-          mkdir -p dist/PeroPix/censoring/uncensored
-          mkdir -p dist/PeroPix/censoring/censored
           cp README.md dist/PeroPix/ 2>/dev/null || true
           cp LICENSE dist/PeroPix/ 2>/dev/null || true
       - name: Create Launcher Script

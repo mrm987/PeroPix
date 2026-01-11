@@ -17,6 +17,8 @@ vibe_cache/
 gallery/
 censoring/
 presets/
+prompts/base/*.txt
+prompts/negative/*.txt
 prompts/character/*.txt
 *.log
 install_status.json

@@ -2538,7 +2538,8 @@
             position: relative;
             display: flex;
             flex-direction: column;
-            height: 100%;
+            flex: 1 1 0;
+            min-height: 0;
             background: var(--bg);
         }
         
@@ -2647,11 +2648,12 @@
         /* 큰 프리뷰 영역 */
         /* 메인 영역: 프리뷰 + 우측 패널 */
         .censor-main-area {
-            flex: 1;
+            flex: 1 1 0;
             display: flex;
             flex-direction: row;
             overflow: hidden;
             min-height: 0;
+            align-items: stretch;  /* 자식들이 전체 높이 차지 */
         }
 
         .censor-preview-area {
@@ -2679,6 +2681,10 @@
             border-left: 1px solid var(--border);
             display: flex;
             flex-direction: column;
+            /* flex row 안에서 align-items: stretch가 기본이므로 height 자동 */
+        }
+        .censor-side-panel-content {
+            flex: 1 1 0;  /* grow, shrink, basis=0으로 남은 공간 채움 */
             overflow-y: auto;
             overflow-x: hidden;
         }
@@ -2842,14 +2848,15 @@
             font-family: monospace;
         }
 
-        /* 액션 버튼 영역 */
+        /* 액션 버튼 영역 - 항상 하단에 고정 (sidebar-footer와 동일) */
         .censor-side-actions {
+            flex-shrink: 0;
             padding: 12px;
-            margin-top: auto;
             display: flex;
             flex-direction: column;
             gap: 8px;
             border-top: 1px solid var(--border);
+            background: var(--bg-light);
         }
         .censor-side-actions .btn {
             width: 100%;
@@ -4738,7 +4745,7 @@
                     <div class="toolbar-right">
                         <!-- 검열 전: 이미지 초기화 버튼 -->
                         <button type="button" class="header-btn" id="censorClearImagesBtn" style="display: none;" title="드롭된 이미지 초기화">
-                            🗑️ 초기화
+                            🧹 Clear
                         </button>
                         <!-- 저장 폴더 드롭다운 (모든 탭에서 표시) -->
                         <div class="folder-dropdown" id="censorFolderAfter">
@@ -4820,6 +4827,8 @@
 
                     <!-- 우측 패널 -->
                     <div class="censor-side-panel" id="censorSidePanel">
+                        <!-- 스크롤 가능한 콘텐츠 영역 -->
+                        <div class="censor-side-panel-content">
                         <!-- 검열전 탭: 모델/감지대상 섹션 -->
                         <div class="censor-side-section censor-side-model" id="censorSideModel">
                             <div class="side-section-title">📦 모델</div>
@@ -4892,8 +4901,9 @@
                                 <div class="shortcut-row"><kbd>우클릭</kbd> 삭제</div>
                             </div>
                         </div>
+                        </div><!-- /.censor-side-panel-content -->
 
-                        <!-- 액션 버튼 -->
+                        <!-- 액션 버튼 - content 밖에서 하단 고정 -->
                         <div class="censor-side-actions">
                             <!-- 검열전: 전체 검열 -->
                             <button type="button" class="btn btn-primary" id="censorRunAllBtn">🔍 전체 검열</button>

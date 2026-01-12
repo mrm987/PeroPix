@@ -2402,6 +2402,8 @@
         }
         .drop-modal-content .metadata div { margin-bottom: 4px; }
         .drop-modal-content .buttons { display: flex; gap: 12px; justify-content: flex-end; }
+        .drop-modal-content .checkbox-row { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 16px; color: var(--text-dim); font-size: 13px; cursor: pointer; }
+        .drop-modal-content .checkbox-row input { margin: 0; }
         .drop-modal-content .buttons .btn {
             width: auto;
             flex: 1;
@@ -5009,6 +5011,10 @@
                 <button type="button" class="btn btn-secondary" id="confirmModalCancel">취소</button>
                 <button type="button" class="btn" id="confirmModalOk">확인</button>
             </div>
+            <label id="confirmModalCheckboxWrapper" class="checkbox-row" style="display: none;">
+                <input type="checkbox" id="confirmModalCheckbox">
+                <span id="confirmModalCheckboxLabel">앞으로 묻지 않음</span>
+            </label>
         </div>
     </div>
 
@@ -5958,22 +5964,41 @@
                     return;
                 }
 
-                if (!confirm(`파일을 삭제하시겠습니까?\n${filename}`)) return;
+                const doDelete = async () => {
+                    try {
+                        const response = await fetch(`${API_BASE}/api/outputs/${encodeURIComponent(imagePath)}`, {
+                            method: 'DELETE'
+                        });
+                        const result = await response.json();
 
-                try {
-                    const response = await fetch(`${API_BASE}/api/outputs/${encodeURIComponent(imagePath)}`, {
-                        method: 'DELETE'
-                    });
-                    const result = await response.json();
-
-                    if (result.success) {
-                        card.remove();
-                        showToast('파일이 삭제되었습니다', 'success');
-                    } else {
-                        showToast('삭제 실패: ' + (result.error || 'Unknown error'), 'error');
+                        if (result.success) {
+                            card.remove();
+                            showToast('파일이 삭제되었습니다', 'success');
+                        } else {
+                            showToast('삭제 실패: ' + (result.error || 'Unknown error'), 'error');
+                        }
+                    } catch (err) {
+                        showToast('삭제 오류: ' + err.message, 'error');
                     }
-                } catch (err) {
-                    showToast('삭제 오류: ' + err.message, 'error');
+                };
+
+                const skipConfirm = sessionStorage.getItem('skipSlotDeleteConfirm') === 'true';
+                if (skipConfirm) {
+                    doDelete();
+                } else {
+                    showConfirmModal(
+                        '🗑️ 파일 삭제',
+                        `<p>파일을 삭제하시겠습니까?</p><p style="color: var(--text-dim); font-size: 12px; word-break: break-all;">${filename}</p>`,
+                        (dontAskAgain) => {
+                            if (dontAskAgain) {
+                                sessionStorage.setItem('skipSlotDeleteConfirm', 'true');
+                            }
+                            doDelete();
+                        },
+                        '삭제',
+                        true,
+                        '앞으로 묻지 않음'
+                    );
                 }
             };
 
@@ -8372,7 +8397,7 @@
         }
 
         // Generic Confirm Modal
-        function showConfirmModal(title, message, onConfirm, confirmText = '확인', isDanger = false) {
+        function showConfirmModal(title, message, onConfirm, confirmText = '확인', isDanger = false, checkboxLabel = null) {
             const modal = document.getElementById('confirmModal');
             document.getElementById('confirmModalTitle').textContent = title;
             document.getElementById('confirmModalMessage').innerHTML = message;
@@ -8380,6 +8405,17 @@
             okBtn.textContent = confirmText;
             okBtn.className = isDanger ? 'btn btn-danger' : 'btn';
             okBtn.style.background = isDanger ? 'var(--error)' : '';
+
+            // 체크박스 설정
+            const checkboxWrapper = document.getElementById('confirmModalCheckboxWrapper');
+            const checkbox = document.getElementById('confirmModalCheckbox');
+            if (checkboxLabel) {
+                document.getElementById('confirmModalCheckboxLabel').textContent = checkboxLabel;
+                checkboxWrapper.style.display = 'flex';
+                checkbox.checked = false;
+            } else {
+                checkboxWrapper.style.display = 'none';
+            }
 
             // 이벤트 리스너 정리 후 재설정
             const newOkBtn = okBtn.cloneNode(true);
@@ -8389,7 +8425,7 @@
 
             newOkBtn.onclick = () => {
                 modal.classList.remove('active');
-                if (onConfirm) onConfirm();
+                if (onConfirm) onConfirm(checkbox.checked);
             };
             newCancelBtn.onclick = () => {
                 modal.classList.remove('active');

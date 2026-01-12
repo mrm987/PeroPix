@@ -4209,6 +4209,8 @@ def _get_yolo():
     """YOLO 클래스 lazy import"""
     global YOLO
     if YOLO is None:
+        # cv2를 먼저 import해야 ultralytics 내부에서 재귀 로딩 오류 방지
+        import cv2
         from ultralytics import YOLO as _YOLO
         YOLO = _YOLO
     return YOLO

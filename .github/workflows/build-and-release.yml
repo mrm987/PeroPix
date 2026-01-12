@@ -28,6 +28,21 @@ jobs:
         run: |
           $pythonExe = "dist/PeroPix/python/python.exe"
           & $pythonExe -m pip install --no-warn-script-location -r requirements-core.txt
+      - name: Fix OpenCV Config
+        shell: pwsh
+        run: |
+          $cv2Dir = "dist/PeroPix/python/Lib/site-packages/cv2"
+          if (Test-Path $cv2Dir) {
+            $configContent = @"
+          import os
+          LOADER_DIR = os.path.dirname(os.path.abspath(__file__))
+          PYTHON_EXTENSIONS_PATHS = [LOADER_DIR]
+          BINARIES_PATHS = [LOADER_DIR]
+          "@
+            Set-Content -Path "$cv2Dir/config.py" -Value $configContent
+            Set-Content -Path "$cv2Dir/config-3.py" -Value $configContent
+            Write-Host "OpenCV config files created"
+          }
       - name: Generate version.json
         shell: pwsh
         run: |
@@ -101,6 +116,19 @@ jobs:
         run: |
           dist/PeroPix/python/bin/python3 -m pip install --upgrade pip
           dist/PeroPix/python/bin/python3 -m pip install -r requirements-core.txt
+      - name: Fix OpenCV Config
+        run: |
+          CV2_DIR="dist/PeroPix/python/lib/python3.11/site-packages/cv2"
+          if [ -d "$CV2_DIR" ]; then
+            cat > "$CV2_DIR/config.py" << 'PYEOF'
+          import os
+          LOADER_DIR = os.path.dirname(os.path.abspath(__file__))
+          PYTHON_EXTENSIONS_PATHS = [LOADER_DIR]
+          BINARIES_PATHS = [LOADER_DIR]
+          PYEOF
+            cp "$CV2_DIR/config.py" "$CV2_DIR/config-3.py"
+            echo "OpenCV config files created"
+          fi
       - name: Generate version.json
         run: |
           VERSION="1.0.0"

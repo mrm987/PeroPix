@@ -116,13 +116,19 @@ logger = setup_logging()
 logger.info(f"PeroPix v{APP_VERSION['version']} 시작")
 
 # 카테고리별 이미지 순번 - 매번 실제 폴더 스캔
+# 이미지 번호 카운터 (메모리에 유지하여 삭제 후 번호 재사용 방지)
+_image_number_counters = {}
+
 def get_next_image_number(category: str, save_dir: Path = None, ext: str = 'png') -> int:
-    """해당 카테고리의 다음 순번 반환 - 실제 폴더에서 스캔 (모든 확장자 검색)"""
+    """해당 카테고리의 다음 순번 반환 - 메모리 카운터 + 폴더 스캔 병합"""
     if save_dir is None:
         save_dir = OUTPUT_DIR
 
+    # 카테고리+폴더 조합으로 키 생성
+    counter_key = f"{save_dir}:{category}"
+
+    # 폴더에서 최대 번호 스캔
     max_num = 0
-    # 모든 지원 포맷에서 순번 검색 (포맷 변경 시에도 연속 번호 유지)
     pattern = re.compile(rf'^{re.escape(category)}_(\d{{7}})\.(png|jpg|webp)$')
 
     if save_dir.exists():
@@ -137,7 +143,14 @@ def get_next_image_number(category: str, save_dir: Path = None, ext: str = 'png'
             except Exception:
                 pass
 
-    return max_num + 1
+    # 메모리 카운터와 폴더 최대값 중 큰 값 사용
+    memory_counter = _image_number_counters.get(counter_key, 0)
+    next_num = max(max_num, memory_counter) + 1
+
+    # 카운터 업데이트
+    _image_number_counters[counter_key] = next_num
+
+    return next_num
 
 # 디렉토리 생성
 for d in [CHECKPOINTS_DIR, LORA_DIR, UPSCALE_DIR, OUTPUT_DIR, PRESETS_DIR, DATA_DIR, CENSOR_MODELS_DIR, CENSORED_DIR]:
@@ -575,8 +588,14 @@ def read_metadata_from_image(image_bytes: bytes) -> dict:
                     comment = comment.decode('utf-8')
                 metadata = json.loads(comment)
                 return metadata
-            except:
+            except Exception as e:
+                print(f"[EXIF] PNG Comment parse error: {e}")
+                print(f"[EXIF] Comment preview: {str(img.info['Comment'])[:200]}")
                 pass
+        else:
+            # Comment가 없는 경우 info 키 목록 출력
+            if hasattr(img, 'info'):
+                print(f"[EXIF] No Comment found. Available keys: {list(img.info.keys())}")
 
         # 2. 레거시 peropix 필드 확인
         if hasattr(img, 'info') and 'peropix' in img.info:
@@ -1808,6 +1827,38 @@ async def process_job(job):
     total_images = len(prompts)
     image_idx = 0
 
+    # 저장 포맷 결정
+    save_format = getattr(req, 'save_format', 'png').lower()
+    if save_format not in ['png', 'jpg', 'webp']:
+        save_format = 'png'
+    ext = 'jpg' if save_format == 'jpg' else save_format
+
+    # 저장 경로 결정
+    if req.output_folder:
+        save_dir = OUTPUT_DIR / req.output_folder
+        save_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        save_dir = OUTPUT_DIR
+
+    # 파일명 미리 할당 (생성 중 삭제로 인한 번호 중복 방지)
+    pre_allocated_filenames = []
+    for prompt_item in prompts:
+        prompt_name = prompt_item.name if hasattr(prompt_item, 'name') else ""
+        slot_index = prompt_item.slotIndex if hasattr(prompt_item, 'slotIndex') else 0
+
+        file_tag = ""
+        if prompt_name:
+            file_tag = sanitize_filename(prompt_name, max_length=100)
+
+        if file_tag:
+            category = f"{slot_index+1:03d}_{file_tag}"
+        else:
+            category = f"{slot_index+1:03d}"
+
+        file_num = get_next_image_number(category, save_dir, ext)
+        filename = f"{category}_{file_num:07d}.{ext}"
+        pre_allocated_filenames.append(filename)
+
     # 시드 설정
     current_seed = req.seed if req.seed >= 0 else random.randint(0, 2**31 - 1)
 
@@ -1917,35 +1968,11 @@ async def process_job(job):
                     lambda: call_local_engine(single_req, cancel_check=lambda: gen_queue.cancel_current)
                 )
             image_time = time.time() - image_start_time
-            
-            # 파일명용 태그 결정: name만 사용 (sanitize_filename 사용)
-            file_tag = ""
-            if prompt_name:
-                file_tag = sanitize_filename(prompt_name, max_length=100)
-            
+
             image_idx += 1
 
-            # 저장 경로 결정
-            if req.output_folder:
-                save_dir = OUTPUT_DIR / req.output_folder
-                save_dir.mkdir(parents=True, exist_ok=True)
-            else:
-                save_dir = OUTPUT_DIR
-
-            # 카테고리 결정 (슬롯 인덱스 + 파일 태그)
-            if file_tag:
-                category = f"{slot_index+1:03d}_{file_tag}"
-            else:
-                category = f"{slot_index+1:03d}"
-
-            # 저장 포맷 결정
-            save_format = getattr(req, 'save_format', 'png').lower()
-            if save_format not in ['png', 'jpg', 'webp']:
-                save_format = 'png'
-            ext = 'jpg' if save_format == 'jpg' else save_format
-
-            file_num = get_next_image_number(category, save_dir, ext)
-            filename = f"{category}_{file_num:07d}.{ext}"
+            # 미리 할당된 파일명 사용
+            filename = pre_allocated_filenames[prompt_idx]
 
             # 메타데이터 옵션
             strip_metadata = getattr(req, 'strip_metadata', False)
@@ -1957,7 +1984,8 @@ async def process_job(job):
             if hasattr(image, 'info') and 'Comment' in image.info:
                 try:
                     existing_comment = json.loads(image.info['Comment'])
-                except:
+                except Exception as e:
+                    print(f"[EXIF] Failed to parse NAI Comment: {e}")
                     pass
 
             # SMEA 설정 파싱
@@ -2566,6 +2594,13 @@ async def delete_output_image(filepath: str):
 
     try:
         file_path.unlink()
+
+        # 재연결 동기화 목록에서도 삭제된 이미지 제거
+        gen_queue.recent_images = [
+            img for img in gen_queue.recent_images
+            if img.get("image_path") != filepath
+        ]
+
         return {"success": True}
     except Exception as e:
         return {"success": False, "error": str(e)}

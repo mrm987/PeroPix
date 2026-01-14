@@ -914,6 +914,25 @@
             overflow: visible;
         }
 
+        /* 설정 적용 시 강조 효과 */
+        .setting-highlight {
+            animation: settingHighlight 1.5s ease-out;
+        }
+        @keyframes settingHighlight {
+            0% {
+                background-color: rgba(74, 222, 128, 0.4);
+                box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
+            }
+            100% {
+                background-color: transparent;
+                box-shadow: none;
+            }
+        }
+        /* 섹션 타이틀 강조 */
+        .section-title.setting-highlight {
+            border-radius: 4px;
+        }
+
         .prompt-preset-dropdown {
             position: relative;
         }
@@ -2166,7 +2185,32 @@
             background: var(--error);
             color: white;
         }
-        
+
+        .slot-lock {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            padding: 2px 6px;
+            font-size: 0.9rem;
+            line-height: 1;
+            border-radius: 4px;
+            opacity: 0.5;
+        }
+        .slot-lock:hover {
+            opacity: 1;
+        }
+        .slot-lock.locked {
+            color: var(--warning);
+            opacity: 1;
+        }
+        .slot.locked {
+            opacity: 0.6;
+        }
+        .slot.locked .slot-prompt-header {
+            background: rgba(234, 179, 8, 0.15);
+        }
+
         .slot-prompt textarea {
             width: 100%;
             border: none;
@@ -4352,7 +4396,7 @@
                     <div class="section">
                         <div class="section-title">
                             <button type="button" class="collapse-toggle" data-target="upscaleContent" title="접기/펼치기">▼</button>
-                            <span>Upscale</span>
+                            <span>Hires.fix</span>
                             <label class="section-toggle">
                                 <input type="checkbox" id="enableUpscale">
                                 <span>Active</span>
@@ -5567,6 +5611,7 @@
                     <div class="slot-prompt-header">
                         <span class="slot-number">001</span>
                         <input type="text" placeholder="이름 (선택)" value="${name}" class="slot-name">
+                        <button type="button" class="slot-lock" title="락 (생성 제외)" tabindex="-1">🔓</button>
                         <button type="button" class="slot-drag" title="드래그하여 순서 변경" tabindex="-1">☰</button>
                         <button type="button" class="slot-delete" tabindex="-1">×</button>
                     </div>
@@ -5588,6 +5633,18 @@
                     updateAnlasCost();
                     autoSaveSettings();
                 }
+            };
+
+            // 락 버튼
+            const lockBtn = slot.querySelector('.slot-lock');
+            lockBtn.onclick = () => {
+                const isLocked = slot.classList.toggle('locked');
+                lockBtn.classList.toggle('locked', isLocked);
+                lockBtn.textContent = isLocked ? '🔒' : '🔓';
+                lockBtn.title = isLocked ? '락 해제' : '락 (생성 제외)';
+                updateQueueButton();
+                updateAnlasCost();
+                autoSaveSettings();
             };
 
             const tagsTextarea = slot.querySelector('textarea');
@@ -5718,8 +5775,15 @@
             autoSaveSettings();
         }
 
-        function addSlot(name = '', content = '') {
+        function addSlot(name = '', content = '', locked = false) {
             const slot = createSlot(name, content);
+            if (locked) {
+                slot.classList.add('locked');
+                const lockBtn = slot.querySelector('.slot-lock');
+                lockBtn.classList.add('locked');
+                lockBtn.textContent = '🔒';
+                lockBtn.title = '락 해제';
+            }
             slotsContainer.appendChild(slot);
             setupSlotImageScroll(slot);
             updateSlotNumbers();
@@ -5730,20 +5794,42 @@
         function getSlotList() {
             const slots = slotsContainer.querySelectorAll('.slot');
             const list = [];
-            
+
             slots.forEach((slot, index) => {
+                // 락된 슬롯은 제외
+                if (slot.classList.contains('locked')) return;
+
                 const name = slot.querySelector('.slot-name').value.trim();
                 const content = slot.querySelector('.slot-tags').value.trim();
                 // 현재 위치 기반 인덱스 사용
                 list.push({ name, content, slotIndex: index });
             });
-            
+
             return list;
         }
-        
+
+        function getUnlockedSlotCount() {
+            const slots = slotsContainer.querySelectorAll('.slot:not(.locked)');
+            return slots.length;
+        }
+
+        // 저장용: 모든 슬롯 정보 (락 상태 포함)
+        function getAllSlotList() {
+            const slots = slotsContainer.querySelectorAll('.slot');
+            const list = [];
+
+            slots.forEach((slot, index) => {
+                const name = slot.querySelector('.slot-name').value.trim();
+                const content = slot.querySelector('.slot-tags').value.trim();
+                const locked = slot.classList.contains('locked');
+                list.push({ name, content, locked, slotIndex: index });
+            });
+
+            return list;
+        }
+
         function updateQueueButton() {
-            const list = getSlotList();
-            const count = list.length || 1;
+            const count = getUnlockedSlotCount() || 1;
             generateBtn.textContent = `Queue (${count})`;
         }
         
@@ -5776,8 +5862,10 @@
             card.className = 'slot-image-card';
 
             // image_path가 있으면 URL로, 없으면 base64로 (하위 호환)
+            // 캐시 버스터 추가 (삭제된 파일명 재사용 시 캐시 문제 방지)
+            const cacheBuster = Date.now();
             const imgSrc = data.image_path
-                ? `${API_BASE}/api/outputs/${data.image_path}`
+                ? `${API_BASE}/api/outputs/${data.image_path}?t=${cacheBuster}`
                 : `data:image/png;base64,${data.image}`;
             card.innerHTML = `
                 <img src="${imgSrc}" alt="" draggable="false">
@@ -7411,6 +7499,15 @@
             const slotList = getSlotList();
             const repeatCount = parseInt(document.getElementById('repeatCount').value) || 1;
 
+            // 슬롯 모드에서 모든 슬롯이 락되어 있으면 생성 불가
+            if (currentMode === 'slot') {
+                const allSlots = getAllSlotList();
+                if (allSlots.length > 0 && slotList.length === 0) {
+                    showToast('모든 슬롯이 잠겨 있어 생성할 수 없습니다', 'warning');
+                    return;
+                }
+            }
+
             // 모든 슬롯 등록 (빈 슬롯도 포함)
             const promptCount = slotList.length || 1;
 
@@ -8642,7 +8739,9 @@
                     images: meta.reference_image_multiple || [],
                     strengths: meta.reference_strength_multiple || [],
                     info_extracted: meta.reference_information_extracted_multiple || []
-                }
+                },
+                // NAI 캐릭터 레퍼런스 사용 여부 (이미지 데이터는 제외됨)
+                has_character_reference: !!(meta.director_reference_strength_values?.length > 0)
             };
         }
 
@@ -8698,26 +8797,36 @@
                 }
             }
 
-            // 시드
-            if (metadata.seed) document.getElementById('seed').value = metadata.seed;
-
-            showToast('프롬프트와 시드가 적용되었습니다', 'success');
+            showToast('프롬프트가 적용되었습니다', 'success');
         }
 
         // 메타데이터 설정 적용
         function applyMetadataSettings(metadata) {
+            // 요소 강조 함수 (스크롤/펼치기 없음)
+            function highlight(elementId) {
+                const el = document.getElementById(elementId);
+                if (el) {
+                    el.classList.remove('setting-highlight');
+                    void el.offsetWidth; // reflow 트리거
+                    el.classList.add('setting-highlight');
+                    setTimeout(() => el.classList.remove('setting-highlight'), 1500);
+                }
+            }
+
             // 프롬프트 (공란이어도 적용)
             if (metadata.prompt !== undefined) {
                 const basePrompt = document.getElementById('basePrompt');
                 basePrompt.value = metadata.prompt;
                 // 하이라이팅 업데이트를 위해 input 이벤트 트리거
                 basePrompt.dispatchEvent(new Event('input', { bubbles: true }));
+                highlight('basePrompt');
             }
             if (metadata.negative_prompt !== undefined) {
                 const negativePrompt = document.getElementById('negativePrompt');
                 negativePrompt.value = metadata.negative_prompt;
                 // 하이라이팅 업데이트를 위해 input 이벤트 트리거
                 negativePrompt.dispatchEvent(new Event('input', { bubbles: true }));
+                highlight('negativePrompt');
             }
 
             // 캐릭터 프롬프트 적용
@@ -8732,6 +8841,7 @@
                     }
                 });
                 updateCharacterNumbers();
+                highlight('charactersList');
             }
 
             // 슬롯 프롬프트 복원 (첫 번째 슬롯에)
@@ -8743,13 +8853,22 @@
                         firstSlotTags.value = metadata.slot_prompt;
                         // 하이라이팅 오버레이 갱신을 위해 input 이벤트 트리거
                         firstSlotTags.dispatchEvent(new Event('input', { bubbles: true }));
+                        // 슬롯 강조
+                        firstSlotTags.classList.add('setting-highlight');
+                        setTimeout(() => firstSlotTags.classList.remove('setting-highlight'), 1500);
                     }
                 }
             }
 
             // 크기
-            if (metadata.width) document.getElementById('width').value = metadata.width;
-            if (metadata.height) document.getElementById('height').value = metadata.height;
+            if (metadata.width) {
+                document.getElementById('width').value = metadata.width;
+                highlight('width');
+            }
+            if (metadata.height) {
+                document.getElementById('height').value = metadata.height;
+                highlight('height');
+            }
             // 사이즈 프리셋 체크
             const sizeValue = `${metadata.width}x${metadata.height}`;
             const sizePreset = document.getElementById('sizePreset');
@@ -8757,28 +8876,62 @@
             sizePreset.value = matchingOption ? sizeValue : 'custom';
 
             // 생성 설정
-            if (metadata.steps) document.getElementById('steps').value = metadata.steps;
-            if (metadata.cfg) document.getElementById('cfg').value = metadata.cfg;
-            if (metadata.seed) document.getElementById('seed').value = metadata.seed;
-            if (metadata.sampler) document.getElementById('sampler').value = metadata.sampler;
-            if (metadata.scheduler) document.getElementById('scheduler').value = metadata.scheduler;
+            if (metadata.steps) {
+                document.getElementById('steps').value = metadata.steps;
+                highlight('steps');
+            }
+            if (metadata.cfg) {
+                document.getElementById('cfg').value = metadata.cfg;
+                highlight('cfg');
+            }
+            if (metadata.seed) {
+                document.getElementById('seed').value = metadata.seed;
+                highlight('seed');
+            }
+            if (metadata.sampler) {
+                document.getElementById('sampler').value = metadata.sampler;
+                highlight('sampler');
+            }
+            if (metadata.scheduler) {
+                document.getElementById('scheduler').value = metadata.scheduler;
+                highlight('scheduler');
+            }
 
             // NAI 설정
-            if (metadata.nai_model) document.getElementById('naiModel').value = metadata.nai_model;
-            if (metadata.smea) document.getElementById('smea').value = metadata.smea;
-            if (metadata.uc_preset) document.getElementById('ucPreset').value = metadata.uc_preset;
-            if (metadata.quality_tags !== undefined) document.getElementById('qualityTags').checked = metadata.quality_tags;
+            if (metadata.nai_model) {
+                document.getElementById('naiModel').value = metadata.nai_model;
+                highlight('naiModel');
+            }
+            if (metadata.smea) {
+                document.getElementById('smea').value = metadata.smea;
+                highlight('smea');
+            }
+            if (metadata.uc_preset) {
+                document.getElementById('ucPreset').value = metadata.uc_preset;
+                highlight('ucPreset');
+            }
+            if (metadata.quality_tags !== undefined) {
+                document.getElementById('qualityTags').checked = metadata.quality_tags;
+                highlight('qualityTags');
+            }
             if (metadata.cfg_rescale !== undefined) {
                 const cfgRescaleEl = document.getElementById('cfgRescale');
                 cfgRescaleEl.value = metadata.cfg_rescale;
                 document.getElementById('cfgRescaleValue').textContent = metadata.cfg_rescale;
                 updateSliderFill(cfgRescaleEl);
+                highlight('cfgRescale');
             }
-            if (metadata.variety_plus !== undefined) document.getElementById('varietyPlus').checked = metadata.variety_plus;
+            if (metadata.variety_plus !== undefined) {
+                document.getElementById('varietyPlus').checked = metadata.variety_plus;
+                highlight('varietyPlus');
+            }
             if (metadata.furry_mode !== undefined) setFurryMode(metadata.furry_mode);
 
             // Local 설정
-            if (metadata.model) document.getElementById('localModel').value = metadata.model;
+            if (metadata.model) {
+                document.getElementById('localModel').value = metadata.model;
+                highlight('localModel');
+            }
 
             // Provider 설정
             if (metadata.provider && metadata.provider !== currentProvider) {
@@ -8790,14 +8943,15 @@
             let vibesRestored = false;
             let vibeCount = 0;
             if (metadata.vibe_transfer && metadata.vibe_transfer.length > 0) {
-                // PeroPix 형식 바이브 (캐시에서 이름 매칭) - async 함수를 별도로 호출
+                // PeroPix 형식 바이브 - 기존 바이브 클리어 후 로드
                 vibeCount = metadata.vibe_transfer.length;
-                loadVibesFromMetadata(metadata.vibe_transfer).then(() => {
-                    // 바이브 로드 완료 후 추가 알림은 loadVibesFromMetadata 내부에서 처리됨
-                }).catch(err => {
+                vibeList = [];  // 기존 바이브 클리어
+                renderVibeList();  // 클리어 후 UI도 갱신
+                loadVibesFromMetadata(metadata.vibe_transfer).catch(err => {
                     console.error('[Vibe] 바이브 로드 실패:', err);
                 });
                 vibesRestored = true;
+                highlight('enableVibeTransfer');
             } else if (metadata.nai_vibes && metadata.nai_vibes.images && metadata.nai_vibes.images.length > 0) {
                 // NAI 원본 이미지의 바이브 복원 (인코딩 데이터만 있음)
                 const naiVibes = metadata.nai_vibes;
@@ -8835,6 +8989,16 @@
                 document.getElementById('enableCharRef').checked = false;
                 document.getElementById('charRefSettings').style.display = 'none';
                 vibesRestored = true;
+                highlight('enableVibeTransfer');
+            } else {
+                // 바이브 없는 이미지: 기존 바이브 클리어
+                if (vibeList.length > 0) {
+                    vibeList = [];
+                    renderVibeList();
+                    document.getElementById('enableVibeTransfer').checked = false;
+                    document.getElementById('vibeTransferSettings').style.display = 'none';
+                    updateAnlasCost();
+                }
             }
 
             autoSaveSettings();
@@ -8855,12 +9019,13 @@
 
             try {
                 let loadedCount = 0;
+                console.log('[Vibe] loadVibesFromMetadata:', vibeInfoList.length, 'items');
 
                 for (const vibeInfo of vibeInfoList) {
-                    // 기존 바이브에 같은 이름이 있으면 건너뛰기
-                    const exists = vibeList.some(v => v.name === vibeInfo.name);
-                    if (exists || vibeList.length >= 16) continue;
+                    // 최대 16개까지만
+                    if (vibeList.length >= 16) break;
 
+                    console.log('[Vibe] vibeInfo:', vibeInfo.name, 'has image:', !!vibeInfo.image);
                     // 메타데이터에 직접 저장된 바이브 데이터 사용
                     if (vibeInfo.image) {
                         vibeList.push({
@@ -9051,6 +9216,12 @@
         widthInput.onchange = checkCustomSize;
         heightInput.onchange = checkCustomSize;
         
+        // Hires.fix (Upscale) 활성화 토글
+        document.getElementById('enableUpscale').onchange = function() {
+            document.getElementById('upscaleSettings').style.display = this.checked ? 'block' : 'none';
+            saveAppSettings();
+        };
+
         // Upscale denoise slider value display
         document.getElementById('upscaleDenoise').oninput = function() {
             document.getElementById('upscaleDenoiseValue').textContent = this.value;
@@ -10234,7 +10405,7 @@
                 start--;
             }
 
-            // 커서 위치에서 앞으로 스캔하여 단어 끝점 찾기
+            // 커서 위치에서 앞으로 스캔하여 단어 끝점 찾기 (태그 삽입 시 교체 범위용)
             let end = cursorPos;
             while (end < value.length) {
                 const char = value[end];
@@ -10250,19 +10421,22 @@
                 end++;
             }
 
-            // 추출한 단어
-            const beforeTrim = value.substring(start, end);
-            const word = beforeTrim.trim();
+            // 검색용 단어: 커서 앞에 있는 부분만 (현재 입력 중인 부분)
+            const beforeCursor = value.substring(start, cursorPos);
+            const searchWord = beforeCursor.trim();
+
+            // 전체 단어: 교체 시 사용 (커서 앞뒤 모두)
+            const fullWord = value.substring(start, end).trim();
 
             // 공백 제거한 후 실제 단어의 위치 재계산
-            const leadingSpaces = beforeTrim.length - beforeTrim.trimStart().length;
-            const trailingSpaces = beforeTrim.length - beforeTrim.trimEnd().length;
+            const leadingSpaces = beforeCursor.length - beforeCursor.trimStart().length;
 
             return {
-                word,
-                rawWord: beforeTrim,  // trim 전 원본 (공백 포함)
+                word: searchWord,          // 검색용: 커서 앞 부분만
+                fullWord: fullWord,        // 전체 단어 (커서 앞뒤)
+                rawWord: beforeCursor,     // trim 전 원본 (공백 포함)
                 start: start + leadingSpaces,  // 공백 제외한 단어 시작
-                end: end - trailingSpaces,     // 공백 제외한 단어 끝
+                end: end,                      // 단어 끝 (교체 범위)
                 fullStart: start,              // 공백 포함한 시작
                 fullEnd: end,                  // 공백 포함한 끝
                 cursorPos
@@ -10488,7 +10662,7 @@
             dropdown.style.maxWidth = dropdownWidth + 'px';
         }
 
-        // Insert tag at cursor position
+        // Insert tag at cursor position (with undo support via execCommand)
         function insertTag(textarea, tagValue) {
             const { start, end, fullStart, fullEnd, word } = getCurrentWord(textarea);
             const value = textarea.value;
@@ -10526,12 +10700,21 @@
                 }
             }
 
-            // Replace: keep everything before fullStart, add leading spaces + tag + suffix, then everything after end
-            const before = value.substring(0, fullStart);
-            const after = value.substring(end);
-            const newValue = before + leadingSpaces + finalTag + suffix + after;
+            // Focus textarea and select the text to replace (for undo support)
+            textarea.focus();
+            textarea.setSelectionRange(fullStart, end);
 
-            textarea.value = newValue;
+            // Use execCommand for undo support (Ctrl+Z)
+            const insertText = leadingSpaces + finalTag + suffix;
+            const success = document.execCommand('insertText', false, insertText);
+
+            if (!success) {
+                // Fallback for browsers that don't support execCommand
+                const before = value.substring(0, fullStart);
+                const after = value.substring(end);
+                const newValue = before + insertText + after;
+                textarea.value = newValue;
+            }
 
             // Set cursor position after inserted tag and suffix
             const newCursorPos = fullStart + leadingSpaces.length + finalTag.length + suffix.length;
@@ -10539,7 +10722,6 @@
 
             // Trigger input event for autosave
             textarea.dispatchEvent(new Event('input', { bubbles: true }));
-            textarea.focus();
         }
 
         // Handle keyboard navigation in dropdown
@@ -10565,8 +10747,11 @@
                     const selectedItem = items[selectedIndex];
                     if (selectedItem) {
                         const tagValue = selectedItem.dataset.tagValue;
+                        // 엔터로 선택 시 잠시 autocomplete 억제
+                        window._suppressAutocomplete = true;
                         insertTag(dropdown._textarea, tagValue);
                         hideAutocomplete();
+                        setTimeout(() => { window._suppressAutocomplete = false; }, 100);
                     }
                     return true;
                 case 'Escape':
@@ -10610,7 +10795,12 @@
             textarea.addEventListener('input', (e) => {
                 console.log('[TagAutocomplete] Input event - enabled:', tagAutocompleteEnabled, 'loaded:', tagsLoaded);
                 if (!tagAutocompleteEnabled || !tagsLoaded) return;
-                
+
+                // 엔터로 태그 선택 직후 억제
+                if (window._suppressAutocomplete) {
+                    return;
+                }
+
                 // 포커스가 없거나 프로그래밍적 이벤트면 무시
                 if (document.activeElement !== textarea || !e.isTrusted) {
                     hideAutocomplete();
@@ -10734,7 +10924,7 @@
                 repeatCount: document.getElementById('repeatCount').value,
                 
                 // Slots & Preset
-                slots: getSlotList(),
+                slots: getAllSlotList(),
                 currentPreset: currentPreset,
                 
                 // NAI-specific (NAI일 때만 의미있음)
@@ -10869,11 +11059,11 @@
                 if (settings.repeatCount) document.getElementById('repeatCount').value = settings.repeatCount;
             }
             
-            // Slots - provider별로 분리됨
+            // Slots - provider별로 분리됨 (락 상태 포함)
             if (settings.slots && settings.slots.length > 0) {
                 slotsContainer.innerHTML = '';
                 settings.slots.forEach(slot => {
-                    addSlot(slot.name || '', slot.content || '');
+                    addSlot(slot.name || '', slot.content || '', slot.locked || false);
                 });
             } else if (isFullRestore) {
                 // 슬롯이 없으면 빈 상태로 (기본 슬롯 1개)
@@ -11123,11 +11313,11 @@
                     if (currentSettings.outputFolder !== undefined) setOutputFolder(currentSettings.outputFolder);
                     if (currentSettings.repeatCount) document.getElementById('repeatCount').value = currentSettings.repeatCount;
                     
-                    // Slots - provider별로 분리됨
+                    // Slots - provider별로 분리됨 (락 상태 포함)
                     if (currentSettings.slots && currentSettings.slots.length > 0) {
                         slotsContainer.innerHTML = '';
                         currentSettings.slots.forEach(slot => {
-                            addSlot(slot.name || '', slot.content || '');
+                            addSlot(slot.name || '', slot.content || '', slot.locked || false);
                         });
                     }
                     
@@ -11325,11 +11515,11 @@
                 if (naiSettings.outputFolder) setOutputFolder(naiSettings.outputFolder);
                 document.getElementById('repeatCount').value = naiSettings.repeatCount;
                 
-                // Slots
+                // Slots (락 상태 포함)
                 if (naiSettings.slots && naiSettings.slots.length > 0) {
                     slotsContainer.innerHTML = '';
                     naiSettings.slots.forEach(slot => {
-                        addSlot(slot.name || '', slot.content || '');
+                        addSlot(slot.name || '', slot.content || '', slot.locked || false);
                     });
                 }
                 

@@ -9035,13 +9035,11 @@
 
             try {
                 let loadedCount = 0;
-                console.log('[Vibe] loadVibesFromMetadata:', vibeInfoList.length, 'items');
 
                 for (const vibeInfo of vibeInfoList) {
                     // 최대 16개까지만
                     if (vibeList.length >= 16) break;
 
-                    console.log('[Vibe] vibeInfo:', vibeInfo.name, 'has image:', !!vibeInfo.image);
                     // 메타데이터에 직접 저장된 바이브 데이터 사용
                     if (vibeInfo.image) {
                         vibeList.push({

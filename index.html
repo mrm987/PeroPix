@@ -8802,6 +8802,10 @@
 
         // 메타데이터 설정 적용
         function applyMetadataSettings(metadata) {
+            // 스크롤 위치 저장 (적용 후 복원용)
+            const sidebarContent = document.querySelector('.sidebar-content');
+            const savedScrollTop = sidebarContent ? sidebarContent.scrollTop : 0;
+
             // 요소 강조 함수 (스크롤/펼치기 없음)
             function highlight(elementId) {
                 const el = document.getElementById(elementId);
@@ -8819,14 +8823,14 @@
                 basePrompt.value = metadata.prompt;
                 // 하이라이팅 업데이트를 위해 input 이벤트 트리거
                 basePrompt.dispatchEvent(new Event('input', { bubbles: true }));
-                highlight('basePrompt');
+                highlight('basePromptContent');
             }
             if (metadata.negative_prompt !== undefined) {
                 const negativePrompt = document.getElementById('negativePrompt');
                 negativePrompt.value = metadata.negative_prompt;
                 // 하이라이팅 업데이트를 위해 input 이벤트 트리거
                 negativePrompt.dispatchEvent(new Event('input', { bubbles: true }));
-                highlight('negativePrompt');
+                highlight('negativePromptContent');
             }
 
             // 캐릭터 프롬프트 적용
@@ -8848,14 +8852,15 @@
             if (metadata.slot_prompt) {
                 const slots = document.querySelectorAll('#slotsContainer .slot');
                 if (slots.length > 0) {
-                    const firstSlotTags = slots[0].querySelector('.slot-tags');
+                    const firstSlot = slots[0];
+                    const firstSlotTags = firstSlot.querySelector('.slot-tags');
                     if (firstSlotTags) {
                         firstSlotTags.value = metadata.slot_prompt;
                         // 하이라이팅 오버레이 갱신을 위해 input 이벤트 트리거
                         firstSlotTags.dispatchEvent(new Event('input', { bubbles: true }));
-                        // 슬롯 강조
-                        firstSlotTags.classList.add('setting-highlight');
-                        setTimeout(() => firstSlotTags.classList.remove('setting-highlight'), 1500);
+                        // 슬롯 전체 강조
+                        firstSlot.classList.add('setting-highlight');
+                        setTimeout(() => firstSlot.classList.remove('setting-highlight'), 1500);
                     }
                 }
             }
@@ -8951,7 +8956,9 @@
                     console.error('[Vibe] 바이브 로드 실패:', err);
                 });
                 vibesRestored = true;
-                highlight('enableVibeTransfer');
+                highlight('vibeTransferSettings');
+                // Vibe/CharRef 섹션 펼치기 (스크롤 없이)
+                expandAndScrollToSection('vibeCharRefContent', null, true);
             } else if (metadata.nai_vibes && metadata.nai_vibes.images && metadata.nai_vibes.images.length > 0) {
                 // NAI 원본 이미지의 바이브 복원 (인코딩 데이터만 있음)
                 const naiVibes = metadata.nai_vibes;
@@ -8989,7 +8996,9 @@
                 document.getElementById('enableCharRef').checked = false;
                 document.getElementById('charRefSettings').style.display = 'none';
                 vibesRestored = true;
-                highlight('enableVibeTransfer');
+                highlight('vibeTransferSettings');
+                // Vibe/CharRef 섹션 펼치기 (스크롤 없이)
+                expandAndScrollToSection('vibeCharRefContent', null, true);
             } else {
                 // 바이브 없는 이미지: 기존 바이브 클리어
                 if (vibeList.length > 0) {
@@ -9011,6 +9020,13 @@
             } else {
                 showToast('설정을 불러왔습니다', 'success');
             }
+
+            // 스크롤 위치 복원 (DOM 업데이트 후)
+            requestAnimationFrame(() => {
+                if (sidebarContent) {
+                    sidebarContent.scrollTop = savedScrollTop;
+                }
+            });
         }
 
         // 메타데이터에서 바이브 로드 (메타데이터에 직접 저장된 데이터 사용)
@@ -12803,7 +12819,8 @@
         };
 
         // 섹션 펼치고 스크롤하는 헬퍼 함수
-        function expandAndScrollToSection(collapsibleContentId, scrollTargetId = null) {
+        // noScroll=true 시 스크롤하지 않고 펼치기만 함
+        function expandAndScrollToSection(collapsibleContentId, scrollTargetId = null, noScroll = false) {
             const collapsibleContent = document.getElementById(collapsibleContentId);
 
             if (collapsibleContent) {
@@ -12817,6 +12834,9 @@
                         if (toggleBtn) toggleBtn.textContent = '▼';
                     }
                 }
+
+                // 스크롤 비활성화 요청 시 종료
+                if (noScroll) return;
 
                 // 스크롤 대상 결정 (지정된 타겟 또는 collapsible content의 부모 섹션)
                 const scrollTarget = scrollTargetId

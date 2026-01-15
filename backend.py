@@ -4486,6 +4486,161 @@ def apply_censor_boxes(image_path: str, boxes: list, method: str = "black",
         image[by:by2, bx:bx2] = blended
         return image
 
+    def generate_perlin_noise(width, height, seed, scale_factor=3):
+        """Perlin-like noise 생성"""
+        from scipy.ndimage import zoom
+        rng = np.random.default_rng(seed)
+        result = np.zeros((height, width), dtype=np.float32)
+        scale = max(width, height) / scale_factor
+
+        for octave in range(3):
+            freq = 2 ** octave
+            amp = 0.5 ** octave
+            grid_size = max(4, int(scale / freq))
+            grid_h = (height // grid_size) + 2
+            grid_w = (width // grid_size) + 2
+            noise_grid = rng.random((grid_h, grid_w)).astype(np.float32)
+            zoom_h = height / (grid_h - 1)
+            zoom_w = width / (grid_w - 1)
+            noise_full = zoom(noise_grid, (zoom_h, zoom_w), order=1)
+            noise_full = noise_full[:height, :width]
+            result += noise_full * amp
+
+        result = (result - result.min()) / (result.max() - result.min() + 1e-6)
+        return result
+
+    def apply_steam_effect(image, bx, by, bw, bh, rotation=0, expand_px=0, feather_px=0):
+        """스팀/구름 효과 적용 (타원형 + 노이즈 왜곡, 테두리 안전 마진 포함)"""
+        img_h, img_w = image.shape[:2]
+
+        # 사용자 확장 적용
+        bx = bx - expand_px
+        by = by - expand_px
+        bw = bw + expand_px * 2
+        bh = bh + expand_px * 2
+
+        # 페이드 영역을 위한 추가 확장 (35%)
+        fade_expand_x = int(bw * 0.35)
+        fade_expand_y = int(bh * 0.35)
+
+        # 시드 생성 (원본 위치 기반)
+        seed = (bx + expand_px) * 1000 + (by + expand_px)
+
+        # 구름 텍스처 생성 (페이드 영역 포함)
+        tw = bw + fade_expand_x * 2
+        th = bh + fade_expand_y * 2
+        if tw <= 0 or th <= 0:
+            return image
+
+        # 밝기 노이즈 생성 (범위를 좁혀서 박스 간 차이 줄임)
+        brightness_noise = generate_perlin_noise(tw, th, seed, scale_factor=2)
+        brightness_noise = 0.5 + brightness_noise * 0.5  # 0.5~1 범위로 압축
+        brightness = (230 + brightness_noise * 25).astype(np.uint8)  # 230~255 범위
+        cloud_layer = cv2.merge([brightness, brightness, brightness])
+
+        # 경계 왜곡용 노이즈
+        edge_noise1 = generate_perlin_noise(tw, th, seed + 12345, scale_factor=2)
+        edge_noise2 = generate_perlin_noise(tw, th, seed + 23456, scale_factor=4)
+        edge_noise3 = generate_perlin_noise(tw, th, seed + 34567, scale_factor=8)
+        edge_noise = edge_noise1 * 0.5 + edge_noise2 * 0.35 + edge_noise3 * 0.15
+        edge_noise = edge_noise - 0.5
+
+        # 타원 중심과 반경 (원본 박스 크기 기준)
+        cx, cy = tw / 2, th / 2
+        rx = bw / 2
+        ry = bh / 2
+
+        # 픽셀 좌표 그리드
+        yy, xx = np.mgrid[0:th, 0:tw]
+
+        # 타원 SDF
+        dx = (xx - cx) / rx
+        dy = (yy - cy) / ry
+        ellipse_dist = np.sqrt(dx * dx + dy * dy)
+
+        # 노이즈로 타원 경계 왜곡
+        warped_dist = ellipse_dist + edge_noise * 0.25
+
+        # 알파 맵 생성
+        alpha = np.zeros((th, tw), dtype=np.float32)
+        alpha[warped_dist < 0.6] = 1.0
+        edge_zone = (warped_dist >= 0.6) & (warped_dist < 1.15)
+        if np.any(edge_zone):
+            t = (warped_dist[edge_zone] - 0.6) / 0.55
+            smooth = t * t * (3 - 2 * t)
+            alpha[edge_zone] = np.clip(1.0 - smooth, 0, 1)
+
+        # 테두리 안전 마진 적용 (캔버스 가장자리는 완전 투명)
+        safe_margin = min(fade_expand_x, fade_expand_y) * 0.25
+        fade_end = safe_margin * 4
+
+        # 테두리로부터의 거리 계산
+        dist_left = xx
+        dist_right = tw - 1 - xx
+        dist_top = yy
+        dist_bottom = th - 1 - yy
+        dist_from_edge = np.minimum(np.minimum(dist_left, dist_right), np.minimum(dist_top, dist_bottom))
+
+        # 안전 마진 내부는 완전 투명
+        alpha[dist_from_edge < safe_margin] = 0
+
+        # 안전 마진 ~ 페이드 끝 구간은 점진적 페이드
+        fade_zone = (dist_from_edge >= safe_margin) & (dist_from_edge < fade_end)
+        if np.any(fade_zone):
+            edge_fade = (dist_from_edge[fade_zone] - safe_margin) / (fade_end - safe_margin)
+            alpha[fade_zone] = alpha[fade_zone] * np.clip(edge_fade, 0, 1)
+
+        # RGBA 구름 이미지 생성
+        cloud_rgba = np.zeros((th, tw, 4), dtype=np.uint8)
+        cloud_rgba[:, :, 0] = cloud_layer[:, :, 0]
+        cloud_rgba[:, :, 1] = cloud_layer[:, :, 1]
+        cloud_rgba[:, :, 2] = cloud_layer[:, :, 2]
+        cloud_rgba[:, :, 3] = (alpha * 255).astype(np.uint8)
+
+        # 회전이 있는 경우 회전 적용
+        if rotation != 0:
+            center = (tw / 2, th / 2)
+            rot_mat = cv2.getRotationMatrix2D(center, -np.degrees(rotation), 1.0)
+            cos_a = abs(rot_mat[0, 0])
+            sin_a = abs(rot_mat[0, 1])
+            new_w = int(th * sin_a + tw * cos_a)
+            new_h = int(th * cos_a + tw * sin_a)
+            rot_mat[0, 2] += (new_w - tw) / 2
+            rot_mat[1, 2] += (new_h - th) / 2
+            cloud_rgba = cv2.warpAffine(cloud_rgba, rot_mat, (new_w, new_h),
+                                        flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=(0,0,0,0))
+            th_rot, tw_rot = cloud_rgba.shape[:2]
+            paste_x = bx + bw // 2 - tw_rot // 2
+            paste_y = by + bh // 2 - th_rot // 2
+        else:
+            tw_rot, th_rot = tw, th
+            paste_x = bx - fade_expand_x
+            paste_y = by - fade_expand_y
+
+        # 이미지에 블렌딩
+        # 클리핑
+        src_x1 = max(0, -paste_x)
+        src_y1 = max(0, -paste_y)
+        src_x2 = min(tw_rot, img_w - paste_x)
+        src_y2 = min(th_rot, img_h - paste_y)
+        dst_x1 = max(0, paste_x)
+        dst_y1 = max(0, paste_y)
+        dst_x2 = dst_x1 + (src_x2 - src_x1)
+        dst_y2 = dst_y1 + (src_y2 - src_y1)
+
+        if src_x2 > src_x1 and src_y2 > src_y1:
+            cloud_crop = cloud_rgba[src_y1:src_y2, src_x1:src_x2]
+            roi = image[dst_y1:dst_y2, dst_x1:dst_x2]
+
+            alpha_crop = cloud_crop[:, :, 3:4].astype(np.float32) / 255.0
+            alpha_3ch = np.concatenate([alpha_crop, alpha_crop, alpha_crop], axis=2)
+
+            blended = (cloud_crop[:, :, :3].astype(np.float32) * alpha_3ch +
+                       roi.astype(np.float32) * (1 - alpha_3ch)).astype(np.uint8)
+            image[dst_y1:dst_y2, dst_x1:dst_x2] = blended
+
+        return image
+
     for i, box_info in enumerate(boxes):
         # 박스 데이터 검증
         box = box_info.get("box")
@@ -4569,6 +4724,9 @@ def apply_censor_boxes(image_path: str, boxes: list, method: str = "black",
                     roi_result = (blurred.astype(np.float32) * alpha_3ch +
                                  roi.astype(np.float32) * (1 - alpha_3ch)).astype(np.uint8)
                     image[by:by2, bx:bx2] = roi_result
+
+        elif box_method == "steam":
+            image = apply_steam_effect(image, x1, y1, x2 - x1, y2 - y1, rotation, expand_pixels, feather if use_feather else 0)
 
     # 저장
     if output_path:

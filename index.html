@@ -4894,6 +4894,7 @@
                             <div class="side-setting-row">
                                 <label>방식</label>
                                 <select id="censorMethod">
+                                    <option value="steam" selected>☁️ 스팀</option>
                                     <option value="black">검정</option>
                                     <option value="white">흰색</option>
                                     <option value="mosaic">모자이크</option>
@@ -4989,6 +4990,7 @@
                         <div class="censor-method-select">
                             <label>방식:</label>
                             <select id="editCensorMethod">
+                                <option value="steam" selected>☁️ 스팀</option>
                                 <option value="black">□ 검정</option>
                                 <option value="white">■ 흰색</option>
                                 <option value="mosaic">▦ 모자이크</option>
@@ -15158,9 +15160,14 @@
         // 검열 적용된 이미지 그리기 (검열중 탭용)
         function drawCensoredImage(img, displayW, displayH) {
             if (!img || !censorPreviewCtx) return;
-            
+
             const scale = censorState.displayScale;
             const method = document.getElementById('censorMethod')?.value || censorState.processingMethod;
+
+            // 스팀 텍스처 프리로드 (캐시에 없는 것만 생성)
+            if (method === 'steam' || censorState.editBoxes.some(b => b.method === 'steam')) {
+                preloadSteamTextures(censorState.editBoxes, scale);
+            }
             
             // 원본 이미지 먼저 그리기
             censorPreviewCtx.drawImage(img, 0, 0, displayW, displayH);
@@ -15212,12 +15219,15 @@
                 case 'blur':
                     applyBlurEffect(ctx, x, y, w, h);
                     break;
+                case 'steam':
+                    applySteamEffect(ctx, x, y, w, h, originalImg, origX, origY, origW, origH);
+                    break;
                 default:
                     ctx.fillStyle = '#000000';
                     ctx.fillRect(x, y, w, h);
             }
         }
-        
+
         // 모자이크 효과
         function applyMosaicEffect(ctx, x, y, w, h, originalImg, origX, origY, origW, origH) {
             const blockSize = Math.max(8, Math.min(w, h) / 8);
@@ -15256,13 +15266,248 @@
             ctx.fillRect(x, y, w, h);
         }
 
+        // 스팀/구름 효과를 위한 Simplex Noise 생성기
+        const SimplexNoise = (function() {
+            const F2 = 0.5 * (Math.sqrt(3) - 1);
+            const G2 = (3 - Math.sqrt(3)) / 6;
+            const grad3 = [
+                [1,1,0],[-1,1,0],[1,-1,0],[-1,-1,0],
+                [1,0,1],[-1,0,1],[1,0,-1],[-1,0,-1],
+                [0,1,1],[0,-1,1],[0,1,-1],[0,-1,-1]
+            ];
+            let perm = new Uint8Array(512);
+            let permMod12 = new Uint8Array(512);
+
+            function seed(s) {
+                const p = new Uint8Array(256);
+                for (let i = 0; i < 256; i++) p[i] = i;
+                for (let i = 255; i > 0; i--) {
+                    s = (s * 16807 + 1) % 2147483647;
+                    const j = s % (i + 1);
+                    [p[i], p[j]] = [p[j], p[i]];
+                }
+                for (let i = 0; i < 512; i++) {
+                    perm[i] = p[i & 255];
+                    permMod12[i] = perm[i] % 12;
+                }
+            }
+
+            function noise2D(x, y) {
+                const s = (x + y) * F2;
+                const i = Math.floor(x + s);
+                const j = Math.floor(y + s);
+                const t = (i + j) * G2;
+                const X0 = i - t;
+                const Y0 = j - t;
+                const x0 = x - X0;
+                const y0 = y - Y0;
+                let i1, j1;
+                if (x0 > y0) { i1 = 1; j1 = 0; }
+                else { i1 = 0; j1 = 1; }
+                const x1 = x0 - i1 + G2;
+                const y1 = y0 - j1 + G2;
+                const x2 = x0 - 1 + 2 * G2;
+                const y2 = y0 - 1 + 2 * G2;
+                const ii = i & 255;
+                const jj = j & 255;
+                let n0, n1, n2;
+                let t0 = 0.5 - x0 * x0 - y0 * y0;
+                if (t0 < 0) n0 = 0;
+                else {
+                    t0 *= t0;
+                    const gi0 = permMod12[ii + perm[jj]];
+                    n0 = t0 * t0 * (grad3[gi0][0] * x0 + grad3[gi0][1] * y0);
+                }
+                let t1 = 0.5 - x1 * x1 - y1 * y1;
+                if (t1 < 0) n1 = 0;
+                else {
+                    t1 *= t1;
+                    const gi1 = permMod12[ii + i1 + perm[jj + j1]];
+                    n1 = t1 * t1 * (grad3[gi1][0] * x1 + grad3[gi1][1] * y1);
+                }
+                let t2 = 0.5 - x2 * x2 - y2 * y2;
+                if (t2 < 0) n2 = 0;
+                else {
+                    t2 *= t2;
+                    const gi2 = permMod12[ii + 1 + perm[jj + 1]];
+                    n2 = t2 * t2 * (grad3[gi2][0] * x2 + grad3[gi2][1] * y2);
+                }
+                return 70 * (n0 + n1 + n2);
+            }
+
+            seed(Date.now());
+            return { seed, noise2D };
+        })();
+
+        // 스팀 텍스처 캐시 (박스별로 미리 렌더링)
+        const steamTextureCache = new Map();
+
+        // 스팀 텍스처 생성 (캐시 키 기반)
+        function generateSteamTexture(w, h, seed) {
+            const expandRatio = 0.35;
+            const expandX = w * expandRatio;
+            const expandY = h * expandRatio;
+
+            const tw = Math.max(1, Math.ceil(w + expandX * 2));
+            const th = Math.max(1, Math.ceil(h + expandY * 2));
+
+            const cloudCanvas = document.createElement('canvas');
+            cloudCanvas.width = tw;
+            cloudCanvas.height = th;
+            const cloudCtx = cloudCanvas.getContext('2d');
+            const imageData = cloudCtx.createImageData(tw, th);
+            const data = imageData.data;
+
+            SimplexNoise.seed(seed);
+            const noiseScale = Math.max(tw, th) / 2;
+
+            const rx = w / 2;
+            const ry = h / 2;
+            const cx = tw / 2;
+            const cy = th / 2;
+            const safeMargin = Math.min(expandX, expandY) * 0.25;
+
+            for (let py = 0; py < th; py++) {
+                for (let px = 0; px < tw; px++) {
+                    const distFromEdge = Math.min(px, py, tw - 1 - px, th - 1 - py);
+
+                    if (distFromEdge < safeMargin) {
+                        const idx = (py * tw + px) * 4;
+                        data[idx] = 255;
+                        data[idx + 1] = 255;
+                        data[idx + 2] = 255;
+                        data[idx + 3] = 0;
+                        continue;
+                    }
+
+                    // 밝기 노이즈 (범위를 좁혀서 박스 간 차이 줄임)
+                    let brightNoise = 0;
+                    brightNoise += SimplexNoise.noise2D(px / noiseScale, py / noiseScale) * 1.0;
+                    brightNoise += SimplexNoise.noise2D(px / noiseScale * 2, py / noiseScale * 2) * 0.5;
+                    brightNoise += SimplexNoise.noise2D(px / noiseScale * 4, py / noiseScale * 4) * 0.25;
+                    brightNoise = (brightNoise / 1.75 + 1) / 2;  // 0~1 범위
+                    brightNoise = 0.5 + brightNoise * 0.5;  // 0.5~1 범위로 압축 (더 밝고 균일하게)
+
+                    const dx = (px - cx) / rx;
+                    const dy = (py - cy) / ry;
+                    const ellipseDist = Math.sqrt(dx * dx + dy * dy);
+
+                    let edgeNoise = 0;
+                    edgeNoise += SimplexNoise.noise2D(px / (noiseScale * 0.5) + 50, py / (noiseScale * 0.5) + 50) * 0.5;
+                    edgeNoise += SimplexNoise.noise2D(px / (noiseScale * 0.25) + 150, py / (noiseScale * 0.25) + 150) * 0.35;
+                    edgeNoise += SimplexNoise.noise2D(px / (noiseScale * 0.12) + 250, py / (noiseScale * 0.12) + 250) * 0.15;
+
+                    const warpedDist = ellipseDist + edgeNoise * 0.25;
+
+                    let alpha;
+                    if (warpedDist < 0.6) {
+                        alpha = 255;
+                    } else if (warpedDist < 1.15) {
+                        const t = (warpedDist - 0.6) / 0.55;
+                        const smooth = t * t * (3 - 2 * t);
+                        alpha = Math.floor((1 - smooth) * 255);
+                    } else {
+                        alpha = 0;
+                    }
+
+                    const fadeStart = safeMargin;
+                    const fadeEnd = safeMargin * 4;
+                    if (distFromEdge < fadeEnd) {
+                        const edgeFade = (distFromEdge - fadeStart) / (fadeEnd - fadeStart);
+                        alpha = Math.floor(alpha * Math.max(0, Math.min(1, edgeFade)));
+                    }
+
+                    const idx = (py * tw + px) * 4;
+                    const brightness = Math.floor(230 + brightNoise * 25);  // 230~255 범위
+                    data[idx] = brightness;
+                    data[idx + 1] = brightness;
+                    data[idx + 2] = brightness;
+                    data[idx + 3] = alpha;
+                }
+            }
+
+            cloudCtx.putImageData(imageData, 0, 0);
+            return { canvas: cloudCanvas, expandX, expandY, tw, th };
+        }
+
+        // 스팀 캐시 키 생성 (확장/부드럽게 값 포함)
+        function getSteamCacheKey(w, h, seed) {
+            const expand = censorState.expandPixels || 0;
+            const feather = censorState.feather || 0;
+            return `${Math.round(w)}_${Math.round(h)}_${seed}_e${expand}_f${feather}`;
+        }
+
+        // 스팀 텍스처 캐시 프리로드 (박스 목록 기반, cleanupOld: 오래된 캐시 정리 여부)
+        function preloadSteamTextures(boxes, scale, cleanupOld = false) {
+            const currentKeys = new Set();
+
+            boxes.forEach(det => {
+                if ((det.method || 'black') !== 'steam') return;
+
+                const [x1, y1, x2, y2] = det.box;
+                const w = (x2 - x1) * scale;
+                const h = (y2 - y1) * scale;
+                const seed = Math.floor(x1 * 1000 + y1);
+                const key = getSteamCacheKey(w, h, seed);
+
+                currentKeys.add(key);
+
+                if (!steamTextureCache.has(key)) {
+                    steamTextureCache.set(key, generateSteamTexture(w, h, seed));
+                }
+            });
+
+            // 옵션: 더 이상 필요없는 캐시 제거
+            if (cleanupOld) {
+                for (const key of steamTextureCache.keys()) {
+                    if (!currentKeys.has(key)) {
+                        steamTextureCache.delete(key);
+                    }
+                }
+            }
+
+            // 캐시가 너무 커지면 오래된 것부터 제거 (최대 100개)
+            if (steamTextureCache.size > 100) {
+                const keysToDelete = [...steamTextureCache.keys()].slice(0, steamTextureCache.size - 100);
+                keysToDelete.forEach(k => steamTextureCache.delete(k));
+            }
+        }
+
+        // 스팀/구름 효과 적용 (캐시 사용)
+        function applySteamEffect(ctx, x, y, w, h, originalImg, origX, origY, origW, origH) {
+            const seed = Math.floor(origX * 1000 + origY);
+            const key = getSteamCacheKey(w, h, seed);
+
+            let texture = steamTextureCache.get(key);
+            if (!texture) {
+                texture = generateSteamTexture(w, h, seed);
+                steamTextureCache.set(key, texture);
+            }
+
+            ctx.drawImage(texture.canvas, x - texture.expandX, y - texture.expandY, texture.tw, texture.th);
+        }
+
         // === 하이브리드 프리뷰: 확장/그라데이션 적용 시 백엔드 API로 정확한 프리뷰 ===
         let censorPreviewDebounceTimer = null;
         let censorPreviewRequestId = 0;
-        let cachedApiPreviewImage = null;  // API 프리뷰 결과 캐시
-        let cachedApiPreviewKey = null;    // 캐시 키 (박스+설정 해시)
+        let cachedApiPreviewImage = null;  // 현재 이미지용 캐시 (호환성)
+        let cachedApiPreviewKey = null;    // 현재 캐시 키
 
-        // 캐시 키 생성 (박스, 확장, 그라데이션, 메서드 기반)
+        // 이미지별 검열 프리뷰 캐시 (Map: imageKey -> { image, settingsKey })
+        const censoredPreviewCache = new Map();
+        const MAX_CENSORED_CACHE_SIZE = 50;
+
+        // 설정 키 생성 (박스, 확장, 그라데이션, 메서드)
+        function getCensorSettingsKey(boxes, method) {
+            return JSON.stringify({
+                boxes: boxes.map(b => ({ box: b.box, method: b.method, rotation: b.rotation })),
+                expand: censorState.expandPixels,
+                feather: censorState.feather,
+                method: method
+            });
+        }
+
+        // 캐시 키 생성 (박스, 확장, 그라데이션, 메서드 기반) - 호환성 유지
         function getPreviewCacheKey() {
             const methodSelector = 'censorMethod';
             const method = document.getElementById(methodSelector)?.value || 'black';
@@ -15297,6 +15542,30 @@
             return false;
         }
 
+        // 이미지별 캐시에서 검열 프리뷰 가져오기
+        function getCachedCensoredPreview(imageKey, boxes, method) {
+            const cached = censoredPreviewCache.get(imageKey);
+            if (!cached) return null;
+
+            const settingsKey = getCensorSettingsKey(boxes, method);
+            if (cached.settingsKey === settingsKey) {
+                return cached.image;
+            }
+            return null;
+        }
+
+        // 이미지별 캐시에 검열 프리뷰 저장
+        function setCachedCensoredPreview(imageKey, boxes, method, image) {
+            const settingsKey = getCensorSettingsKey(boxes, method);
+            censoredPreviewCache.set(imageKey, { image, settingsKey });
+
+            // 캐시 크기 제한
+            if (censoredPreviewCache.size > MAX_CENSORED_CACHE_SIZE) {
+                const firstKey = censoredPreviewCache.keys().next().value;
+                censoredPreviewCache.delete(firstKey);
+            }
+        }
+
         async function updateCensorPreviewFromAPI() {
             if (!censorState.currentImage) return;
             if (censorState.editBoxes.length === 0) {
@@ -15310,10 +15579,24 @@
             }
 
             const requestId = ++censorPreviewRequestId;
+            const imageKey = censorState.currentImage?.id || censorState.currentImage?.path;
             const requestImagePath = censorState.currentImage.path;  // 요청 시점의 이미지 경로 저장
             // 탭에 따라 올바른 method selector 사용
             const methodSelector = 'censorMethod';
             const method = document.getElementById(methodSelector)?.value || censorState.processingMethod;
+
+            // 이미지별 캐시 확인
+            const cachedImg = getCachedCensoredPreview(imageKey, censorState.editBoxes, method);
+            if (cachedImg) {
+                const displayW = censorPreviewCanvas.width;
+                const displayH = censorPreviewCanvas.height;
+                censorPreviewCtx.drawImage(cachedImg, 0, 0, displayW, displayH);
+                drawProcessingOverlay();
+                // 현재 이미지 캐시도 업데이트
+                cachedApiPreviewImage = cachedImg;
+                cachedApiPreviewKey = getPreviewCacheKey();
+                return;
+            }
 
             try {
                 const requestBody = {
@@ -15373,9 +15656,12 @@
                         if (requestId !== censorPreviewRequestId) return;
                         if (censorState.currentImage?.path !== requestImagePath) return;
 
-                        // 캐시에 저장
+                        // 현재 이미지 캐시에 저장
                         cachedApiPreviewImage = img;
                         cachedApiPreviewKey = getPreviewCacheKey();
+
+                        // 이미지별 캐시에도 저장
+                        setCachedCensoredPreview(imageKey, censorState.editBoxes, method, img);
 
                         const displayW = censorPreviewCanvas.width;
                         const displayH = censorPreviewCanvas.height;
@@ -16003,7 +16289,106 @@
             censorState.currentImage = null;
             censorState.editBoxes = [];
 
+            // 스팀 방식일 때 모든 이미지의 텍스처를 미리 캐싱 (비동기)
+            if (method === 'steam') {
+                setTimeout(() => {
+                    precacheAllSteamTextures();
+                }, 100);
+            }
+
+            // 확장/부드럽게가 설정되어 있으면 모든 이미지 검열 프리뷰를 미리 캐싱
+            setTimeout(() => {
+                precacheAllCensoredPreviews(method);
+            }, 200);
+
             switchCensorTab('processing');
+        }
+
+        // 모든 이미지의 스팀 텍스처를 미리 캐싱
+        function precacheAllSteamTextures() {
+            const canvasW = censorPreviewCanvas?.width || 800;
+            const canvasH = censorPreviewCanvas?.height || 600;
+
+            for (const imageKey of censorState.processingImages) {
+                const result = censorState.processingResults[imageKey];
+                if (!result?.editBoxes || result.editBoxes.length === 0) continue;
+
+                const imgInfo = result.imgInfo;
+                if (!imgInfo?.width || !imgInfo?.height) continue;
+
+                const scale = Math.min(canvasW / imgInfo.width, canvasH / imgInfo.height);
+                preloadSteamTextures(result.editBoxes, scale);
+            }
+            console.log(`Steam textures precached: ${steamTextureCache.size} entries`);
+        }
+
+        // 모든 이미지의 검열 프리뷰를 백그라운드에서 미리 캐싱 (확장/부드럽게 적용)
+        async function precacheAllCensoredPreviews(method) {
+            const expand = censorState.expandPixels || 0;
+            const feather = censorState.feather || 0;
+
+            // 확장/부드럽게가 없으면 캐싱 불필요 (프론트엔드에서 직접 렌더링)
+            if (expand === 0 && feather === 0) {
+                console.log('No expand/feather, skipping precache');
+                return;
+            }
+
+            console.log(`Precaching censored previews for ${censorState.processingImages.length} images...`);
+
+            for (const imageKey of censorState.processingImages) {
+                const result = censorState.processingResults[imageKey];
+                if (!result?.editBoxes || result.editBoxes.length === 0) continue;
+
+                // 이미 캐시되어 있으면 스킵
+                const cached = getCachedCensoredPreview(imageKey, result.editBoxes, method);
+                if (cached) continue;
+
+                const imgInfo = result.imgInfo;
+                if (!imgInfo) continue;
+
+                try {
+                    const requestBody = {
+                        boxes: result.editBoxes.map(box => ({
+                            box: box.box,
+                            method: box.method || method,
+                            rotation: box.rotation || 0
+                        })),
+                        method: method,
+                        expand_pixels: expand,
+                        feather: feather
+                    };
+
+                    // 이미지 소스 설정
+                    if (imgInfo.isDropped) {
+                        if (imgInfo.absolutePath) {
+                            requestBody.absolute_path = imgInfo.absolutePath;
+                        } else if (imgInfo.base64) {
+                            requestBody.image_base64 = imgInfo.base64;
+                        }
+                    } else {
+                        requestBody.image_path = imgInfo.path;
+                    }
+
+                    const response = await fetch(`${API_BASE}/api/censor/apply`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(requestBody)
+                    });
+
+                    const apiResult = await response.json();
+                    if (apiResult.success && apiResult.image) {
+                        // 이미지 로드 후 캐시에 저장
+                        const img = new Image();
+                        img.onload = () => {
+                            setCachedCensoredPreview(imageKey, result.editBoxes, method, img);
+                        };
+                        img.src = `data:image/png;base64,${apiResult.image}`;
+                    }
+                } catch (err) {
+                    console.error('Precache failed for:', imageKey, err);
+                }
+            }
+            console.log(`Censored previews precached: ${censoredPreviewCache.size} entries`);
         }
         
         // 검열중 모드에서 이미지 선택
@@ -16098,6 +16483,9 @@
                     isDropped: imgInfo?.isDropped
                 };
 
+                // 원본 이미지 객체 저장 (재렌더링용)
+                censorState.originalImageObj = imgObj;
+
                 // 저장된 결과에서 editBoxes 로드
                 const procResult = censorState.processingResults[imageKey];
                 if (procResult) {
@@ -16113,7 +16501,40 @@
                 }
                 censorState.selectedBoxIndex = -1;
 
-                drawCensorPreview();
+                const method = document.getElementById('censorMethod')?.value || censorState.processingMethod;
+                const canvasW = censorPreviewCanvas.width;
+                const canvasH = censorPreviewCanvas.height;
+
+                // 스팀 텍스처 프리로드 (현재 이미지 + 다음 이미지)
+                if (method === 'steam' || censorState.editBoxes.some(b => b.method === 'steam')) {
+                    const scale = Math.min(canvasW / width, canvasH / height);
+                    preloadSteamTextures(censorState.editBoxes, scale);
+
+                    // 다음 이미지도 미리 프리로드
+                    if (index + 1 < imageKeys.length) {
+                        const nextKey = imageKeys[index + 1];
+                        const nextResult = censorState.processingResults[nextKey];
+                        if (nextResult?.editBoxes) {
+                            const nextImgInfo = nextResult.imgInfo;
+                            if (nextImgInfo) {
+                                const nextScale = Math.min(canvasW / nextImgInfo.width, canvasH / nextImgInfo.height);
+                                preloadSteamTextures(nextResult.editBoxes, nextScale);
+                            }
+                        }
+                    }
+                }
+
+                // 이미지별 검열 프리뷰 캐시 확인 (확장/부드럽게 적용된 이미지)
+                const cachedImg = getCachedCensoredPreview(imageKey, censorState.editBoxes, method);
+                if (cachedImg) {
+                    // 캐시된 이미지를 바로 그리기
+                    cachedApiPreviewImage = cachedImg;
+                    cachedApiPreviewKey = getPreviewCacheKey();
+                    censorPreviewCtx.drawImage(cachedImg, 0, 0, canvasW, canvasH);
+                    drawProcessingOverlay();
+                } else {
+                    drawCensorPreview();
+                }
             } catch (err) {
                 console.error('Failed to load image:', err);
             }

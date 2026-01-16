@@ -1437,7 +1437,14 @@ async def call_nai_api(req: GenerateRequest):
             with zipfile.ZipFile(zip_buffer, 'r') as zf:
                 image_name = zf.namelist()[0]
                 image_data = zf.read(image_name)
-                return Image.open(io.BytesIO(image_data)), int(seed)
+                image = Image.open(io.BytesIO(image_data))
+
+                # LUT 적용 (NAI에서도 동작하도록)
+                print(f"[NAI] LUT check: enable_lut={req.enable_lut}, lut_file='{req.lut_file}'")
+                if req.enable_lut and req.lut_file:
+                    image = apply_lut(image, req.lut_file, req.lut_intensity)
+
+                return image, int(seed)
         except zipfile.BadZipFile:
             # ZIP이 아닌 응답 (에러 메시지일 수 있음)
             content_preview = response.content[:500].decode('utf-8', errors='replace')
@@ -1692,6 +1699,7 @@ def apply_lut(image: Image.Image, lut_file: str, intensity: float = 1.0) -> Imag
     Returns:
         LUT이 적용된 PIL Image
     """
+    print(f"[LUT] apply_lut called: file={lut_file}, intensity={intensity}")
     lut_path = LUTS_DIR / lut_file
     if not lut_path.exists():
         logger.warning(f"[LUT] File not found: {lut_path}")
@@ -1699,6 +1707,7 @@ def apply_lut(image: Image.Image, lut_file: str, intensity: float = 1.0) -> Imag
 
     try:
         lut_3d, size = parse_cube_lut(lut_path)
+        print(f"[LUT] Parsed LUT: size={size}")
     except Exception as e:
         logger.error(f"[LUT] Failed to parse LUT file: {e}")
         return image
@@ -1766,6 +1775,7 @@ def apply_lut(image: Image.Image, lut_file: str, intensity: float = 1.0) -> Imag
     result = np.clip(result, 0, 1)
     result = (result * 255).astype(np.uint8)
 
+    print(f"[LUT] Applied successfully, output shape={result.shape}")
     return Image.fromarray(result)
 
 

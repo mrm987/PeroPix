@@ -4453,8 +4453,8 @@
                     </div>
                 </div>
 
-                <!-- LUT (Color Grading) - Local Only -->
-                <div class="section local-only" id="lutSection">
+                <!-- LUT (Color Grading) -->
+                <div class="section" id="lutSection">
                     <div class="section-title">
                         <button type="button" class="collapse-toggle" data-target="lutContent" title="접기/펼치기">▼</button>
                         <span>LUT</span>
@@ -7632,16 +7632,17 @@
                     }
                 }
 
-                // LUT settings
-                request.enable_lut = document.getElementById('enableLut').checked;
-                if (request.enable_lut) {
-                    request.lut_file = document.getElementById('lutFile').value;
-                    request.lut_intensity = parseFloat(document.getElementById('lutIntensity').value);
+            }
 
-                    if (!request.lut_file) {
-                        showToast('LUT 파일을 선택하세요', 'error');
-                        return;
-                    }
+            // LUT settings (NAI와 Local 모두 지원)
+            request.enable_lut = document.getElementById('enableLut').checked;
+            if (request.enable_lut) {
+                request.lut_file = document.getElementById('lutFile').value;
+                request.lut_intensity = parseFloat(document.getElementById('lutIntensity').value);
+
+                if (!request.lut_file) {
+                    showToast('LUT 파일을 선택하세요', 'error');
+                    return;
                 }
             }
 

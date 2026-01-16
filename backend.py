@@ -3683,6 +3683,7 @@ import tarfile
 import shutil
 import platform
 import urllib.request
+import ssl
 
 # 설치 상태 추적 (런타임)
 install_status = {
@@ -3862,7 +3863,11 @@ def download_file(url: str, dest: Path, progress_callback=None):
     """파일 다운로드 with 진행률"""
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=60) as response:
+        # SSL 인증서 검증 문제 우회 (회사 방화벽/프록시 환경 대응)
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        with urllib.request.urlopen(req, timeout=60, context=ssl_context) as response:
             total_size = int(response.headers.get('content-length', 0))
             downloaded = 0
             chunk_size = 1024 * 1024  # 1MB

@@ -13887,7 +13887,10 @@
                 base_image: imageBase64,
                 base_mode: 'img2img',
                 base_strength: preset.strength,
-                base_noise: preset.noise
+                base_noise: preset.noise,
+                // 저장 옵션 추가
+                save_format: document.getElementById('saveFormat').value || 'png',
+                jpg_quality: parseInt(document.getElementById('jpgQuality')?.value) || 95
             };
 
             closeEnhanceModal();
@@ -16359,7 +16362,14 @@
                 censorState.processingResults = {};
                 return;
             }
-            
+
+            if (detectedCount === 0) {
+                showToast('검열 대상이 감지되지 않았습니다', 'info');
+                censorState.processingMode = false;
+                censorState.processingResults = {};
+                return;
+            }
+
             showToast(`스캔 완료: ${detectedCount}/${scannedCount} 이미지에서 감지`, 'success');
 
             // 이벤트가 초기화되지 않았으면 초기화

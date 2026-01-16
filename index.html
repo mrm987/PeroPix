@@ -16625,10 +16625,36 @@
                 // 이미지별 검열 프리뷰 캐시 확인 (확장/부드럽게 적용된 이미지)
                 const cachedImg = getCachedCensoredPreview(imageKey, censorState.editBoxes, method);
                 if (cachedImg) {
+                    // 캔버스 크기와 오프셋 계산 (drawCensorPreview와 동일하게)
+                    const previewArea = document.querySelector('.censor-preview-area');
+                    const areaW = previewArea.clientWidth;
+                    const areaH = previewArea.clientHeight;
+                    const maxW = areaW - 80;
+                    const maxH = areaH - 80;
+
+                    const scale = Math.min(maxW / width, maxH / height, 1);
+                    const displayW = Math.round(width * scale);
+                    const displayH = Math.round(height * scale);
+
+                    // 캔버스 크기 설정
+                    censorPreviewCanvas.width = displayW;
+                    censorPreviewCanvas.height = displayH;
+                    censorPreviewCanvas.style.width = displayW + 'px';
+                    censorPreviewCanvas.style.height = displayH + 'px';
+
+                    // 오버레이 캔버스 설정
+                    censorOverlayCanvas.width = areaW;
+                    censorOverlayCanvas.height = areaH;
+
+                    // 오프셋과 스케일 저장 (핸들 위치 계산용)
+                    censorState.overlayOffsetX = (areaW - displayW) / 2;
+                    censorState.overlayOffsetY = (areaH - displayH) / 2;
+                    censorState.displayScale = scale;
+
                     // 캐시된 이미지를 바로 그리기
                     cachedApiPreviewImage = cachedImg;
                     cachedApiPreviewKey = getPreviewCacheKey();
-                    censorPreviewCtx.drawImage(cachedImg, 0, 0, canvasW, canvasH);
+                    censorPreviewCtx.drawImage(cachedImg, 0, 0, displayW, displayH);
                     drawProcessingOverlay();
                 } else {
                     drawCensorPreview();

@@ -4674,9 +4674,31 @@ def apply_censor_boxes(image_path: str, boxes: list, method: str = "black",
         image[by:by2, bx:bx2] = blended
         return image
 
+    def bilinear_zoom(arr, zoom_factors):
+        """scipy.ndimage.zoom(order=1) 대체 - numpy만 사용"""
+        in_h, in_w = arr.shape
+        out_h = int(round(in_h * zoom_factors[0]))
+        out_w = int(round(in_w * zoom_factors[1]))
+
+        # scipy zoom과 동일한 좌표 매핑: [0, out-1] -> [0, in-1]
+        y_in = np.linspace(0, in_h - 1, out_h, dtype=np.float64) if out_h > 1 else np.array([0.0])
+        x_in = np.linspace(0, in_w - 1, out_w, dtype=np.float64) if out_w > 1 else np.array([0.0])
+
+        y0 = np.floor(y_in).astype(np.int32)
+        x0 = np.floor(x_in).astype(np.int32)
+        y1 = np.minimum(y0 + 1, in_h - 1)
+        x1 = np.minimum(x0 + 1, in_w - 1)
+
+        fy = (y_in - y0).astype(np.float32).reshape(-1, 1)
+        fx = (x_in - x0).astype(np.float32).reshape(1, -1)
+
+        return (arr[y0][:, x0] * (1 - fy) * (1 - fx) +
+                arr[y1][:, x0] * fy * (1 - fx) +
+                arr[y0][:, x1] * (1 - fy) * fx +
+                arr[y1][:, x1] * fy * fx).astype(np.float32)
+
     def generate_perlin_noise(width, height, seed, scale_factor=3):
         """Perlin-like noise 생성"""
-        from scipy.ndimage import zoom
         rng = np.random.default_rng(seed)
         result = np.zeros((height, width), dtype=np.float32)
         scale = max(width, height) / scale_factor
@@ -4690,7 +4712,7 @@ def apply_censor_boxes(image_path: str, boxes: list, method: str = "black",
             noise_grid = rng.random((grid_h, grid_w)).astype(np.float32)
             zoom_h = height / (grid_h - 1)
             zoom_w = width / (grid_w - 1)
-            noise_full = zoom(noise_grid, (zoom_h, zoom_w), order=1)
+            noise_full = bilinear_zoom(noise_grid, (zoom_h, zoom_w))
             noise_full = noise_full[:height, :width]
             result += noise_full * amp
 

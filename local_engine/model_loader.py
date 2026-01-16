@@ -23,6 +23,20 @@ def _configure_pytorch_backends():
     if not torch.cuda.is_available():
         return
 
+    # 결정론적 알고리즘 사용 (재현 가능한 결과를 위해)
+    # 주의: 약간의 성능 저하가 있을 수 있음
+    import os
+    if os.environ.get("PEROPIX_DETERMINISTIC", "0") == "1":
+        torch.use_deterministic_algorithms(True, warn_only=True)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        logging.info("Deterministic mode enabled (PEROPIX_DETERMINISTIC=1)")
+    else:
+        # cuDNN 자동 튜닝 활성화 (동일 입력 크기에서 최적 알고리즘 캐싱)
+        if torch.backends.cudnn.is_available():
+            torch.backends.cudnn.benchmark = True
+            logging.info("cuDNN benchmark mode enabled")
+
     # SDPA (Scaled Dot Product Attention) 백엔드 활성화
     try:
         torch.backends.cuda.enable_math_sdp(True)
@@ -33,24 +47,27 @@ def _configure_pytorch_backends():
         # PyTorch 버전이 낮으면 해당 함수가 없을 수 있음
         pass
 
-    # cuDNN 자동 튜닝 활성화 (동일 입력 크기에서 최적 알고리즘 캐싱)
-    if torch.backends.cudnn.is_available():
-        torch.backends.cudnn.benchmark = True
-        logging.info("cuDNN benchmark mode enabled")
-
-    # FP16 matmul 최적화 (RTX 30/40 시리즈에서 효과적)
+    # Float32 matmul precision - 'highest'로 설정 (ComfyUI 기본값)
+    # 'medium'/'high'는 TF32 사용하여 정밀도 손실 발생 가능
     try:
-        torch.backends.cuda.matmul.allow_fp16_accumulation = True
-        logging.info("FP16 matmul accumulation enabled")
-    except AttributeError:
-        pass
+        torch.set_float32_matmul_precision('highest')
+        logging.info("Float32 matmul precision: highest (quality priority)")
+    except Exception as e:
+        logging.warning(f"Could not set float32 matmul precision: {e}")
 
-    # FP16/BF16 reduction 최적화
-    try:
-        torch.backends.cuda.allow_fp16_bf16_reduction_math_sdp(True)
-        logging.info("FP16/BF16 reduction for SDPA enabled")
-    except AttributeError:
-        pass
+    # FP16 matmul accumulation - PyTorch 2.1+에서 지원
+    if hasattr(torch.backends.cuda, 'matmul') and hasattr(torch.backends.cuda.matmul, 'allow_fp16_accumulation'):
+        torch.backends.cuda.matmul.allow_fp16_accumulation = False
+        logging.info("FP16 matmul accumulation: disabled")
+
+    # FP16/BF16 reduction for SDPA - PyTorch 2.5+에서 지원
+    # ComfyUI는 이것을 True로 설정하지만, 품질 우선이면 False가 나을 수 있음
+    if hasattr(torch.backends.cuda, 'allow_fp16_bf16_reduction_math_sdp'):
+        try:
+            torch.backends.cuda.allow_fp16_bf16_reduction_math_sdp(False)
+            logging.info("FP16/BF16 SDPA reduction: disabled (quality priority)")
+        except Exception:
+            pass
 
 
 # 모듈 로드 시 백엔드 설정 적용
@@ -347,7 +364,7 @@ class SDXLModelLoader:
         if clip_g_sd:
             logging.info(f"CLIP-G sample keys: {list(clip_g_sd.keys())[:3]}")
 
-        clip = SDXLClipModel(device="cpu", dtype=self.dtype)
+        clip = SDXLClipModel(device="cpu", dtype=torch.float32)  # fp32로 CLIP 유지
 
         if clip_l_sd:
             missing, unexpected = clip.load_clip_l(clip_l_sd)
@@ -373,34 +390,51 @@ class SDXLModelLoader:
         # 체크포인트를 1번만 로드하여 메모리 절약
         sd = self.load_checkpoint(path)
 
-        # UNet 로드
+        # UNet 로드 (ComfyUI 방식: bfloat16 사용 가능하면 bfloat16)
+        # bfloat16은 float16보다 수치 범위가 넓어 안정적
         unet_sd = extract_unet_state_dict(sd)
         logging.info(f"UNet extracted keys: {len(unet_sd)}")
-        unet = UNetModel(**SDXL_UNET_CONFIG.copy(), dtype=self.dtype, device="cpu")
+        # bfloat16 지원 여부에 따라 dtype 결정
+        import os
+        force_fp16 = os.environ.get("PEROPIX_FORCE_FP16", "0") == "1"
+        if force_fp16:
+            unet_dtype = torch.float16
+            logging.info("UNet dtype: float16 (forced by PEROPIX_FORCE_FP16=1)")
+        elif torch.cuda.is_bf16_supported():
+            unet_dtype = torch.bfloat16
+            logging.info("UNet dtype: bfloat16 (CUDA bf16 supported)")
+        else:
+            unet_dtype = self.dtype
+            logging.info(f"UNet dtype: {unet_dtype}")
+        unet = UNetModel(**SDXL_UNET_CONFIG.copy(), dtype=unet_dtype, device="cpu")
         unet.load_state_dict(unet_sd, strict=False)
         del unet_sd  # 메모리 해제
-        unet = unet.to(device=self.device, dtype=self.dtype)
+        unet = unet.to(device=self.device, dtype=unet_dtype)
         unet.eval()
 
-        # VAE 로드
+        # VAE 로드 (ComfyUI 방식: bfloat16 사용)
         vae_sd = extract_vae_state_dict(sd)
         logging.info(f"VAE extracted keys: {len(vae_sd)}")
         vae = AutoencoderKL(**SDXL_VAE_CONFIG.copy())
         vae.load_state_dict(vae_sd, strict=False)
         del vae_sd  # 메모리 해제
-        vae = vae.to(device=self.device, dtype=self.dtype)
+        # VAE는 bfloat16 사용 (ComfyUI 기본값, 색상 정확도 향상)
+        vae_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else self.dtype
+        vae = vae.to(device=self.device, dtype=vae_dtype)
         vae.eval()
+        logging.info(f"VAE dtype: {vae_dtype}")
 
-        # CLIP 로드
+        # CLIP 로드 (ComfyUI 방식: fp32로 유지하여 정밀도 보장)
         clip_l_sd, clip_g_sd = extract_clip_state_dicts(sd)
         logging.info(f"CLIP-L extracted keys: {len(clip_l_sd)}, CLIP-G: {len(clip_g_sd)}")
-        clip = SDXLClipModel(device="cpu", dtype=self.dtype)
+        clip = SDXLClipModel(device="cpu", dtype=torch.float32)  # fp32로 CLIP 유지
         if clip_l_sd:
             clip.load_clip_l(clip_l_sd)
         if clip_g_sd:
             clip.load_clip_g(clip_g_sd)
         del clip_l_sd, clip_g_sd  # 메모리 해제
         clip = clip.to(device=self.device)
+        logging.info("CLIP dtype: float32 (for precision)")
 
         # 체크포인트 메모리 해제 (중요!)
         del sd
@@ -411,10 +445,11 @@ class SDXLModelLoader:
             logging.info("Model warmup (minimal)...")
             with torch.no_grad():
                 # 가장 일반적인 설정으로 1회만 워밍업
-                dummy_x = torch.zeros(2, 4, 128, 128, device=self.device, dtype=self.dtype)
-                dummy_t = torch.zeros(2, device=self.device, dtype=self.dtype)
-                dummy_c = torch.zeros(2, 77, 2048, device=self.device, dtype=self.dtype)
-                dummy_y = torch.zeros(2, 2816, device=self.device, dtype=self.dtype)
+                # UNet dtype과 일치해야 함
+                dummy_x = torch.zeros(2, 4, 128, 128, device=self.device, dtype=unet_dtype)
+                dummy_t = torch.zeros(2, device=self.device, dtype=unet_dtype)
+                dummy_c = torch.zeros(2, 77, 2048, device=self.device, dtype=unet_dtype)
+                dummy_y = torch.zeros(2, 2816, device=self.device, dtype=unet_dtype)
                 _ = unet(dummy_x, timesteps=dummy_t, context=dummy_c, y=dummy_y)
                 del dummy_x, dummy_t, dummy_c, dummy_y
                 torch.cuda.synchronize()

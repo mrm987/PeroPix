@@ -4,6 +4,7 @@ SDXL 이미지 생성
 ComfyUI 방식의 샘플링으로 txt2img, img2img, inpaint 지원
 """
 
+import math
 import torch
 import torch.nn.functional as F
 import numpy as np
@@ -30,37 +31,46 @@ def pil_to_tensor(image: Image.Image) -> torch.Tensor:
 
 
 def tensor_to_pil(tensor: torch.Tensor) -> Image.Image:
-    """[0, 1] 범위 텐서를 PIL 이미지로 변환"""
+    """[0, 1] 범위 텐서를 PIL 이미지로 변환 (ComfyUI 방식)"""
     tensor = tensor.squeeze(0).permute(1, 2, 0)
-    tensor = tensor.clamp(0, 1)
-    np_image = (tensor.cpu().numpy() * 255).astype(np.uint8)
+    # ComfyUI 방식: 255 곱한 후 clip
+    i = 255.0 * tensor.cpu().numpy()
+    np_image = np.clip(i, 0, 255).astype(np.uint8)
     return Image.fromarray(np_image)
 
 
-def encode_image(vae, image: torch.Tensor, device: str, dtype: torch.dtype) -> torch.Tensor:
-    """이미지를 latent로 인코딩"""
+def encode_image(vae, image: torch.Tensor, device: str) -> torch.Tensor:
+    """이미지를 latent로 인코딩 (ComfyUI 방식)"""
     # [0, 1] -> [-1, 1]
     image = image * 2.0 - 1.0
-    image = image.to(device=device, dtype=dtype)
+
+    # VAE의 실제 dtype 사용 (bfloat16 또는 float16)
+    vae_dtype = next(vae.parameters()).dtype
+    image = image.to(device=device, dtype=vae_dtype)
 
     with torch.no_grad():
-        latent = vae.encode(image)
+        # VAE encode 후 float32로 변환 (noise와 dtype 일치)
+        latent = vae.encode(image).float()
 
     # VAE 스케일 팩터 적용 (SDXL: 0.13025)
     latent = latent * 0.13025
     return latent
 
 
-def decode_latent(vae, latent: torch.Tensor, dtype: torch.dtype) -> torch.Tensor:
-    """latent를 이미지로 디코딩"""
+def decode_latent(vae, latent: torch.Tensor) -> torch.Tensor:
+    """latent를 이미지로 디코딩 (ComfyUI 방식)"""
     # VAE 스케일 팩터 역적용
     latent = latent / 0.13025
 
-    with torch.no_grad():
-        image = vae.decode(latent.to(dtype))
+    # VAE의 실제 dtype 사용 (bfloat16 또는 float16)
+    vae_dtype = next(vae.parameters()).dtype
 
-    # [-1, 1] -> [0, 1]
-    image = (image + 1.0) / 2.0
+    with torch.no_grad():
+        # VAE dtype으로 계산하되, 출력은 float32로 변환
+        image = vae.decode(latent.to(vae_dtype)).float()
+
+    # [-1, 1] -> [0, 1], clamp로 범위 제한 (ComfyUI 방식)
+    image = torch.clamp((image + 1.0) / 2.0, min=0.0, max=1.0)
     return image
 
 
@@ -268,9 +278,13 @@ class SDXLGenerator:
                 repeat_times = target_len // uncond_len
                 uncond = uncond.repeat(1, repeat_times, 1)
 
+        # UNet의 실제 dtype 가져오기 (bfloat16 또는 float16)
+        unet_dtype = next(self.unet.parameters()).dtype
+
         # 성능 최적화: step과 무관한 값들을 미리 계산 (클로저 생성 시 1회)
-        c_in = torch.cat([cond, uncond], dim=0)
-        y_in = torch.cat([y_cond, y_uncond], dim=0)
+        # conditioning도 UNet dtype과 일치시킴
+        c_in = torch.cat([cond, uncond], dim=0).to(dtype=unet_dtype)
+        y_in = torch.cat([y_cond, y_uncond], dim=0).to(dtype=unet_dtype)
 
         def wrapper(x, sigma, **kwargs):
             # sigma -> timestep (ComfyUI model_base.py:182 참조)
@@ -281,21 +295,21 @@ class SDXLGenerator:
             x_scaled = self.eps.calculate_input(sigma, x)
 
             # 배치 처리 (cond + uncond)
-            # x_scaled는 이미 float32이므로 dtype 변환 필요
-            x_in = torch.cat([x_scaled, x_scaled], dim=0).to(dtype=self.dtype)
-            t_in = torch.cat([timestep, timestep], dim=0).to(dtype=self.dtype)
+            # x_scaled는 이미 float32이므로 UNet의 dtype으로 변환
+            x_in = torch.cat([x_scaled, x_scaled], dim=0).to(dtype=unet_dtype)
+            t_in = torch.cat([timestep, timestep], dim=0).to(dtype=unet_dtype)
 
             # UNet forward - eps (noise prediction) 출력
             with torch.no_grad():
                 eps_out = self.unet(x_in, timesteps=t_in, context=c_in, y=y_in)
 
-            # eps -> denoised 변환 (각각 별도로)
-            eps_cond, eps_uncond = eps_out.chunk(2)
-            denoised_cond = self.eps.calculate_denoised(sigma, eps_cond.float(), x)
-            denoised_uncond = self.eps.calculate_denoised(sigma, eps_uncond.float(), x)
+            # CFG 적용 (eps 공간에서, float32로) - ComfyUI 방식
+            # 정밀도를 위해 float32에서 CFG 계산
+            eps_cond, eps_uncond = eps_out.float().chunk(2)
+            cfg_eps = eps_uncond + cfg_scale * (eps_cond - eps_uncond)
 
-            # CFG 적용 (denoised 공간에서) - ComfyUI 방식
-            cfg_result = denoised_uncond + cfg_scale * (denoised_cond - denoised_uncond)
+            # eps -> denoised 변환 (이미 float32)
+            cfg_result = self.eps.calculate_denoised(sigma, cfg_eps, x)
 
             return cfg_result
 
@@ -315,8 +329,9 @@ class SDXLGenerator:
         base_image: Optional[Image.Image] = None,
         mask: Optional[Image.Image] = None,
         denoise: float = 1.0,
-        callback: Optional[callable] = None
-    ) -> Tuple[Image.Image, int]:
+        callback: Optional[callable] = None,
+        cached_cond: Optional[Tuple] = None
+    ) -> Tuple[Image.Image, int, Optional[Tuple]]:
         """
         이미지 생성
 
@@ -334,47 +349,61 @@ class SDXLGenerator:
             mask: 인페인트 마스크 (검정=유지, 흰색=인페인트)
             denoise: 디노이즈 강도 (0.0-1.0)
             callback: 진행 콜백
+            cached_cond: 캐시된 conditioning (cond, cond_pooled, uncond, uncond_pooled)
+                         hires fix 등에서 CLIP 중복 계산 방지용
 
         Returns:
-            (생성된 이미지, 사용된 시드)
+            (생성된 이미지, 사용된 시드, conditioning 캐시)
         """
         # 시드 처리
         if seed == -1:
             seed = torch.randint(0, 2**32, (1,)).item()
 
-        # 프롬프트 인코딩
-        cond, cond_pooled, uncond, uncond_pooled = self.encode_prompt(prompt, negative_prompt)
+        # 프롬프트 인코딩 (캐시 있으면 재사용)
+        if cached_cond is not None:
+            cond, cond_pooled, uncond, uncond_pooled = cached_cond
+            logger.debug("[Generate] Using cached conditioning (skip CLIP encoding)")
+        else:
+            cond, cond_pooled, uncond, uncond_pooled = self.encode_prompt(prompt, negative_prompt)
 
         # 시그마 스케줄 생성
         sigmas = get_sigmas(self.model_sampling, scheduler, steps, device=self.device)
-
-        # max_denoise 판단 (ComfyUI 방식: samplers.py:718-721)
-        # math.isclose(max_sigma, sigma, rel_tol=1e-05) or sigma > max_sigma
-        import math
-        sigma_max = float(self.model_sampling.sigma_max)
-        sigma_start = float(sigmas[0])
-        is_max_denoise = math.isclose(sigma_max, sigma_start, rel_tol=1e-05) or sigma_start > sigma_max
 
         # img2img/inpaint 처리
         if base_image is not None:
             # 이미지를 latent로 인코딩
             image_tensor = pil_to_tensor(base_image.resize((width, height)))
-            latent = encode_image(self.vae, image_tensor, self.device, self.dtype)
+            latent = encode_image(self.vae, image_tensor, self.device)
 
-            # denoise에 따라 시그마 조정
-            # denoise=0.7, steps=28 -> 실제 20 스텝 실행
-            denoise_steps = max(1, int(steps * denoise))
-            logger.debug(f"[Generate] i2i: denoise={denoise}, steps={steps}, denoise_steps={denoise_steps}")
-            if denoise_steps < steps:
-                sigmas = sigmas[-(denoise_steps + 1):]
-                # denoise < 1.0이면 max_denoise가 아님
-                is_max_denoise = False
+            # denoise에 따라 시그마 조정 (ComfyUI 방식: samplers.py:1131-1141)
+            # denoise=0.5, steps=28 -> new_steps=56, sigmas[-(28+1):]
+            if denoise is not None and denoise < 0.9999:
+                if denoise <= 0.0:
+                    # denoise=0이면 원본 이미지 그대로 반환
+                    pil_image = base_image.resize((width, height))
+                    cond_cache = (cond.clone(), cond_pooled.clone(), uncond.clone(), uncond_pooled.clone())
+                    return pil_image, seed, cond_cache
+                else:
+                    new_steps = int(steps / denoise)
+                    sigmas = get_sigmas(self.model_sampling, scheduler, new_steps, device=self.device)
+                    sigmas = sigmas[-(steps + 1):]
+
+            # max_denoise 판단 (ComfyUI 방식: samplers.py:718-721)
+            # 중요: 잘린 후의 sigmas[0]으로 판단해야 함
+            sigma_max = float(self.model_sampling.sigma_max)
+            sigma_start = float(sigmas[0])
+            is_max_denoise = math.isclose(sigma_max, sigma_start, rel_tol=1e-05) or sigma_start > sigma_max
 
             # 초기 latent = noise_scaling(sigma[0], noise, latent)
             noise = self.get_noise(1, height, width, seed)
             x = self.eps.noise_scaling(sigmas[0], noise, latent, max_denoise=is_max_denoise)
         else:
             # txt2img: ComfyUI 방식의 noise_scaling 사용
+            # max_denoise 판단 (ComfyUI 방식: samplers.py:718-721)
+            sigma_max = float(self.model_sampling.sigma_max)
+            sigma_start = float(sigmas[0])
+            is_max_denoise = math.isclose(sigma_max, sigma_start, rel_tol=1e-05) or sigma_start > sigma_max
+
             # latent_image는 0 텐서
             noise = self.get_noise(1, height, width, seed)
             latent_image = torch.zeros_like(noise)
@@ -391,7 +420,7 @@ class SDXLGenerator:
 
             # 원본 latent 저장
             image_tensor = pil_to_tensor(base_image.resize((width, height)))
-            original_latent = encode_image(self.vae, image_tensor, self.device, self.dtype)
+            original_latent = encode_image(self.vae, image_tensor, self.device)
 
         # 모델 래퍼 생성
         model_fn = self.model_wrapper(
@@ -427,9 +456,11 @@ class SDXLGenerator:
             samples = original_latent * (1 - latent_mask) + samples * latent_mask
 
         # VAE 디코딩
-        image = decode_latent(self.vae, samples, self.dtype)
-
+        image = decode_latent(self.vae, samples)
         pil_image = tensor_to_pil(image)
+
+        # conditioning 캐시 저장 (hires fix용)
+        cond_cache = (cond.clone(), cond_pooled.clone(), uncond.clone(), uncond_pooled.clone())
 
         # 중간 텐서 해제 (VRAM 절약)
         del cond, cond_pooled, uncond, uncond_pooled
@@ -442,7 +473,7 @@ class SDXLGenerator:
         # GPU 캐시 정리
         torch.cuda.empty_cache()
 
-        return pil_image, seed
+        return pil_image, seed, cond_cache
 
 
 # 편의 함수

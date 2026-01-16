@@ -34,30 +34,38 @@ def tensor_to_pil(tensor: torch.Tensor) -> Image.Image:
     return Image.fromarray(np_image)
 
 
-def encode_image(vae, image: torch.Tensor, device: str, dtype: torch.dtype) -> torch.Tensor:
-    """이미지를 latent로 인코딩"""
+def encode_image(vae, image: torch.Tensor, device: str) -> torch.Tensor:
+    """이미지를 latent로 인코딩 (ComfyUI 방식)"""
     # [0, 1] -> [-1, 1]
     image = image * 2.0 - 1.0
-    image = image.to(device=device, dtype=dtype)
+
+    # VAE의 실제 dtype 사용 (bfloat16 또는 float16)
+    vae_dtype = next(vae.parameters()).dtype
+    image = image.to(device=device, dtype=vae_dtype)
 
     with torch.no_grad():
-        latent = vae.encode(image)
+        # VAE encode 후 float32로 변환 (noise와 dtype 일치)
+        latent = vae.encode(image).float()
 
     # VAE 스케일 팩터 적용 (SDXL: 0.13025)
     latent = latent * 0.13025
     return latent
 
 
-def decode_latent(vae, latent: torch.Tensor, dtype: torch.dtype) -> torch.Tensor:
-    """latent를 이미지로 디코딩"""
+def decode_latent(vae, latent: torch.Tensor) -> torch.Tensor:
+    """latent를 이미지로 디코딩 (ComfyUI 방식)"""
     # VAE 스케일 팩터 역적용
     latent = latent / 0.13025
 
-    with torch.no_grad():
-        image = vae.decode(latent.to(dtype))
+    # VAE의 실제 dtype 사용 (bfloat16 또는 float16)
+    vae_dtype = next(vae.parameters()).dtype
 
-    # [-1, 1] -> [0, 1]
-    image = (image + 1.0) / 2.0
+    with torch.no_grad():
+        # VAE dtype으로 계산하되, 출력은 float32로 변환
+        image = vae.decode(latent.to(vae_dtype)).float()
+
+    # [-1, 1] -> [0, 1], clamp로 범위 제한 (ComfyUI 방식)
+    image = torch.clamp((image + 1.0) / 2.0, min=0.0, max=1.0)
     return image
 
 
@@ -265,15 +273,12 @@ class SDXLGenerator:
             with torch.no_grad():
                 eps_out = self.unet(x_in, timesteps=t_in, context=c_in, y=y_in)
 
-            # eps -> denoised 변환 (각각 별도로)
-            # ComfyUI는 apply_model에서 calculate_denoised까지 처리하여 denoised를 반환
+            # CFG 적용 (eps 공간에서) - ComfyUI 방식
             eps_cond, eps_uncond = eps_out.chunk(2)
-            denoised_cond = self.eps.calculate_denoised(sigma, eps_cond.float(), x)
-            denoised_uncond = self.eps.calculate_denoised(sigma, eps_uncond.float(), x)
+            cfg_eps = eps_uncond + cfg_scale * (eps_cond - eps_uncond)
 
-            # CFG 적용 (denoised 공간에서) - ComfyUI 방식
-            # cfg_result = uncond_pred + (cond_pred - uncond_pred) * cond_scale
-            cfg_result = denoised_uncond + cfg_scale * (denoised_cond - denoised_uncond)
+            # eps -> denoised 변환
+            cfg_result = self.eps.calculate_denoised(sigma, cfg_eps.float(), x)
 
             return cfg_result
 
@@ -347,7 +352,7 @@ class SDXLGenerator:
         if base_image is not None:
             # 이미지를 latent로 인코딩
             image_tensor = pil_to_tensor(base_image.resize((width, height)))
-            latent = encode_image(self.vae, image_tensor, self.device, self.dtype)
+            latent = encode_image(self.vae, image_tensor, self.device)
 
             # denoise에 따라 시그마 조정
             denoise_steps = int(steps * denoise)
@@ -383,7 +388,7 @@ class SDXLGenerator:
 
             # 원본 latent 저장
             image_tensor = pil_to_tensor(base_image.resize((width, height)))
-            original_latent = encode_image(self.vae, image_tensor, self.device, self.dtype)
+            original_latent = encode_image(self.vae, image_tensor, self.device)
 
         # 모델 래퍼 생성
         model_fn = self.model_wrapper(
@@ -430,7 +435,7 @@ class SDXLGenerator:
 
         # VAE 디코딩
         _t0 = _time.perf_counter()
-        image = decode_latent(self.vae, samples, self.dtype)
+        image = decode_latent(self.vae, samples)
         if self.device == "cuda":
             torch.cuda.synchronize()
         _t1 = _time.perf_counter()

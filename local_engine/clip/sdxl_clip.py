@@ -199,9 +199,12 @@ class SDXLTokenizer:
 
     def tokenize_with_weights(self, text: str) -> List[Tuple[List[Tuple[int, float]], List[Tuple[int, float]]]]:
         """
-        ComfyUI 방식: 가중치 파싱 + 단어별 토큰화 + 단어 경계 존중 청킹
+        ComfyUI 방식: 가중치 파싱 + 세그먼트 토큰화 + 청킹
 
-        ComfyUI sd1_clip.py:573 방식을 정확히 재현
+        ComfyUI sd1_clip.py:573 방식을 정확히 재현:
+        - 각 가중치 세그먼트를 통째로 토큰화 (단어별 X)
+        - 세그먼트 토큰 수가 max_word_length 이상이면 청크 경계에서 분할 허용
+        - 아니면 통째로 다음 청크로 이동
 
         Returns:
             [(chunk_l, chunk_g), ...] where each chunk is [(token, weight), ...]
@@ -209,52 +212,53 @@ class SDXLTokenizer:
         # 가중치 파싱
         weighted_segments = parse_prompt_weights(text)
 
-        # ComfyUI 방식: 단어별 토큰화 (sd1_clip.py:573)
+        # ComfyUI 방식: 세그먼트 전체를 한번에 토큰화 (sd1_clip.py:573)
+        # 각 세그먼트가 하나의 "word" (t_group)로 취급됨
         word_tokens = []  # [(tokens, weight), ...] where tokens = [token_id, ...]
 
         for segment_text, weight in weighted_segments:
             if not segment_text.strip():
                 continue
 
-            # ComfyUI: 공백으로 단어 분리 후 각 단어를 개별 토큰화
-            # 토크나이저가 start/end 토큰을 추가하므로 add_special_tokens=False
-            for word in segment_text.split():
-                if not word:
-                    continue
-                encoded = self.tokenizer(
-                    word,
-                    truncation=False,
-                    add_special_tokens=False
-                )
-                tokens = encoded["input_ids"]
-                if tokens:
-                    word_tokens.append((tokens, weight))
+            # ComfyUI: 세그먼트 전체를 한번에 토큰화
+            # (embedding 처리는 생략 - PeroPix는 embedding 미지원)
+            encoded = self.tokenizer(
+                segment_text,
+                truncation=False,
+                add_special_tokens=False
+            )
+            tokens = encoded["input_ids"]
+            if tokens:
+                word_tokens.append((tokens, weight))
 
-        # ComfyUI 방식 청킹: 단어 경계 존중
+        # ComfyUI 방식 청킹 (sd1_clip.py:575-611)
         chunks_l = []
         chunks_g = []
 
         current_chunk_l = [(self.start_token, 1.0)]
         current_chunk_g = [(self.start_token, 1.0)]
 
-        max_content = self.max_length - 2  # start + end 제외
+        # ComfyUI 조건 (sd1_clip.py:590):
+        # if len(t_group) + len(batch) > self.max_length - has_end_token:
+        #     remaining_length = self.max_length - len(batch) - has_end_token
+        #
+        # len(batch) = start 토큰 포함 전체 길이
+        # 넘침 조건: len(tokens) + len(batch) > 77 - 1 = 76
+        # remaining_length = 77 - len(batch) - 1
 
         for tokens, weight in word_tokens:
             is_large_word = len(tokens) >= self.max_word_length
 
             while len(tokens) > 0:
-                current_len = len(current_chunk_l) - 1  # start 토큰 제외
-                remaining = max_content - current_len
+                batch_len = len(current_chunk_l)  # start 포함 전체 길이
 
-                if len(tokens) <= remaining:
-                    # 현재 청크에 모두 들어감
-                    for t in tokens:
-                        current_chunk_l.append((t, weight))
-                        current_chunk_g.append((t, weight))
-                    tokens = []
-                else:
+                # ComfyUI 조건: len(tokens) + batch_len > 76
+                if len(tokens) + batch_len > self.max_length - 1:
                     # 청크 넘침
-                    if is_large_word:
+                    # ComfyUI: remaining_length = 77 - batch_len - 1
+                    remaining = self.max_length - batch_len - 1
+
+                    if is_large_word and remaining > 0:
                         # 큰 단어는 분할
                         for t in tokens[:remaining]:
                             current_chunk_l.append((t, weight))
@@ -284,6 +288,12 @@ class SDXLTokenizer:
                             current_chunk_l.append((t, weight))
                             current_chunk_g.append((t, weight))
                         tokens = []
+                else:
+                    # 현재 청크에 모두 들어감
+                    for t in tokens:
+                        current_chunk_l.append((t, weight))
+                        current_chunk_g.append((t, weight))
+                    tokens = []
 
         # 마지막 청크 완성
         if len(current_chunk_l) > 1:  # start 토큰만 있는 게 아니라면
@@ -427,6 +437,22 @@ class SDXLClipModel(nn.Module):
 
         return cond, g_pooled
 
+    def _gen_empty_tokens(self, length: int) -> Tuple[List[int], List[int]]:
+        """
+        ComfyUI 방식 empty 토큰 생성
+
+        [start, end, pad, pad, ...] 형태로 length만큼 생성
+        """
+        # CLIP-L: pad = 49407 (end token)
+        # CLIP-G: pad = 0
+        tokens_l = [self.tokenizer.start_token, self.tokenizer.end_token]
+        tokens_g = [self.tokenizer.start_token, self.tokenizer.end_token]
+
+        tokens_l += [self.tokenizer.pad_token_l] * (length - 2)
+        tokens_g += [self.tokenizer.pad_token_g] * (length - 2)
+
+        return tokens_l, tokens_g
+
     def encode_text(self, text: str, apply_weights: bool = True) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         텍스트를 직접 CLIP 임베딩으로 인코딩
@@ -459,42 +485,74 @@ class SDXLClipModel(nn.Module):
 
             chunks_l.append(torch.tensor([tokens_l], dtype=torch.long))
             chunks_g.append(torch.tensor([tokens_g], dtype=torch.long))
-            weights_list.append(torch.tensor([weights], dtype=torch.float32))
+            weights_list.append(weights)
 
-        # 인코딩
-        cond, pooled = self.encode_chunks(chunks_l, chunks_g)
-
-        # 가중치 적용 (ComfyUI 방식: weight != 1.0인 토큰에 대해 empty embedding과 lerp)
+        # 가중치가 1.0이 아닌 토큰이 있는지 확인
+        has_weights = False
         if apply_weights:
-            # 가중치를 하나의 텐서로 합침
-            all_weights = torch.cat(weights_list, dim=1)  # [1, total_seq_len]
-            all_weights = all_weights.to(cond.device)
+            for weights in weights_list:
+                if any(w != 1.0 for w in weights):
+                    has_weights = True
+                    break
 
-            # 가중치가 1.0이 아닌 토큰이 있는지 확인
-            has_weights = (all_weights != 1.0).any()
+        # ComfyUI 방식: 가중치가 있으면 empty 토큰을 배치에 포함하여 함께 인코딩
+        if has_weights:
+            # 각 청크의 최대 길이 (보통 77)
+            max_token_len = max(len(w) for w in weights_list)
 
-            if has_weights:
-                # Empty 프롬프트 인코딩 (캐싱 가능)
-                if not hasattr(self, '_empty_cond'):
-                    empty_chunks_l, empty_chunks_g = self.tokenizer.tokenize("")
-                    self._empty_cond, _ = self.encode_chunks(empty_chunks_l, empty_chunks_g)
+            # Empty 토큰 생성 (ComfyUI gen_empty_tokens 방식)
+            empty_tokens_l, empty_tokens_g = self._gen_empty_tokens(max_token_len)
+            empty_chunk_l = torch.tensor([empty_tokens_l], dtype=torch.long)
+            empty_chunk_g = torch.tensor([empty_tokens_g], dtype=torch.long)
 
-                # 빈 임베딩을 현재 길이에 맞게 확장
-                empty_cond = self._empty_cond
-                if empty_cond.shape[1] < cond.shape[1]:
-                    # 청크 수 만큼 반복
-                    repeat_times = (cond.shape[1] + 76) // 77
-                    empty_cond = empty_cond.repeat(1, repeat_times, 1)[:, :cond.shape[1], :]
+            # Empty를 배치 마지막에 추가
+            chunks_l.append(empty_chunk_l)
+            chunks_g.append(empty_chunk_g)
 
-                empty_cond = empty_cond.to(cond.device)
+        # 모든 청크를 배치로 인코딩
+        batch_l = torch.cat(chunks_l, dim=0)  # [N+1, 77] if has_weights else [N, 77]
+        batch_g = torch.cat(chunks_g, dim=0)
 
-                # 가중치 적용: cond = empty + weight * (cond - empty)
-                # 또는: cond = lerp(empty, cond, weight)
-                weight_expanded = all_weights.unsqueeze(-1)  # [1, seq_len, 1]
-                cond = empty_cond + weight_expanded * (cond - empty_cond)
+        l_hidden, l_pooled = self.clip_l(batch_l)  # [N+1, 77, 768]
+        g_hidden, g_pooled = self.clip_g(batch_g)  # [N+1, 77, 1280]
 
-        logging.info(f"[CLIP] Encoded cond shape: {cond.shape}")
-        return cond, pooled
+        # 첫 번째 청크의 pooled만 사용
+        first_pooled = g_pooled[0:1]  # [1, 1280]
+
+        # 시퀀스 길이 맞추기
+        min_len = min(l_hidden.shape[1], g_hidden.shape[1])
+        l_hidden = l_hidden[:, :min_len]
+        g_hidden = g_hidden[:, :min_len]
+
+        # 가중치 적용 (ComfyUI 방식)
+        if has_weights:
+            # 마지막 배치가 empty embedding
+            l_empty = l_hidden[-1]  # [77, 768]
+            g_empty = g_hidden[-1]  # [77, 1280]
+
+            # 실제 청크들만 추출 (empty 제외)
+            l_hidden = l_hidden[:-1]  # [N, 77, 768]
+            g_hidden = g_hidden[:-1]  # [N, 77, 1280]
+
+            # 각 청크별로 가중치 적용
+            for k in range(num_chunks):
+                weights = weights_list[k]
+                for j in range(len(weights)):
+                    weight = weights[j]
+                    if weight != 1.0:
+                        # ComfyUI 공식: z[i][j] = (z[i][j] - z_empty[j]) * weight + z_empty[j]
+                        l_hidden[k, j] = (l_hidden[k, j] - l_empty[j]) * weight + l_empty[j]
+                        g_hidden[k, j] = (g_hidden[k, j] - g_empty[j]) * weight + g_empty[j]
+
+        # 배치를 시퀀스로 변환: [N, 77, dim] -> [1, N*77, dim]
+        l_concat = l_hidden.reshape(1, -1, l_hidden.shape[-1])  # [1, N*77, 768]
+        g_concat = g_hidden.reshape(1, -1, g_hidden.shape[-1])  # [1, N*77, 1280]
+
+        # 결합: [1, N*77, 768] + [1, N*77, 1280] -> [1, N*77, 2048]
+        cond = torch.cat([l_concat, g_concat], dim=-1)
+
+        logging.debug(f"[CLIP] Encoded cond shape: {cond.shape}")
+        return cond, first_pooled
 
     def load_clip_l(self, sd: dict):
         """CLIP-L state dict 로드"""

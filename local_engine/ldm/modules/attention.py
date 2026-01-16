@@ -172,10 +172,23 @@ def attention_pytorch(q, k, v, heads, mask=None, skip_reshape=False):
 
 
 # 최적 attention 함수 선택
-if XFORMERS_AVAILABLE:
+# 기본값: xformers 사용 가능하면 xformers, 아니면 SDPA
+# 환경변수로 강제 지정 가능: PEROPIX_ATTENTION=sdpa 또는 PEROPIX_ATTENTION=xformers
+import os
+_FORCE_ATTENTION = os.environ.get("PEROPIX_ATTENTION", "").lower()
+
+if _FORCE_ATTENTION == "sdpa":
+    optimized_attention = attention_pytorch
+    print(f"[Attention] Forced to use PyTorch SDPA (PEROPIX_ATTENTION=sdpa)")
+elif _FORCE_ATTENTION == "xformers" and XFORMERS_AVAILABLE:
     optimized_attention = attention_xformers
+    print(f"[Attention] Forced to use xformers (PEROPIX_ATTENTION=xformers)")
+elif XFORMERS_AVAILABLE:
+    optimized_attention = attention_xformers
+    print(f"[Attention] Using xformers (memory_efficient_attention)")
 else:
     optimized_attention = attention_pytorch
+    print(f"[Attention] Using PyTorch SDPA (scaled_dot_product_attention)")
 
 
 class CrossAttention(nn.Module):

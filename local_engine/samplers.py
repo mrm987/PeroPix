@@ -39,6 +39,9 @@ def default_noise_sampler(x, seed=None):
     ComfyUI 원본 그대로
     """
     if seed is not None:
+        # ComfyUI: CPU에서는 seed += 1
+        if x.device == torch.device("cpu"):
+            seed += 1
         generator = torch.Generator(device=x.device)
         generator.manual_seed(seed)
     else:

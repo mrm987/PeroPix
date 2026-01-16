@@ -38,6 +38,7 @@ MODELS_DIR = APP_DIR / "models"
 CHECKPOINTS_DIR = MODELS_DIR / "checkpoints"
 LORA_DIR = MODELS_DIR / "loras"
 UPSCALE_DIR = MODELS_DIR / "upscale_models"
+LUTS_DIR = MODELS_DIR / "luts"
 OUTPUT_DIR = APP_DIR / "outputs"
 PRESETS_DIR = APP_DIR / "presets"
 PROMPTS_DIR = APP_DIR / "prompts"
@@ -797,6 +798,11 @@ class GenerateRequest(BaseModel):
     upscale_denoise: float = 0.5
     size_alignment: str = "none"  # "none", "8", "64"
 
+    # LUT (Local only)
+    enable_lut: bool = False
+    lut_file: str = ""
+    lut_intensity: float = 1.0
+
     # Save Options
     save_format: str = "png"  # png, jpg, webp
     jpg_quality: int = 95
@@ -856,6 +862,11 @@ class MultiGenerateRequest(BaseModel):
     upscale_cfg: float = 5.0
     upscale_denoise: float = 0.5
     size_alignment: str = "none"
+
+    # LUT (Local only)
+    enable_lut: bool = False
+    lut_file: str = ""
+    lut_intensity: float = 1.0
 
     # Save Options
     save_format: str = "png"  # png, jpg, webp
@@ -1522,7 +1533,7 @@ def call_local_engine(req: GenerateRequest, cancel_check=None):
             raise GenerationCancelled("Generation cancelled by user")
 
     # 이미지 생성
-    image, used_seed = _local_engine_generator.generate(
+    image, used_seed, cond_cache = _local_engine_generator.generate(
         prompt=req.prompt,
         negative_prompt=req.negative_prompt,
         width=req.width,
@@ -1585,24 +1596,177 @@ def call_local_engine(req: GenerateRequest, cancel_check=None):
         resized_image = upscaled_image.resize((target_w, target_h), Image.LANCZOS)
         logger.info(f"[LocalEngine Upscale] Resized to {target_w}x{target_h}")
 
-        # 3. 2nd pass - 로컬 엔진 img2img
-        image, _ = _local_engine_generator.generate(
+        # 3. 2nd pass - 로컬 엔진 img2img (conditioning 캐시 재사용)
+        image, _, _ = _local_engine_generator.generate(
             prompt=req.prompt,
             negative_prompt=req.negative_prompt,
             width=target_w,
             height=target_h,
             steps=req.upscale_steps,
             cfg_scale=req.upscale_cfg,
-            seed=used_seed + 1,
+            seed=used_seed,
             sampler=req.sampler,
             scheduler=req.scheduler,
             base_image=resized_image,
-            denoise=req.upscale_denoise
+            denoise=req.upscale_denoise,
+            cached_cond=cond_cache  # CLIP 인코딩 스킵
         )
         logger.info(f"[LocalEngine Upscale] 2nd pass done, final size={image.size[0]}x{image.size[1]}")
 
+    # conditioning 캐시 해제
+    del cond_cache
+
+    # LUT 적용 (마지막 단계)
+    if req.enable_lut and req.lut_file:
+        image = apply_lut(image, req.lut_file, req.lut_intensity)
+
     logger.info(f"[LocalEngine] Done, seed={used_seed}")
     return image, int(used_seed)
+
+
+def parse_cube_lut(lut_path: Path):
+    """
+    .cube LUT 파일 파싱
+
+    Returns:
+        (lut_3d, size) - 3D LUT 배열과 크기
+    """
+    lazy_imports()  # numpy 로드
+    with open(lut_path, 'r', encoding='utf-8', errors='ignore') as f:
+        lines = f.readlines()
+
+    size = None
+    lut_data = []
+
+    # 키워드 목록 (데이터 행이 아닌 메타데이터)
+    keywords = ('TITLE', 'DOMAIN_MIN', 'DOMAIN_MAX', 'LUT_1D_SIZE', 'LUT_3D_SIZE', 'LUT_1D_INPUT_RANGE', 'LUT_3D_INPUT_RANGE')
+
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+
+        # 키워드 처리
+        if line.startswith('LUT_3D_SIZE'):
+            size = int(line.split()[1])
+            continue
+
+        # 다른 키워드는 스킵
+        is_keyword = False
+        for kw in keywords:
+            if line.startswith(kw):
+                is_keyword = True
+                break
+        if is_keyword:
+            continue
+
+        # RGB 값
+        try:
+            values = [float(x) for x in line.split()]
+            if len(values) >= 3:
+                lut_data.append(values[:3])
+        except ValueError:
+            continue
+
+    if size is None:
+        raise ValueError(f"LUT_3D_SIZE not found in LUT file")
+
+    expected = size ** 3
+    if len(lut_data) != expected:
+        raise ValueError(f"Invalid LUT file: size={size}, expected {expected} data points, got {len(lut_data)}")
+
+    # numpy 배열로 변환 (size x size x size x 3)
+    lut_3d = np.array(lut_data, dtype=np.float32).reshape(size, size, size, 3)
+    return lut_3d, size
+
+
+def apply_lut(image: Image.Image, lut_file: str, intensity: float = 1.0) -> Image.Image:
+    """
+    이미지에 LUT 적용
+
+    Args:
+        image: PIL Image
+        lut_file: LUT 파일명 (.cube)
+        intensity: 적용 강도 (0.0 ~ 1.0)
+
+    Returns:
+        LUT이 적용된 PIL Image
+    """
+    lut_path = LUTS_DIR / lut_file
+    if not lut_path.exists():
+        logger.warning(f"[LUT] File not found: {lut_path}")
+        return image
+
+    try:
+        lut_3d, size = parse_cube_lut(lut_path)
+    except Exception as e:
+        logger.error(f"[LUT] Failed to parse LUT file: {e}")
+        return image
+
+    # RGBA -> RGB 변환
+    if image.mode == 'RGBA':
+        image = image.convert('RGB')
+
+    # 이미지를 numpy 배열로 변환
+    img_array = np.array(image, dtype=np.float32) / 255.0
+    original = img_array.copy()
+
+    # 3D LUT 적용 (trilinear interpolation)
+    # .cube 파일은 BGR 순서로 저장됨 (B가 가장 빠르게 변함)
+    h, w, c = img_array.shape
+
+    # 정규화된 좌표 계산
+    r = img_array[:, :, 0] * (size - 1)
+    g = img_array[:, :, 1] * (size - 1)
+    b = img_array[:, :, 2] * (size - 1)
+
+    # 정수 인덱스와 소수부 분리
+    r0 = np.floor(r).astype(np.int32)
+    g0 = np.floor(g).astype(np.int32)
+    b0 = np.floor(b).astype(np.int32)
+
+    r1 = np.minimum(r0 + 1, size - 1)
+    g1 = np.minimum(g0 + 1, size - 1)
+    b1 = np.minimum(b0 + 1, size - 1)
+
+    rf = r - r0
+    gf = g - g0
+    bf = b - b0
+
+    # Trilinear interpolation
+    # .cube 형식: lut[b][g][r] - B가 첫 번째 축
+    rf = rf[:, :, np.newaxis]
+    gf = gf[:, :, np.newaxis]
+    bf = bf[:, :, np.newaxis]
+
+    c000 = lut_3d[b0, g0, r0]
+    c001 = lut_3d[b0, g0, r1]
+    c010 = lut_3d[b0, g1, r0]
+    c011 = lut_3d[b0, g1, r1]
+    c100 = lut_3d[b1, g0, r0]
+    c101 = lut_3d[b1, g0, r1]
+    c110 = lut_3d[b1, g1, r0]
+    c111 = lut_3d[b1, g1, r1]
+
+    c00 = c000 * (1 - rf) + c001 * rf
+    c01 = c010 * (1 - rf) + c011 * rf
+    c10 = c100 * (1 - rf) + c101 * rf
+    c11 = c110 * (1 - rf) + c111 * rf
+
+    c0 = c00 * (1 - gf) + c01 * gf
+    c1 = c10 * (1 - gf) + c11 * gf
+
+    result = c0 * (1 - bf) + c1 * bf
+
+    # intensity 적용 (원본과 블렌딩)
+    if intensity < 1.0:
+        result = original * (1 - intensity) + result * intensity
+
+    # 클램핑 및 변환
+    result = np.clip(result, 0, 1)
+    result = (result * 255).astype(np.uint8)
+
+    return Image.fromarray(result)
 
 
 def tiled_upscale(model, img_tensor, tile_size=512, overlap=32):
@@ -1946,6 +2110,10 @@ async def process_job(job):
             upscale_cfg=req.upscale_cfg,
             upscale_denoise=req.upscale_denoise,
             size_alignment=req.size_alignment,
+            # LUT (Local only)
+            enable_lut=req.enable_lut,
+            lut_file=req.lut_file,
+            lut_intensity=req.lut_intensity,
             # Save Options
             save_format=req.save_format,
             jpg_quality=req.jpg_quality,
@@ -3110,6 +3278,16 @@ async def list_upscale_models():
             if f.suffix in (".pth", ".safetensors", ".pt"):
                 models.append(f.name)
     return {"models": sorted(models)}
+
+
+@app.get("/api/luts")
+async def list_luts():
+    luts = []
+    if LUTS_DIR.exists():
+        for f in LUTS_DIR.iterdir():
+            if f.suffix.lower() == ".cube":
+                luts.append(f.name)
+    return {"luts": sorted(luts)}
 
 
 @app.post("/api/generate")

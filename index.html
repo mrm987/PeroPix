@@ -4453,6 +4453,39 @@
                     </div>
                 </div>
 
+                <!-- LUT (Color Grading) - Local Only -->
+                <div class="section local-only" id="lutSection">
+                    <div class="section-title">
+                        <button type="button" class="collapse-toggle" data-target="lutContent" title="접기/펼치기">▼</button>
+                        <span>LUT</span>
+                        <label class="section-toggle">
+                            <input type="checkbox" id="enableLut">
+                            <span>Active</span>
+                        </label>
+                    </div>
+                    <div id="lutContent" class="collapsible-content">
+                        <div id="lutSettings" style="display: none;">
+                            <label>LUT File</label>
+                            <select id="lutFile">
+                                <option value="">-- Select LUT --</option>
+                            </select>
+                            <small>Place .cube files in models/luts/</small>
+
+                            <div class="row" style="margin-top: 8px;">
+                                <div style="flex: 1;">
+                                    <label>Intensity</label>
+                                    <input type="range" id="lutIntensity" value="1.0" min="0.0" max="1.0" step="0.05" style="width: 100%;">
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-dim);">
+                                        <span>0</span>
+                                        <span id="lutIntensityValue">1.0</span>
+                                        <span>1</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Base Image (Inpaint/Img2Img) -->
                 <div class="section" id="baseImageSection">
                     <div class="section-title">
@@ -7341,34 +7374,43 @@
         // Load resources
         async function loadResources() {
             try {
-                const [modelsRes, lorasRes, upscaleRes, configRes] = await Promise.all([
+                const [modelsRes, lorasRes, upscaleRes, lutsRes, configRes] = await Promise.all([
                     fetch(`${API_BASE}/api/models`),
                     fetch(`${API_BASE}/api/loras`),
                     fetch(`${API_BASE}/api/upscale_models`),
+                    fetch(`${API_BASE}/api/luts`),
                     fetch(`${API_BASE}/api/config`)
                 ]);
-                
+
                 const { models } = await modelsRes.json();
                 const { loras } = await lorasRes.json();
                 const upscaleData = await upscaleRes.json();
+                const lutsData = await lutsRes.json();
                 const config = await configRes.json();
-                
+
                 // Models
                 const modelSelect = document.getElementById('localModel');
                 modelSelect.innerHTML = '<option value="">-- Select Model --</option>';
                 models.forEach(m => {
                     modelSelect.innerHTML += `<option value="${m}">${m}</option>`;
                 });
-                
+
                 // LoRAs - 사용 가능한 목록 저장 후 슬롯 렌더링
                 availableLoras = loras;
                 renderLoraSlots();
-                
+
                 // Upscale Models
                 const upscaleSelect = document.getElementById('upscaleModel');
                 upscaleSelect.innerHTML = '<option value="">-- Select Model --</option>';
                 (upscaleData.models || []).forEach(m => {
                     upscaleSelect.innerHTML += `<option value="${m}">${m}</option>`;
+                });
+
+                // LUT Files
+                const lutSelect = document.getElementById('lutFile');
+                lutSelect.innerHTML = '<option value="">-- Select LUT --</option>';
+                (lutsData.luts || []).forEach(l => {
+                    lutSelect.innerHTML += `<option value="${l}">${l}</option>`;
                 });
                 
                 // Config
@@ -7586,6 +7628,18 @@
                     
                     if (!request.upscale_model) {
                         showToast('업스케일 모델을 선택하세요', 'error');
+                        return;
+                    }
+                }
+
+                // LUT settings
+                request.enable_lut = document.getElementById('enableLut').checked;
+                if (request.enable_lut) {
+                    request.lut_file = document.getElementById('lutFile').value;
+                    request.lut_intensity = parseFloat(document.getElementById('lutIntensity').value);
+
+                    if (!request.lut_file) {
+                        showToast('LUT 파일을 선택하세요', 'error');
                         return;
                     }
                 }
@@ -9241,6 +9295,17 @@
         // Upscale denoise slider value display
         document.getElementById('upscaleDenoise').oninput = function() {
             document.getElementById('upscaleDenoiseValue').textContent = this.value;
+        };
+
+        // LUT 활성화 토글
+        document.getElementById('enableLut').onchange = function() {
+            document.getElementById('lutSettings').style.display = this.checked ? 'block' : 'none';
+            saveAppSettings();
+        };
+
+        // LUT intensity slider value display
+        document.getElementById('lutIntensity').oninput = function() {
+            document.getElementById('lutIntensityValue').textContent = this.value;
         };
 
         // CFG Rescale slider value display
@@ -10969,6 +11034,11 @@
                 upscaleCfg: document.getElementById('upscaleCfg').value,
                 upscaleDenoise: document.getElementById('upscaleDenoise').value,
 
+                // LUT settings
+                enableLut: document.getElementById('enableLut').checked,
+                lutFile: document.getElementById('lutFile').value,
+                lutIntensity: document.getElementById('lutIntensity').value,
+
                 // Tag Autocomplete
                 tagAutocompleteEnabled: tagAutocompleteEnabled,
 
@@ -11162,6 +11232,20 @@
                     upscaleDenoiseEl.value = settings.upscaleDenoise;
                     document.getElementById('upscaleDenoiseValue').textContent = settings.upscaleDenoise;
                     updateSliderFill(upscaleDenoiseEl);
+                }
+
+                // LUT settings
+                if (settings.enableLut !== undefined) {
+                    document.getElementById('enableLut').checked = settings.enableLut;
+                    document.getElementById('lutSettings').style.display = settings.enableLut ? 'block' : 'none';
+                }
+                // LUT 파일은 loadResources 후에 적용 (select 옵션이 로드된 후)
+                if (settings.lutFile) window._pendingLutFile = settings.lutFile;
+                if (settings.lutIntensity !== undefined) {
+                    const lutIntensityEl = document.getElementById('lutIntensity');
+                    lutIntensityEl.value = settings.lutIntensity;
+                    document.getElementById('lutIntensityValue').textContent = settings.lutIntensity;
+                    updateSliderFill(lutIntensityEl);
                 }
             }
 
@@ -11744,6 +11828,9 @@
             }
             if (window._pendingUpscaleModel) {
                 document.getElementById('upscaleModel').value = window._pendingUpscaleModel;
+            }
+            if (window._pendingLutFile) {
+                document.getElementById('lutFile').value = window._pendingLutFile;
             }
             // 캐릭터 프롬프트 복원 (레이아웃 포함)
             if (window._pendingCharacterPromptsLayout) {

@@ -46,29 +46,8 @@ jobs:
           else
             echo "requires_pip_update=false" >> $GITHUB_OUTPUT
             echo "Hotfix possible: no requirements changes"
-
-            # 과거 태그들을 순회하며 마지막으로 requirements가 변경된 버전 찾기
-            MIN_VERSION="1.0.0"  # 기본값
-            TAGS=$(git tag --sort=-version:refname)
-            PREV_CHECK_TAG=""
-
-            for TAG in $TAGS; do
-              if [ -z "$PREV_CHECK_TAG" ]; then
-                PREV_CHECK_TAG="$TAG"
-                continue
-              fi
-
-              REQ_CHANGED=$(git diff --name-only "$TAG" "$PREV_CHECK_TAG" 2>/dev/null | grep -E "^requirements.*\.txt$" || true)
-
-              if [ -n "$REQ_CHANGED" ]; then
-                MIN_VERSION="${PREV_CHECK_TAG#v}"
-                echo "Found requirements change at $PREV_CHECK_TAG"
-                break
-              fi
-
-              PREV_CHECK_TAG="$TAG"
-            done
-
+            # 모든 버전에서 패치 가능 (pip update 없이 코드만 교체)
+            MIN_VERSION="1.0.0"
             echo "min_version=$MIN_VERSION" >> $GITHUB_OUTPUT
             echo "Min patchable version: $MIN_VERSION"
           fi

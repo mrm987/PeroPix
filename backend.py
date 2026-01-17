@@ -2392,7 +2392,7 @@ async def check_update():
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
                 "https://api.github.com/repos/mrm987/PeroPix/releases/latest",
-                headers={"Accept": "application/vnd.github.v3+json"}
+                headers={"Accept": "application/vnd.github.v3+json", "User-Agent": "PeroPix-App"}
             )
 
             if response.status_code == 200:
@@ -2448,11 +2448,11 @@ async def check_patch():
     import httpx
 
     try:
-        async with httpx.AsyncClient(timeout=15.0, verify=False) as client:
+        async with httpx.AsyncClient(timeout=15.0, verify=False, follow_redirects=True) as client:
             # 최신 릴리즈 정보 가져오기
             response = await client.get(
                 "https://api.github.com/repos/mrm987/PeroPix/releases/latest",
-                headers={"Accept": "application/vnd.github.v3+json"}
+                headers={"Accept": "application/vnd.github.v3+json", "User-Agent": "PeroPix-App"}
             )
 
             if response.status_code != 200:
@@ -2473,19 +2473,23 @@ async def check_patch():
                 elif asset["name"] == "patch-files.zip":
                     patch_files_url = asset["browser_download_url"]
 
-            # 버전 비교 함수
+            # 버전 비교 함수 (4자리까지 지원: 1.1.9.1)
             def parse_version(v):
                 try:
                     parts = v.split(".")
-                    return tuple(int(p) for p in parts[:3])
+                    # 4자리까지 지원, 부족하면 0으로 채움
+                    result = [0, 0, 0, 0]
+                    for i, p in enumerate(parts[:4]):
+                        result[i] = int(p)
+                    return tuple(result)
                 except:
-                    return (0, 0, 0)
+                    return (0, 0, 0, 0)
 
             current = parse_version(current_version)
             latest = parse_version(latest_version)
             has_update = latest > current
 
-            # 패치 파일이 없는 릴리즈 (구버전 릴리즈)
+            # 패치 파일이 없는 경우 (빌드 중이거나 구버전 릴리즈)
             if not patch_info_url or not patch_files_url:
                 return {
                     "success": True,
@@ -2497,18 +2501,29 @@ async def check_patch():
                     "patch_files_url": None,
                     "release_url": release_data.get("html_url", ""),
                     "release_notes": release_data.get("body", ""),
-                    "no_patch_available": True  # 패치 파일 자체가 없음
+                    "is_building": True  # 패치 파일이 아직 없으면 빌드 중으로 간주
                 }
 
             # patch-info.json 다운로드
             patch_resp = await client.get(patch_info_url)
-            if patch_resp.status_code == 200:
-                patch_info = patch_resp.json()
-            else:
-                return {"success": False, "error": "Failed to download patch info"}
+            if patch_resp.status_code != 200:
+                return {
+                    "success": True,
+                    "has_update": has_update,
+                    "can_patch": False,
+                    "current_version": current_version,
+                    "latest_version": latest_version,
+                    "patch_info": None,
+                    "patch_files_url": None,
+                    "release_url": release_data.get("html_url", ""),
+                    "release_notes": release_data.get("body", ""),
+                    "no_patch_available": True  # 다운로드 실패 = 패치 지원 안 함
+                }
+
+            patch_info = patch_resp.json()
 
             min_ver = parse_version(patch_info.get("min_version", "0.0.0"))
-            can_patch = has_update and current >= min_ver and not patch_info.get("requires_reinstall", False)
+            can_patch = has_update and current >= min_ver
 
             return {
                 "success": True,
@@ -2527,15 +2542,39 @@ async def check_patch():
         return {"success": False, "error": str(e)}
 
 
+# 패치 진행 중 Lock
+_patch_in_progress = False
+
 @app.post("/api/apply-patch")
 async def apply_patch(request: dict):
-    """패치 적용 (patch-files.zip 다운로드 및 압축 해제)"""
+    """패치 적용 (patch-files.zip 다운로드 및 압축 해제, 필요시 pip update)"""
+    global _patch_in_progress
     import httpx
     import zipfile
     import tempfile
+    import subprocess
+
+    # 동시 패치 방지
+    if _patch_in_progress:
+        return {"success": False, "error": "패치가 이미 진행 중입니다. 잠시 후 다시 시도해주세요."}
+
+    _patch_in_progress = True
+
+    try:
+        return await _apply_patch_internal(request)
+    finally:
+        _patch_in_progress = False
+
+async def _apply_patch_internal(request: dict):
+    """실제 패치 로직"""
+    import httpx
+    import zipfile
+    import tempfile
+    import subprocess
 
     patch_files_url = request.get("patch_files_url")
     target_version = request.get("target_version")
+    requires_pip_update = request.get("requires_pip_update", False)
 
     if not patch_files_url:
         return {"success": False, "error": "No patch URL provided"}
@@ -2558,23 +2597,53 @@ async def apply_patch(request: dict):
     PRESERVE_EXTENSIONS = {".log", ".bak"}
 
     backup_files = []
+    tmp_path = None
 
     try:
+        # 사전 권한 검사 - APP_DIR에 쓰기 가능한지 확인
+        test_file = APP_DIR / ".patch_permission_test"
+        try:
+            test_file.write_text("test")
+            test_file.unlink()
+        except (PermissionError, OSError) as e:
+            return {"success": False, "error": f"쓰기 권한이 없습니다: {APP_DIR}. 관리자 권한으로 실행해주세요."}
+
         logger.info(f"패치 다운로드 시작: {patch_files_url}")
 
-        async with httpx.AsyncClient(timeout=60.0, verify=False, follow_redirects=True) as client:
-            # patch-files.zip 다운로드
-            response = await client.get(patch_files_url)
+        # 네트워크 재시도 로직 (최대 3회)
+        response = None
+        last_error = None
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient(timeout=60.0, verify=False, follow_redirects=True) as client:
+                    response = await client.get(patch_files_url)
+                    if response.status_code == 200:
+                        break
+                    last_error = f"HTTP {response.status_code}"
+            except httpx.TimeoutException:
+                last_error = "타임아웃"
+                logger.warning(f"다운로드 시도 {attempt + 1}/3 실패: 타임아웃")
+            except httpx.RequestError as e:
+                last_error = str(e)
+                logger.warning(f"다운로드 시도 {attempt + 1}/3 실패: {e}")
 
-            if response.status_code != 200:
-                return {"success": False, "error": f"Download failed: {response.status_code}"}
+            if attempt < 2:
+                import asyncio
+                await asyncio.sleep(2)  # 재시도 전 2초 대기
 
-            # 임시 파일에 저장
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp_file:
-                tmp_file.write(response.content)
-                tmp_path = tmp_file.name
+        if response is None or response.status_code != 200:
+            return {"success": False, "error": f"다운로드 실패 (3회 시도): {last_error}"}
 
-            logger.info(f"패치 파일 다운로드 완료: {len(response.content)} bytes")
+        # ZIP 파일 최소 크기 검증
+        if len(response.content) < 1000:
+            return {"success": False, "error": "다운로드된 파일이 너무 작습니다. 손상된 파일일 수 있습니다."}
+
+        # 임시 파일에 저장
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp_file:
+            tmp_file.write(response.content)
+            tmp_path = tmp_file.name
+
+        logger.info(f"패치 파일 다운로드 완료: {len(response.content)} bytes")
 
         # ZIP 압축 해제
         with zipfile.ZipFile(tmp_path, 'r') as zip_ref:
@@ -2629,21 +2698,79 @@ async def apply_patch(request: dict):
         for _, backup_path in backup_files:
             backup_path.unlink(missing_ok=True)
 
+        # pip update 필요시 실행
+        pip_updated = False
+        pip_error = None
+        if requires_pip_update:
+            logger.info("의존성 업데이트 시작...")
+            try:
+                # Python 실행 경로 찾기
+                python_exe = APP_DIR / "python" / "python.exe"
+                if not python_exe.exists():
+                    # macOS/Linux
+                    python_exe = APP_DIR / "python" / "bin" / "python3"
+                if not python_exe.exists():
+                    # 시스템 Python 사용
+                    python_exe = sys.executable
+
+                requirements_path = APP_DIR / "requirements-core.txt"
+
+                if requirements_path.exists():
+                    # pip install 실행
+                    result = subprocess.run(
+                        [str(python_exe), "-m", "pip", "install", "-r", str(requirements_path), "--upgrade", "--no-warn-script-location"],
+                        capture_output=True,
+                        text=True,
+                        timeout=300  # 5분 타임아웃
+                    )
+
+                    if result.returncode == 0:
+                        pip_updated = True
+                        logger.info("의존성 업데이트 완료")
+                    else:
+                        pip_error = result.stderr[:500] if result.stderr else "Unknown error"
+                        logger.error(f"pip update 실패: {pip_error}")
+                else:
+                    pip_error = "requirements-core.txt not found"
+                    logger.error(pip_error)
+
+            except subprocess.TimeoutExpired:
+                pip_error = "pip update timed out (5 min)"
+                logger.error(pip_error)
+            except Exception as pip_err:
+                pip_error = str(pip_err)
+                logger.error(f"pip update 예외: {pip_err}")
+
         # 버전 정보 다시 로드
         global APP_VERSION
         APP_VERSION = load_version()
 
         logger.info(f"패치 완료: v{target_version}")
 
-        return {
+        response = {
             "success": True,
             "message": f"패치가 적용되었습니다. 앱을 재시작해주세요.",
             "new_version": target_version,
             "patched_files": len(file_list)
         }
 
+        if requires_pip_update:
+            response["pip_updated"] = pip_updated
+            if pip_error:
+                response["pip_error"] = pip_error
+                response["message"] = f"패치는 적용되었으나 의존성 업데이트에 실패했습니다. 수동으로 pip install -r requirements-core.txt를 실행해주세요."
+
+        return response
+
     except Exception as e:
         logger.error(f"패치 적용 실패: {e}")
+
+        # 임시 파일 정리
+        if tmp_path:
+            try:
+                Path(tmp_path).unlink(missing_ok=True)
+            except:
+                pass
 
         # 롤백
         for target_path, backup_path in backup_files:

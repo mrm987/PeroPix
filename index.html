@@ -8129,14 +8129,19 @@
 
                     if (data.can_patch) {
                         // 핫픽스 패치 가능
+                        const pipNote = data.patch_info?.requires_pip_update
+                            ? '<div style="color: var(--warning); font-size: 11px; margin-bottom: 8px;">⚠️ 의존성 업데이트가 포함됩니다 (시간이 다소 걸릴 수 있음)</div>'
+                            : '';
                         statusDiv.innerHTML = `
                             <div style="padding: 12px; background: var(--bg-lighter); border-radius: var(--radius-sm); border: 1px solid var(--success);">
                                 <div style="font-weight: 600; color: var(--success); margin-bottom: 8px;">
                                     ✨ v${data.latest_version} 패치 가능
                                 </div>
                                 <div style="color: var(--text-dim); font-size: 12px; margin-bottom: 12px;">
-                                    재설치 없이 자동 패치할 수 있습니다.
+                                    재설치 없이 자동 패치할 수 있습니다.<br>
+                                    <span style="color: var(--text-dimmer);">완료 시 앱이 자동으로 재시작됩니다.</span>
                                 </div>
+                                ${pipNote}
                                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                                     <button class="btn btn-sm" onclick="applyPatch()" id="applyPatchBtn" style="background: var(--success); border-color: var(--success);">
                                         🔄 지금 패치
@@ -8147,26 +8152,17 @@
                                 </div>
                             </div>
                         `;
-                    } else if (data.patch_info?.requires_reinstall) {
-                        // 재설치 필요
+                    } else if (data.is_building) {
+                        // 빌드 중
                         statusDiv.innerHTML = `
-                            <div style="padding: 12px; background: var(--bg-lighter); border-radius: var(--radius-sm); border: 1px solid var(--warning);">
-                                <div style="font-weight: 600; color: var(--warning); margin-bottom: 8px;">
-                                    ⚠️ v${data.latest_version} 재설치 필요
+                            <div style="padding: 12px; background: var(--bg-lighter); border-radius: var(--radius-sm); border: 1px solid var(--text-dim);">
+                                <div style="font-weight: 600; color: var(--text-dim); margin-bottom: 8px;">
+                                    ⏳ v${data.latest_version} 빌드 중...
                                 </div>
-                                <div style="color: var(--text-dim); font-size: 12px; margin-bottom: 8px;">
-                                    이 업데이트는 의존성 변경으로 재설치가 필요합니다.
+                                <div style="color: var(--text-dim); font-size: 12px; margin-bottom: 12px;">
+                                    릴리즈가 방금 생성되어 빌드 파일을 준비 중입니다. 잠시 후 다시 확인해주세요.
                                 </div>
-                                <details style="margin-bottom: 12px;">
-                                    <summary style="cursor: pointer; color: var(--text-dim); font-size: 12px;">백업 필요 항목</summary>
-                                    <div style="margin-top: 8px; padding: 8px; background: var(--surface); border-radius: 4px; font-size: 11px; font-family: monospace;">
-                                        models, outputs, presets, gallery,<br>
-                                        prompts, vibe_cache, config.json
-                                    </div>
-                                </details>
-                                <a href="${data.release_url}" target="_blank" class="btn btn-sm">
-                                    📥 다운로드 페이지
-                                </a>
+                                <a href="${data.release_url}" target="_blank" class="btn btn-sm">📋 릴리즈 페이지</a>
                             </div>
                         `;
                     } else if (data.no_patch_available) {
@@ -8217,9 +8213,10 @@
 
             const btn = document.getElementById('applyPatchBtn');
             const statusDiv = document.getElementById('updateStatus');
+            const requiresPipUpdate = currentPatchData.patch_info?.requires_pip_update || false;
 
             btn.disabled = true;
-            btn.textContent = '⏳ 패치 중...';
+            btn.textContent = requiresPipUpdate ? '⏳ 패치 및 의존성 설치 중...' : '⏳ 패치 중...';
 
             try {
                 const res = await fetch(`${API_BASE}/api/apply-patch`, {
@@ -8227,27 +8224,67 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         patch_files_url: currentPatchData.patch_files_url,
-                        target_version: currentPatchData.latest_version
+                        target_version: currentPatchData.latest_version,
+                        requires_pip_update: requiresPipUpdate
                     })
                 });
 
                 const data = await res.json();
 
                 if (data.success) {
-                    statusDiv.innerHTML = `
-                        <div style="padding: 12px; background: var(--bg-lighter); border-radius: var(--radius-sm); border: 1px solid var(--success);">
-                            <div style="font-weight: 600; color: var(--success); margin-bottom: 8px;">
-                                ✅ 패치 완료! (v${data.new_version})
+                    // pip 설치 실패 시 자동 재시작 안 함 - 릴리즈 링크 제공
+                    if (data.pip_error) {
+                        const releaseUrl = currentPatchData?.release_url || 'https://github.com/peroatcri/peropix/releases/latest';
+                        statusDiv.innerHTML = `
+                            <div style="padding: 12px; background: var(--bg-lighter); border-radius: var(--radius-sm); border: 1px solid var(--warning);">
+                                <div style="font-weight: 600; color: var(--warning); margin-bottom: 8px;">
+                                    ⚠️ 패치 완료, 의존성 설치 실패
+                                </div>
+                                <div style="color: var(--text-dim); font-size: 12px; margin-bottom: 8px;">
+                                    코드는 업데이트되었으나 의존성 설치에 실패했습니다.<br>
+                                    앱이 정상 작동하지 않을 수 있습니다.
+                                </div>
+                                <div style="color: var(--error); font-size: 11px; margin-bottom: 12px; padding: 8px; background: var(--surface); border-radius: 4px; font-family: monospace; word-break: break-all;">
+                                    ${data.pip_error}
+                                </div>
+                                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                    <a href="${releaseUrl}" target="_blank" class="btn btn-sm" style="background: var(--primary); border-color: var(--primary);">
+                                        📥 최신 버전 다운로드
+                                    </a>
+                                    <button class="btn btn-sm" onclick="confirmRestart()" style="background: var(--surface-light);">
+                                        🔄 그래도 재시작
+                                    </button>
+                                </div>
                             </div>
-                            <div style="color: var(--text-dim); font-size: 12px; margin-bottom: 12px;">
-                                변경사항을 적용하려면 앱을 재시작해주세요.
+                        `;
+                        showToast('의존성 설치 실패 - 최신 버전 다운로드를 권장합니다', 'warning', 8000);
+                    } else {
+                        // 정상 완료 - 자동 재시작
+                        const pipNote = data.pip_updated ? '<div style="color: var(--success); font-size: 11px; margin-bottom: 8px;">✓ 의존성 업데이트 완료</div>' : '';
+                        statusDiv.innerHTML = `
+                            <div style="padding: 12px; background: var(--bg-lighter); border-radius: var(--radius-sm); border: 1px solid var(--success);">
+                                <div style="font-weight: 600; color: var(--success); margin-bottom: 8px;">
+                                    ✅ 패치 완료! (v${data.new_version})
+                                </div>
+                                ${pipNote}
+                                <div style="color: var(--text-dim); font-size: 12px;">
+                                    🔄 앱을 재시작합니다...
+                                </div>
                             </div>
-                            <button class="btn btn-sm" onclick="window.location.reload()" style="background: var(--primary); border-color: var(--primary);">
-                                🔄 새로고침
-                            </button>
-                        </div>
-                    `;
-                    showToast('패치가 완료되었습니다! 앱을 재시작해주세요.', 'success', 5000);
+                        `;
+                        showToast('패치 완료! 재시작 중...', 'success', 3000);
+
+                        // 자동 재시작
+                        setTimeout(async () => {
+                            window.isIntentionalClose = true;
+                            try {
+                                await fetch(`${API_BASE}/api/restart`, { method: 'POST' });
+                            } catch (e) {
+                                // 서버가 종료되면서 연결이 끊어질 수 있음
+                            }
+                            window.close();
+                        }, 1500);
+                    }
                 } else {
                     statusDiv.innerHTML = `
                         <div style="padding: 12px; background: var(--bg-lighter); border-radius: var(--radius-sm); border: 1px solid var(--error);">
@@ -14220,8 +14257,6 @@
                     currentPatchData = data;  // 전역 변수에 저장
                     if (data.can_patch) {
                         showToast(`✨ v${data.latest_version} 패치 가능! Settings에서 바로 적용하세요.`, 'success', 8000);
-                    } else if (data.patch_info?.requires_reinstall) {
-                        showToast(`⚠️ v${data.latest_version} 업데이트 (재설치 필요)`, 'warning', 8000);
                     } else {
                         showToast(`New version v${data.latest_version} available!`, 'warning', 8000);
                     }

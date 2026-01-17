@@ -2442,6 +2442,224 @@ async def check_update():
         }
 
 
+@app.get("/api/check-patch")
+async def check_patch():
+    """패치 가능 여부 확인 (patch-info.json 다운로드)"""
+    import httpx
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0, verify=False) as client:
+            # 최신 릴리즈 정보 가져오기
+            response = await client.get(
+                "https://api.github.com/repos/mrm987/PeroPix/releases/latest",
+                headers={"Accept": "application/vnd.github.v3+json"}
+            )
+
+            if response.status_code != 200:
+                return {"success": False, "error": f"GitHub API error: {response.status_code}"}
+
+            release_data = response.json()
+            latest_version = release_data.get("tag_name", "").lstrip("v")
+            current_version = APP_VERSION.get("version", "1.0.0")
+
+            # patch-info.json 찾기
+            patch_info = None
+            patch_info_url = None
+            patch_files_url = None
+
+            for asset in release_data.get("assets", []):
+                if asset["name"] == "patch-info.json":
+                    patch_info_url = asset["browser_download_url"]
+                elif asset["name"] == "patch-files.zip":
+                    patch_files_url = asset["browser_download_url"]
+
+            # 버전 비교 함수
+            def parse_version(v):
+                try:
+                    parts = v.split(".")
+                    return tuple(int(p) for p in parts[:3])
+                except:
+                    return (0, 0, 0)
+
+            current = parse_version(current_version)
+            latest = parse_version(latest_version)
+            has_update = latest > current
+
+            # 패치 파일이 없는 릴리즈 (구버전 릴리즈)
+            if not patch_info_url or not patch_files_url:
+                return {
+                    "success": True,
+                    "has_update": has_update,
+                    "can_patch": False,
+                    "current_version": current_version,
+                    "latest_version": latest_version,
+                    "patch_info": None,
+                    "patch_files_url": None,
+                    "release_url": release_data.get("html_url", ""),
+                    "release_notes": release_data.get("body", ""),
+                    "no_patch_available": True  # 패치 파일 자체가 없음
+                }
+
+            # patch-info.json 다운로드
+            patch_resp = await client.get(patch_info_url)
+            if patch_resp.status_code == 200:
+                patch_info = patch_resp.json()
+            else:
+                return {"success": False, "error": "Failed to download patch info"}
+
+            min_ver = parse_version(patch_info.get("min_version", "0.0.0"))
+            can_patch = has_update and current >= min_ver and not patch_info.get("requires_reinstall", False)
+
+            return {
+                "success": True,
+                "has_update": has_update,
+                "can_patch": can_patch,
+                "current_version": current_version,
+                "latest_version": latest_version,
+                "patch_info": patch_info,
+                "patch_files_url": patch_files_url,
+                "release_url": release_data.get("html_url", ""),
+                "release_notes": release_data.get("body", "")
+            }
+
+    except Exception as e:
+        logger.error(f"패치 확인 실패: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/apply-patch")
+async def apply_patch(request: dict):
+    """패치 적용 (patch-files.zip 다운로드 및 압축 해제)"""
+    import httpx
+    import zipfile
+    import tempfile
+
+    patch_files_url = request.get("patch_files_url")
+    target_version = request.get("target_version")
+
+    if not patch_files_url:
+        return {"success": False, "error": "No patch URL provided"}
+
+    # 보존해야 할 경로 (절대 덮어쓰지 않음)
+    PRESERVE_PATHS = {
+        "models/checkpoints",
+        "models/loras",
+        "models/upscale_models",
+        "outputs",
+        "presets",
+        "gallery",
+        "prompts",  # 사용자 커스텀 프롬프트가 있을 수 있음 (기본 prompts 폴더는 덮어쓰지만 사용자 추가분 보존)
+        "vibe_cache",
+        "config.json",
+        "local_venv",
+    }
+
+    # 절대 삭제하면 안 되는 확장자
+    PRESERVE_EXTENSIONS = {".log", ".bak"}
+
+    backup_files = []
+
+    try:
+        logger.info(f"패치 다운로드 시작: {patch_files_url}")
+
+        async with httpx.AsyncClient(timeout=60.0, verify=False, follow_redirects=True) as client:
+            # patch-files.zip 다운로드
+            response = await client.get(patch_files_url)
+
+            if response.status_code != 200:
+                return {"success": False, "error": f"Download failed: {response.status_code}"}
+
+            # 임시 파일에 저장
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp_file:
+                tmp_file.write(response.content)
+                tmp_path = tmp_file.name
+
+            logger.info(f"패치 파일 다운로드 완료: {len(response.content)} bytes")
+
+        # ZIP 압축 해제
+        with zipfile.ZipFile(tmp_path, 'r') as zip_ref:
+            file_list = zip_ref.namelist()
+            logger.info(f"패치 파일 목록: {len(file_list)} files")
+
+            for file_name in file_list:
+                # 디렉토리는 스킵
+                if file_name.endswith('/'):
+                    continue
+
+                # 보존 경로 체크
+                should_preserve = False
+                for preserve_path in PRESERVE_PATHS:
+                    if file_name.startswith(preserve_path):
+                        should_preserve = True
+                        break
+
+                # 보존 확장자 체크
+                for ext in PRESERVE_EXTENSIONS:
+                    if file_name.endswith(ext):
+                        should_preserve = True
+                        break
+
+                if should_preserve:
+                    logger.debug(f"보존 대상 스킵: {file_name}")
+                    continue
+
+                # 대상 경로
+                target_path = APP_DIR / file_name
+
+                # 기존 파일 백업
+                if target_path.exists():
+                    backup_path = target_path.with_suffix(target_path.suffix + ".patch_bak")
+                    shutil.copy2(target_path, backup_path)
+                    backup_files.append((target_path, backup_path))
+
+                # 부모 디렉토리 생성
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+
+                # 파일 추출
+                with zip_ref.open(file_name) as src:
+                    with open(target_path, 'wb') as dst:
+                        dst.write(src.read())
+
+                logger.debug(f"패치 적용: {file_name}")
+
+        # 임시 파일 삭제
+        Path(tmp_path).unlink(missing_ok=True)
+
+        # 백업 파일 삭제 (성공 시)
+        for _, backup_path in backup_files:
+            backup_path.unlink(missing_ok=True)
+
+        # 버전 정보 다시 로드
+        global APP_VERSION
+        APP_VERSION = load_version()
+
+        logger.info(f"패치 완료: v{target_version}")
+
+        return {
+            "success": True,
+            "message": f"패치가 적용되었습니다. 앱을 재시작해주세요.",
+            "new_version": target_version,
+            "patched_files": len(file_list)
+        }
+
+    except Exception as e:
+        logger.error(f"패치 적용 실패: {e}")
+
+        # 롤백
+        for target_path, backup_path in backup_files:
+            try:
+                if backup_path.exists():
+                    shutil.copy2(backup_path, target_path)
+                    backup_path.unlink()
+            except Exception as rollback_err:
+                logger.error(f"롤백 실패: {rollback_err}")
+
+        return {
+            "success": False,
+            "error": f"패치 실패: {str(e)}. 원래 상태로 복원되었습니다."
+        }
+
+
 @app.post("/api/extract-metadata")
 async def extract_metadata(request: dict):
     """이미지에서 메타데이터 추출 (PNG/JPG/WebP 지원)"""

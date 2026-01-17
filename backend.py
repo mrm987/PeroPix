@@ -1038,10 +1038,10 @@ def save_vibe_cache(cache_key: str, encoded_vibe: str, original_image_base64: st
     metadata.add_text("info_extracted", str(info_extracted))
     metadata.add_text("strength", str(strength))
 
-    # 파일명 생성: {image_name}_{strength}_{info_extracted}_{number}.png
+    # 파일명 생성 (타임스탬프 우선 - 탐색기에서 저장 순서대로 정렬)
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     safe_name = sanitize_filename(image_name)
-    number = get_next_vibe_number()
-    filename = f"{safe_name}_{strength:.1f}_{info_extracted:.1f}_{number:07d}.png"
+    filename = f"{timestamp}_{safe_name}_{strength:.1f}_{info_extracted:.1f}.png"
     filepath = VIBE_CACHE_DIR / filename
 
     # PNG 저장
@@ -2648,10 +2648,10 @@ async def save_to_gallery(request: dict):
         else:
             return {"success": False, "error": "No image provided"}
 
-        # 고유 파일명 생성
+        # 고유 파일명 생성 (타임스탬프 우선 - 탐색기에서 저장 순서대로 정렬)
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         base_name = Path(filename).stem
-        new_filename = f"{base_name}_{timestamp}.png"
+        new_filename = f"{timestamp}_{base_name}.png"
         filepath = gallery_path / new_filename
 
         # 메타데이터 처리

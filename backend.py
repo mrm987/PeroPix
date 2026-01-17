@@ -2522,13 +2522,15 @@ async def check_patch():
 
             patch_info = patch_resp.json()
 
-            min_ver = parse_version(patch_info.get("min_version", "0.0.0"))
-            can_patch = has_update and current >= min_ver
+            # 유저 버전이 pip_required_before보다 낮으면 pip 설치 필요
+            pip_required_before = parse_version(patch_info.get("pip_required_before", "1.0.0"))
+            requires_pip_update = current < pip_required_before
 
             return {
                 "success": True,
                 "has_update": has_update,
-                "can_patch": can_patch,
+                "can_patch": has_update,  # 모든 버전에서 패치 가능
+                "requires_pip_update": requires_pip_update,
                 "current_version": current_version,
                 "latest_version": latest_version,
                 "patch_info": patch_info,

@@ -8129,7 +8129,7 @@
 
                     if (data.can_patch) {
                         // 핫픽스 패치 가능
-                        const pipNote = data.patch_info?.requires_pip_update
+                        const pipNote = data.requires_pip_update
                             ? '<div style="color: var(--warning); font-size: 11px; margin-bottom: 8px;">⚠️ 의존성 업데이트가 포함됩니다 (시간이 다소 걸릴 수 있음)</div>'
                             : '';
                         statusDiv.innerHTML = `
@@ -8213,7 +8213,7 @@
 
             const btn = document.getElementById('applyPatchBtn');
             const statusDiv = document.getElementById('updateStatus');
-            const requiresPipUpdate = currentPatchData.patch_info?.requires_pip_update || false;
+            const requiresPipUpdate = currentPatchData.requires_pip_update || false;
 
             btn.disabled = true;
             btn.textContent = requiresPipUpdate ? '⏳ 패치 및 의존성 설치 중...' : '⏳ 패치 중...';

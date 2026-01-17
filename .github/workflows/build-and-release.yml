@@ -27,30 +27,33 @@ jobs:
           echo "prev_tag=$PREV_TAG" >> $GITHUB_OUTPUT
           echo "Previous tag: $PREV_TAG"
 
-      - name: Check if pip update required
+      - name: Find last requirements change version
         id: check-reinstall
         run: |
-          PREV_TAG="${{ steps.prev-tag.outputs.prev_tag }}"
+          # 과거 태그들을 순회하며 마지막으로 requirements가 변경된 버전 찾기
+          PIP_REQUIRED_BEFORE="1.0.0"  # 기본값 (requirements 변경 없으면 pip 불필요)
+          TAGS=$(git tag --sort=-version:refname)
+          PREV_CHECK_TAG=""
 
-          # 직전 릴리즈와의 변경 확인
-          CHANGED_FILES=$(git diff --name-only $PREV_TAG HEAD 2>/dev/null || echo "")
-          echo "Changed files since $PREV_TAG:"
-          echo "$CHANGED_FILES"
+          for TAG in $TAGS; do
+            if [ -z "$PREV_CHECK_TAG" ]; then
+              PREV_CHECK_TAG="$TAG"
+              continue
+            fi
 
-          # requirements 변경은 pip update 필요
-          if echo "$CHANGED_FILES" | grep -qE "^requirements.*\.txt$"; then
-            echo "requires_pip_update=true" >> $GITHUB_OUTPUT
-            echo "Pip update required: requirements changed in this release"
-            MIN_VERSION="1.0.0"  # pip update는 모든 버전에서 가능
-            echo "min_version=$MIN_VERSION" >> $GITHUB_OUTPUT
-          else
-            echo "requires_pip_update=false" >> $GITHUB_OUTPUT
-            echo "Hotfix possible: no requirements changes"
-            # 모든 버전에서 패치 가능 (pip update 없이 코드만 교체)
-            MIN_VERSION="1.0.0"
-            echo "min_version=$MIN_VERSION" >> $GITHUB_OUTPUT
-            echo "Min patchable version: $MIN_VERSION"
-          fi
+            REQ_CHANGED=$(git diff --name-only "$TAG" "$PREV_CHECK_TAG" 2>/dev/null | grep -E "^requirements.*\.txt$" || true)
+
+            if [ -n "$REQ_CHANGED" ]; then
+              PIP_REQUIRED_BEFORE="${PREV_CHECK_TAG#v}"
+              echo "Found requirements change at $PREV_CHECK_TAG"
+              break
+            fi
+
+            PREV_CHECK_TAG="$TAG"
+          done
+
+          echo "pip_required_before=$PIP_REQUIRED_BEFORE" >> $GITHUB_OUTPUT
+          echo "Pip required for versions before: $PIP_REQUIRED_BEFORE"
 
       - name: Generate version.json for patch
         run: |
@@ -71,15 +74,13 @@ jobs:
         run: |
           VERSION="${{ github.event.release.tag_name }}"
           VERSION="${VERSION#v}"
-          REQUIRES_PIP_UPDATE="${{ steps.check-reinstall.outputs.requires_pip_update }}"
-          MIN_VERSION="${{ steps.check-reinstall.outputs.min_version }}"
+          PIP_REQUIRED_BEFORE="${{ steps.check-reinstall.outputs.pip_required_before }}"
 
           # 패치 대상 파일 목록 (항상 동일)
           cat > patch-info.json << EOF
           {
             "version": "$VERSION",
-            "requires_pip_update": $REQUIRES_PIP_UPDATE,
-            "min_version": "$MIN_VERSION",
+            "pip_required_before": "$PIP_REQUIRED_BEFORE",
             "files": [
               "index.html",
               "backend.py",
@@ -88,7 +89,6 @@ jobs:
               "requirements-core.txt"
             ],
             "folders": [
-              "prompts",
               "assets",
               "scripts",
               "data",
@@ -111,8 +111,7 @@ jobs:
           cp PeroPix.bat patch-files/ 2>/dev/null || true
           cp requirements-core.txt patch-files/
 
-          # 폴더 복사
-          cp -r prompts patch-files/
+          # 폴더 복사 (prompts는 로컬 데이터이므로 제외)
           cp -r assets patch-files/
           cp -r scripts patch-files/
           cp -r data patch-files/

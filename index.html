@@ -1909,30 +1909,142 @@
             color: white;
         }
 
-        /* PIP Preview Container */
-        .pip-preview {
-            display: none;
+        /* PIP Floating Button */
+        .pip-float {
             position: absolute;
-            top: 10px;
-            right: 10px;
-            max-width: 850px;
-            max-height: calc(100% - 20px);
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            cursor: move;
+            user-select: none;
+        }
+
+        .pip-float.collapsed {
+            width: 36px;
+            height: 36px;
+        }
+
+        .pip-float.collapsed .pip-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(60, 60, 70, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: none;
+            transition: all 0.2s;
+            backdrop-filter: blur(4px);
+        }
+
+        .pip-float.collapsed .pip-btn:hover {
+            background: var(--accent);
+            color: white;
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        .pip-float.collapsed .pip-content {
+            display: none;
+        }
+
+        .pip-float.expanded {
             background: var(--bg);
-            border: 2px solid var(--accent);
+            border: 1px solid rgba(255, 255, 255, 0.15);
             border-radius: var(--radius-md);
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-            z-index: 1000;
+            min-width: 200px;
+            min-height: 150px;
+            display: flex;
+            flex-direction: column;
+            resize: both;
             overflow: hidden;
         }
 
-        .pip-preview.show {
-            display: block;
+        .pip-float.expanded .pip-btn {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--bg-lighter);
+            border: 1px solid var(--border);
+            color: var(--text);
+            font-size: 0.9rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
         }
 
-        .pip-preview img {
+        .pip-float.expanded .pip-btn:hover,
+        .pip-float.expanded .pip-fit-btn:hover {
+            background: var(--accent);
+            color: white;
+        }
+
+        .pip-float.collapsed .pip-fit-btn {
+            display: none;
+        }
+
+        .pip-float.expanded .pip-fit-btn {
+            position: absolute;
+            bottom: 8px;
+            right: 44px;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--bg-lighter);
+            border: 1px solid var(--border);
+            color: var(--text);
+            font-size: 0.9rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        .pip-float.expanded .pip-content {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            cursor: move;
+        }
+
+        .pip-float.expanded .pip-content img {
             width: 100%;
             height: 100%;
             object-fit: contain;
+        }
+
+        .pip-float.expanded .pip-content .pip-empty {
+            color: var(--text-dim);
+            font-size: 0.85rem;
+        }
+
+        .pip-float .pip-resize {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 12px;
+            height: 12px;
+            cursor: nw-resize;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12'%3E%3Cpath d='M11 0L0 11M7 0L0 7M3 0L0 3' stroke='%23888' stroke-width='1'/%3E%3C/svg%3E");
+            background-position: top left;
+            background-repeat: no-repeat;
+        }
+
+        .pip-float.collapsed .pip-resize {
+            display: none;
         }
 
         /* 검열중 탭 버튼 - 골드 색상 */
@@ -5040,10 +5152,6 @@
                         <span>💾</span>
                         <span>세트 저장</span>
                     </button>
-                    <button type="button" class="header-btn" id="pipModeBtn" title="PIP 모드 (이미지 호버 시 크게 미리보기)">
-                        <span>⧉</span>
-                        <span>PIP</span>
-                    </button>
                 </div>
                 <div class="toolbar-right">
                     <span class="toolbar-label">Save to:</span>
@@ -5070,9 +5178,15 @@
                 <div class="slots-container" id="slotsContainer">
                     <!-- 슬롯들이 가로로 배치됨 -->
                 </div>
-                <!-- PIP Preview -->
-                <div class="pip-preview" id="pipPreview">
-                    <img id="pipPreviewImg" src="" alt="PIP Preview">
+                <!-- PIP Floating Button -->
+                <div class="pip-float collapsed" id="pipFloat">
+                    <button type="button" class="pip-btn" id="pipBtn" title="PIP 모드">⧉</button>
+                    <button type="button" class="pip-fit-btn" id="pipFitBtn" title="이미지 크기에 맞추기">⊡</button>
+                    <div class="pip-content">
+                        <span class="pip-empty">이미지에 마우스를 올리세요</span>
+                        <img id="pipPreviewImg" src="" alt="PIP Preview" style="display: none;">
+                    </div>
+                    <div class="pip-resize" id="pipResize"></div>
                 </div>
             </div>
 
@@ -6901,42 +7015,251 @@
             syncScrollBtn.classList.toggle('active', syncScrollEnabled);
         };
 
-        // PIP 모드
-        const pipModeBtn = document.getElementById('pipModeBtn');
-        const pipPreview = document.getElementById('pipPreview');
+        // PIP 플로팅 버튼
+        const pipFloat = document.getElementById('pipFloat');
+        const pipBtn = document.getElementById('pipBtn');
+        const pipFitBtn = document.getElementById('pipFitBtn');
         const pipPreviewImg = document.getElementById('pipPreviewImg');
+        const pipResize = document.getElementById('pipResize');
+        const pipEmpty = pipFloat.querySelector('.pip-empty');
         let pipModeEnabled = false;
+        let pipExpanded = false;
+        let pipDragging = false;
+        let pipResizing = false;
+        let pipDragOffset = { x: 0, y: 0 };
+        let pipSize = { width: 400, height: 400 };
 
-        pipModeBtn.onclick = () => {
-            pipModeEnabled = !pipModeEnabled;
-            pipModeBtn.classList.toggle('active', pipModeEnabled);
-            if (!pipModeEnabled) {
-                pipPreview.classList.remove('show');
+        // PIP 버튼 - 드래그로 이동, 클릭으로 펼치기/접기
+        let pipBtnStartPos = { x: 0, y: 0 };
+        let pipBtnMoved = false;
+
+        function togglePip() {
+            if (pipFloat.classList.contains('collapsed')) {
+                // 펼치기 - 버튼(우하단)을 고정점으로 좌상단 방향으로 확장
+                const wrapperRect = slotsWrapper.getBoundingClientRect();
+                const floatRect = pipFloat.getBoundingClientRect();
+
+                // 현재 우하단 위치 계산
+                const currentRight = floatRect.right - wrapperRect.left;
+                const currentBottom = floatRect.bottom - wrapperRect.top;
+
+                // 새 좌상단 위치 계산 (우하단 고정)
+                const newLeft = Math.max(0, currentRight - pipSize.width);
+                const newTop = Math.max(0, currentBottom - pipSize.height);
+
+                pipFloat.classList.remove('collapsed');
+                pipFloat.classList.add('expanded');
+                pipFloat.style.left = newLeft + 'px';
+                pipFloat.style.top = newTop + 'px';
+                pipFloat.style.right = 'auto';
+                pipFloat.style.bottom = 'auto';
+                pipFloat.style.width = pipSize.width + 'px';
+                pipFloat.style.height = pipSize.height + 'px';
+                pipModeEnabled = true;
+                pipExpanded = true;
+                pipBtn.textContent = '⧉';
+                pipBtn.title = '접기';
+            } else {
+                // 접기 - 버튼(우하단) 위치로 이동
+                const wrapperRect = slotsWrapper.getBoundingClientRect();
+                const floatRect = pipFloat.getBoundingClientRect();
+
+                // 현재 우하단 위치 계산
+                const currentRight = floatRect.right - wrapperRect.left;
+                const currentBottom = floatRect.bottom - wrapperRect.top;
+
+                // 접힌 버튼 크기 (36px)
+                const collapsedSize = 36;
+                const newLeft = currentRight - collapsedSize;
+                const newTop = currentBottom - collapsedSize;
+
+                pipFloat.classList.remove('expanded');
+                pipFloat.classList.add('collapsed');
+                pipFloat.style.left = newLeft + 'px';
+                pipFloat.style.top = newTop + 'px';
+                pipFloat.style.right = 'auto';
+                pipFloat.style.bottom = 'auto';
+                pipFloat.style.width = '';
+                pipFloat.style.height = '';
+                pipModeEnabled = false;
+                pipExpanded = false;
+                pipBtn.textContent = '⧉';
+                pipBtn.title = 'PIP 모드';
+                pipPreviewImg.style.display = 'none';
+                pipEmpty.style.display = '';
             }
             autoSaveSettings();
-        };
+        }
+
+        const pipContent = pipFloat.querySelector('.pip-content');
+
+        function startPipDrag(e) {
+            pipBtnStartPos = { x: e.clientX, y: e.clientY };
+            pipBtnMoved = false;
+            pipDragging = true;
+
+            const rect = pipFloat.getBoundingClientRect();
+            pipDragOffset.x = e.clientX - rect.left;
+            pipDragOffset.y = e.clientY - rect.top;
+
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        pipBtn.addEventListener('mousedown', startPipDrag);
+        pipContent.addEventListener('mousedown', (e) => {
+            if (e.target === pipResize) return;
+            startPipDrag(e);
+        });
+
+        pipBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            // 드래그 이동이 있었으면 클릭 무시
+            if (pipBtnMoved) {
+                pipBtnMoved = false;
+                return;
+            }
+            togglePip();
+        });
+
+        // PIP 이미지 크기에 맞추기
+        pipFitBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!pipPreviewImg.src || pipPreviewImg.style.display === 'none') return;
+
+            const img = pipPreviewImg;
+            const imgWidth = img.naturalWidth;
+            const imgHeight = img.naturalHeight;
+
+            if (!imgWidth || !imgHeight) return;
+
+            const wrapperRect = slotsWrapper.getBoundingClientRect();
+            const floatRect = pipFloat.getBoundingClientRect();
+
+            // 현재 우하단 위치 유지
+            const currentRight = floatRect.right - wrapperRect.left;
+            const currentBottom = floatRect.bottom - wrapperRect.top;
+
+            // 새 크기 (wrapper 범위 내로 제한)
+            const newWidth = Math.min(imgWidth, wrapperRect.width);
+            const newHeight = Math.min(imgHeight, wrapperRect.height);
+
+            // 새 좌상단 위치 계산 (우하단 고정)
+            const newLeft = Math.max(0, currentRight - newWidth);
+            const newTop = Math.max(0, currentBottom - newHeight);
+
+            pipFloat.style.width = newWidth + 'px';
+            pipFloat.style.height = newHeight + 'px';
+            pipFloat.style.left = newLeft + 'px';
+            pipFloat.style.top = newTop + 'px';
+            pipSize.width = newWidth;
+            pipSize.height = newHeight;
+
+            autoSaveSettings();
+        });
+
+        // PIP 리사이즈
+        pipResize.addEventListener('mousedown', (e) => {
+            if (pipFloat.classList.contains('collapsed')) return;
+            pipResizing = true;
+            e.stopPropagation();
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (pipDragging) {
+                // 드래그 이동 감지 (5px 이상 이동 시)
+                const dx = Math.abs(e.clientX - pipBtnStartPos.x);
+                const dy = Math.abs(e.clientY - pipBtnStartPos.y);
+                if (dx > 5 || dy > 5) {
+                    pipBtnMoved = true;
+                }
+
+                const wrapperRect = slotsWrapper.getBoundingClientRect();
+                let newX = e.clientX - wrapperRect.left - pipDragOffset.x;
+                let newY = e.clientY - wrapperRect.top - pipDragOffset.y;
+
+                // 경계 제한
+                const floatRect = pipFloat.getBoundingClientRect();
+                newX = Math.max(0, Math.min(newX, wrapperRect.width - floatRect.width));
+                newY = Math.max(0, Math.min(newY, wrapperRect.height - floatRect.height));
+
+                pipFloat.style.left = newX + 'px';
+                pipFloat.style.top = newY + 'px';
+                pipFloat.style.right = 'auto';
+                pipFloat.style.bottom = 'auto';
+            }
+
+            if (pipResizing) {
+                const wrapperRect = slotsWrapper.getBoundingClientRect();
+                const floatRect = pipFloat.getBoundingClientRect();
+
+                // 좌상단 방향 리사이즈: 우하단 고정, 마우스 위치가 새로운 좌상단
+                let newWidth = floatRect.right - e.clientX;
+                let newHeight = floatRect.bottom - e.clientY;
+
+                // 최소/최대 크기 제한
+                newWidth = Math.max(200, Math.min(newWidth, floatRect.right - wrapperRect.left));
+                newHeight = Math.max(150, Math.min(newHeight, floatRect.bottom - wrapperRect.top));
+
+                // 새 위치 계산 (우하단 고정)
+                const newLeft = floatRect.right - wrapperRect.left - newWidth;
+                const newTop = floatRect.bottom - wrapperRect.top - newHeight;
+
+                pipFloat.style.width = newWidth + 'px';
+                pipFloat.style.height = newHeight + 'px';
+                pipFloat.style.left = newLeft + 'px';
+                pipFloat.style.top = newTop + 'px';
+                pipFloat.style.right = 'auto';
+                pipFloat.style.bottom = 'auto';
+                pipSize.width = newWidth;
+                pipSize.height = newHeight;
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (pipDragging || pipResizing) {
+                pipDragging = false;
+                pipResizing = false;
+                autoSaveSettings();
+            }
+        });
+
+        // 브라우저 리사이즈 시 PIP가 화면 밖으로 나가지 않도록
+        window.addEventListener('resize', () => {
+            const wrapperRect = slotsWrapper.getBoundingClientRect();
+            const floatRect = pipFloat.getBoundingClientRect();
+
+            if (floatRect.width === 0 || floatRect.height === 0) return;
+
+            // 현재 위치가 wrapper 밖이면 조정
+            let left = parseFloat(pipFloat.style.left) || 0;
+            let top = parseFloat(pipFloat.style.top) || 0;
+
+            const maxLeft = wrapperRect.width - floatRect.width;
+            const maxTop = wrapperRect.height - floatRect.height;
+
+            if (left > maxLeft || top > maxTop || left < 0 || top < 0) {
+                left = Math.max(0, Math.min(left, maxLeft));
+                top = Math.max(0, Math.min(top, maxTop));
+
+                pipFloat.style.left = left + 'px';
+                pipFloat.style.top = top + 'px';
+                pipFloat.style.right = 'auto';
+                pipFloat.style.bottom = 'auto';
+            }
+        });
 
         // 슬롯 이미지 호버 시 PIP 프리뷰 표시
         slotsContainer.addEventListener('mouseover', (e) => {
-            if (!pipModeEnabled) return;
+            if (!pipModeEnabled || !pipExpanded) return;
             const imgCard = e.target.closest('.slot-image-card');
             if (imgCard) {
                 const img = imgCard.querySelector('img');
                 if (img && img.src) {
                     pipPreviewImg.src = img.src;
-                    pipPreview.classList.add('show');
-                }
-            }
-        });
-
-        slotsContainer.addEventListener('mouseout', (e) => {
-            if (!pipModeEnabled) return;
-            const imgCard = e.target.closest('.slot-image-card');
-            if (imgCard) {
-                // 다른 이미지로 이동하는 경우는 유지
-                const relatedTarget = e.relatedTarget;
-                if (!relatedTarget || !relatedTarget.closest('.slot-image-card')) {
-                    pipPreview.classList.remove('show');
+                    pipPreviewImg.style.display = '';
+                    pipEmpty.style.display = 'none';
                 }
             }
         });
@@ -12033,7 +12356,14 @@
                 basePromptCollapsed: document.getElementById('basePromptContent').classList.contains('collapsed'),
                 charactersCollapsed: document.getElementById('charactersContent').classList.contains('collapsed'),
                 negativePromptCollapsed: document.getElementById('negativePromptContent').classList.contains('collapsed'),
-                pipModeEnabled: pipModeEnabled,
+                pipState: {
+                    expanded: pipExpanded,
+                    size: pipSize,
+                    position: pipFloat.style.left ? {
+                        left: pipFloat.style.left,
+                        top: pipFloat.style.top
+                    } : null
+                },
                 currentCharPreset: currentCharPreset,
             };
             
@@ -12099,9 +12429,28 @@
                         document.getElementById('negativePromptContent').classList.add('collapsed');
                         document.querySelector('[data-target="negativePromptContent"]').classList.add('collapsed');
                     }
-                    if (settings.pipModeEnabled) {
-                        pipModeEnabled = true;
-                        document.getElementById('pipModeBtn').classList.add('active');
+                    if (settings.pipState) {
+                        if (settings.pipState.expanded) {
+                            pipFloat.classList.remove('collapsed');
+                            pipFloat.classList.add('expanded');
+                            pipModeEnabled = true;
+                            pipExpanded = true;
+                            pipBtn.textContent = '⧉';
+                            pipBtn.title = '접기';
+                        }
+                        if (settings.pipState.size) {
+                            pipSize = settings.pipState.size;
+                            if (pipExpanded) {
+                                pipFloat.style.width = pipSize.width + 'px';
+                                pipFloat.style.height = pipSize.height + 'px';
+                            }
+                        }
+                        if (settings.pipState.position) {
+                            pipFloat.style.left = settings.pipState.position.left;
+                            pipFloat.style.top = settings.pipState.position.top;
+                            pipFloat.style.right = 'auto';
+                            pipFloat.style.bottom = 'auto';
+                        }
                     }
                     if (settings.currentCharPreset) {
                         currentCharPreset = settings.currentCharPreset;

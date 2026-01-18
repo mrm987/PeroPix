@@ -3867,6 +3867,7 @@ async def create_output_folder(req: dict):
 class PresetSlot(BaseModel):
     name: str = ""
     content: str = ""
+    locked: bool = False
 
 class PresetData(BaseModel):
     name: str
@@ -3918,10 +3919,10 @@ async def create_preset(preset: PresetData):
     data = {
         "name": preset.name,
         "prefix": preset.prefix,
-        "slots": [{"name": s.name, "content": s.content} for s in preset.slots]
+        "slots": [{"name": s.name, "content": s.content, "locked": s.locked} for s in preset.slots]
     }
     filepath.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
-    
+
     return {"filename": filename, "name": preset.name}
 
 @app.put("/api/presets/{filename}")
@@ -3930,14 +3931,14 @@ async def update_preset(filename: str, preset: PresetData):
     filepath = PRESETS_DIR / filename
     if not filepath.exists():
         raise HTTPException(status_code=404, detail="Preset not found")
-    
+
     data = {
         "name": preset.name,
         "prefix": preset.prefix,
-        "slots": [{"name": s.name, "content": s.content} for s in preset.slots]
+        "slots": [{"name": s.name, "content": s.content, "locked": s.locked} for s in preset.slots]
     }
     filepath.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
-    
+
     return {"filename": filename, "name": preset.name}
 
 @app.delete("/api/presets/{filename}")
@@ -3947,6 +3948,43 @@ async def delete_preset(filename: str):
     if not filepath.exists():
         raise HTTPException(status_code=404, detail="Preset not found")
     
+    filepath.unlink()
+    return {"deleted": filename}
+
+
+# === Character List Presets API (구체적인 경로가 먼저 와야 함) ===
+@app.get("/api/prompts/character-list")
+async def list_character_list_presets():
+    """캐릭터 리스트 프리셋 목록"""
+    folder = PROMPTS_DIR / "character-list"
+    folder.mkdir(parents=True, exist_ok=True)
+    presets = []
+    for f in sorted(folder.iterdir()):
+        if f.suffix == ".json":
+            try:
+                data = json.loads(f.read_text(encoding='utf-8'))
+                presets.append({"name": f.stem, "filename": f.name, "data": data})
+            except:
+                pass
+    return presets
+
+@app.post("/api/prompts/character-list/{filename}")
+async def save_character_list_preset(filename: str, request: Request):
+    """캐릭터 리스트 프리셋 저장"""
+    folder = PROMPTS_DIR / "character-list"
+    folder.mkdir(parents=True, exist_ok=True)
+
+    data = await request.json()
+    filepath = folder / filename
+    filepath.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
+    return {"filename": filename}
+
+@app.delete("/api/prompts/character-list/{filename}")
+async def delete_character_list_preset(filename: str):
+    """캐릭터 리스트 프리셋 삭제"""
+    filepath = PROMPTS_DIR / "character-list" / filename
+    if not filepath.exists():
+        raise HTTPException(status_code=404, detail="Character list preset not found")
     filepath.unlink()
     return {"deleted": filename}
 
@@ -3961,7 +3999,7 @@ async def list_prompt_presets(category: str):
     """프롬프트 프리셋 목록 (category: base, negative, character)"""
     if category not in ['base', 'negative', 'character']:
         raise HTTPException(status_code=400, detail="Invalid category")
-    
+
     folder = PROMPTS_DIR / category
     presets = []
     if folder.exists():
@@ -3975,11 +4013,11 @@ async def get_prompt_preset(category: str, filename: str):
     """프롬프트 프리셋 내용 가져오기"""
     if category not in ['base', 'negative', 'character']:
         raise HTTPException(status_code=400, detail="Invalid category")
-    
+
     filepath = PROMPTS_DIR / category / filename
     if not filepath.exists() or filepath.suffix != ".txt":
         raise HTTPException(status_code=404, detail="Prompt preset not found")
-    
+
     content = filepath.read_text(encoding='utf-8')
     return {"name": filepath.stem, "content": content}
 
@@ -3988,22 +4026,22 @@ async def create_prompt_preset(category: str, data: PromptPresetData):
     """프롬프트 프리셋 저장"""
     if category not in ['base', 'negative', 'character']:
         raise HTTPException(status_code=400, detail="Invalid category")
-    
+
     # 파일명 생성
     safe_name = "".join(c for c in data.name if c.isalnum() or c in " _-가-힣").strip()
     if not safe_name:
         safe_name = "prompt"
-    
+
     filename = f"{safe_name}.txt"
     filepath = PROMPTS_DIR / category / filename
-    
+
     # 중복 시 숫자 추가
     counter = 1
     while filepath.exists():
         filename = f"{safe_name}_{counter}.txt"
         filepath = PROMPTS_DIR / category / filename
         counter += 1
-    
+
     filepath.write_text(data.content, encoding='utf-8')
     return {"filename": filename, "name": safe_name}
 
@@ -4012,11 +4050,11 @@ async def delete_prompt_preset(category: str, filename: str):
     """프롬프트 프리셋 삭제"""
     if category not in ['base', 'negative', 'character']:
         raise HTTPException(status_code=400, detail="Invalid category")
-    
+
     filepath = PROMPTS_DIR / category / filename
     if not filepath.exists():
         raise HTTPException(status_code=404, detail="Prompt preset not found")
-    
+
     filepath.unlink()
     return {"deleted": filename}
 

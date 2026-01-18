@@ -742,6 +742,11 @@
             align-items: center;
             gap: var(--space-sm);
             padding: var(--space-xs) 0;
+            user-select: none;
+        }
+
+        .character-item-header .char-name {
+            user-select: text;
         }
 
         .character-item .char-num {
@@ -755,7 +760,28 @@
             min-width: 28px;
             text-align: center;
         }
-        
+
+        .character-item .char-name {
+            width: 80px;
+            flex: none;
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            padding: 4px 6px;
+            margin: 0;
+            font-size: 0.8rem;
+            color: var(--text);
+        }
+
+        .character-item .char-name::placeholder {
+            color: var(--text-dim);
+        }
+
+        .character-item .char-name:focus {
+            outline: none;
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+
         .character-item .prompt-preset-dropdown {
             margin-left: auto;
         }
@@ -1063,6 +1089,151 @@
             text-align: center;
             color: var(--text-dim);
             font-size: 0.8rem;
+        }
+
+        /* Character All Preset Button */
+        .char-preset-dropdown {
+            position: relative;
+            margin-left: auto;
+        }
+
+        .char-preset-btn {
+            background: var(--bg-lighter);
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+            padding: 2px 6px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.7rem;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .char-preset-btn:hover {
+            background: var(--bg-light);
+            border-color: var(--text-dim);
+        }
+
+        .char-preset-name.modified::after {
+            content: '●';
+            margin-left: 4px;
+            color: white;
+            font-size: 0.5rem;
+            vertical-align: middle;
+        }
+
+        .char-preset-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            min-width: 220px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 100;
+            margin-top: 4px;
+        }
+
+        .char-preset-menu.show {
+            display: block;
+        }
+
+        .char-preset-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .char-preset-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: var(--space-sm) var(--space-sm);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            cursor: pointer;
+        }
+
+        .char-preset-item:hover {
+            background: var(--bg-lighter);
+        }
+
+        .char-preset-item:last-child {
+            border-bottom: none;
+        }
+
+        .char-preset-item .label {
+            flex: 1;
+            font-size: 0.85rem;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .char-preset-item .preview {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100px;
+            margin-right: 8px;
+        }
+
+        .char-preset-item .delete-btn {
+            padding: 2px 6px;
+            font-size: 0.75rem;
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .char-preset-item .delete-btn:hover {
+            background: var(--error);
+            color: white;
+        }
+
+        .char-preset-actions {
+            border-top: 1px solid var(--border);
+            padding: 8px;
+            display: flex;
+            gap: 6px;
+        }
+
+        .char-preset-action-btn {
+            flex: 1;
+            padding: 6px 10px;
+            background: var(--bg-lighter);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+
+        .char-preset-action-btn:hover {
+            background: var(--bg);
+            border-color: var(--text-dim);
+        }
+
+        .char-preset-empty {
+            padding: 12px;
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 0.8rem;
+        }
+
+        .char-preset-item.selected {
+            background: var(--accent-dim);
+        }
+
+        .char-preset-item .check {
+            width: 12px;
+            color: var(--accent);
         }
 
         /* Tag Autocomplete Dropdown */
@@ -1737,7 +1908,33 @@
             border-color: var(--accent);
             color: white;
         }
-        
+
+        /* PIP Preview Container */
+        .pip-preview {
+            display: none;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            max-width: 850px;
+            max-height: calc(100% - 20px);
+            background: var(--bg);
+            border: 2px solid var(--accent);
+            border-radius: var(--radius-md);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            overflow: hidden;
+        }
+
+        .pip-preview.show {
+            display: block;
+        }
+
+        .pip-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
         /* 검열중 탭 버튼 - 골드 색상 */
         #censorTabProcessing {
             border-color: var(--accent-gold-dim);
@@ -1776,7 +1973,15 @@
             text-overflow: ellipsis;
             white-space: nowrap;
         }
-        
+
+        .preset-btn .preset-name.modified::after {
+            content: '●';
+            margin-left: 4px;
+            color: white;
+            font-size: 0.5rem;
+            vertical-align: middle;
+        }
+
         .preset-btn .dropdown-arrow {
             font-size: 0.6rem;
             margin-left: 4px;
@@ -2416,7 +2621,7 @@
             position: fixed;
             inset: 0;
             background: rgba(0,0,0,0.85);
-            z-index: 10000;
+            z-index: 999999;
             justify-content: center;
             align-items: center;
         }
@@ -4277,6 +4482,20 @@
                         <div class="characters-header">
                             <button type="button" class="collapse-toggle" data-target="charactersContent" title="접기/펼치기">▼</button>
                             <label class="prompt-label">Characters</label>
+                            <div class="char-preset-dropdown" id="charPresetDropdown">
+                                <button type="button" class="char-preset-btn" title="캐릭터 전체 프리셋">
+                                    <span>🔖</span>
+                                    <span class="char-preset-name" id="charPresetName">Preset</span>
+                                    <span>▼</span>
+                                </button>
+                                <div class="char-preset-menu" id="charPresetMenu">
+                                    <div class="char-preset-list" id="charPresetList"></div>
+                                    <div class="char-preset-actions">
+                                        <button type="button" class="char-preset-action-btn" id="charPresetNewBtn">+ New</button>
+                                        <button type="button" class="char-preset-action-btn" id="charPresetSaveBtn">💾 Save</button>
+                                    </div>
+                                </div>
+                            </div>
                             <button type="button" class="add-char-btn" id="addCharBtn" title="캐릭터 추가">+</button>
                         </div>
                         <div id="charactersContent" class="collapsible-content">
@@ -4821,6 +5040,10 @@
                         <span>💾</span>
                         <span>세트 저장</span>
                     </button>
+                    <button type="button" class="header-btn" id="pipModeBtn" title="PIP 모드 (이미지 호버 시 크게 미리보기)">
+                        <span>⧉</span>
+                        <span>PIP</span>
+                    </button>
                 </div>
                 <div class="toolbar-right">
                     <span class="toolbar-label">Save to:</span>
@@ -4846,6 +5069,10 @@
             <div class="slots-container-wrapper" id="slotsWrapper">
                 <div class="slots-container" id="slotsContainer">
                     <!-- 슬롯들이 가로로 배치됨 -->
+                </div>
+                <!-- PIP Preview -->
+                <div class="pip-preview" id="pipPreview">
+                    <img id="pipPreviewImg" src="" alt="PIP Preview">
                 </div>
             </div>
 
@@ -6254,9 +6481,21 @@
         const presetNameSpan = document.getElementById('presetName');
         const newPresetBtn = document.getElementById('newPresetBtn');
         const savePresetBtn = document.getElementById('savePresetBtn');
-        
+
         let currentPreset = null; // { filename, name }
         let presets = [];
+        let savedPresetData = null; // 프리셋 로드 시 저장된 원본 데이터
+
+        // 슬롯 프리셋 변경 감지
+        function checkSlotPresetModified() {
+            if (!currentPreset || !savedPresetData) {
+                presetNameSpan.classList.remove('modified');
+                return;
+            }
+            const currentSlots = getAllSlotList().map(s => ({ name: s.name, content: s.content, locked: s.locked }));
+            const isModified = JSON.stringify(currentSlots) !== JSON.stringify(savedPresetData);
+            presetNameSpan.classList.toggle('modified', isModified);
+        }
         
         // 드롭다운 토글 (body에 붙여서 overflow 문제 해결)
         presetBtn.onclick = (e) => {
@@ -6318,14 +6557,18 @@
             // 이벤트 바인딩
             presetList.querySelectorAll('.preset-item').forEach(item => {
                 const filename = item.dataset.filename;
-                
-                item.querySelector('.label').onclick = () => loadPreset(filename);
-                
+
+                item.onclick = (e) => {
+                    if (!e.target.closest('.edit-btn, .delete-btn')) {
+                        loadPreset(filename);
+                    }
+                };
+
                 item.querySelector('.edit-btn').onclick = (e) => {
                     e.stopPropagation();
                     renamePreset(filename);
                 };
-                
+
                 item.querySelector('.delete-btn').onclick = (e) => {
                     e.stopPropagation();
                     deletePreset(filename);
@@ -6344,7 +6587,7 @@
                 
                 // 프리셋 슬롯들로 교체
                 data.slots.forEach(s => {
-                    addSlot(s.name, s.content);
+                    addSlot(s.name, s.content, s.locked || false);
                 });
                 
                 // 최소 1개 슬롯
@@ -6354,11 +6597,15 @@
                 
                 // 폴더 적용
                 setOutputFolder(data.folder || '');
-                
+
                 currentPreset = { filename, name: data.name };
                 presetNameSpan.textContent = data.name;
                 presetMenu.classList.remove('show');
-                
+
+                // 원본 데이터 저장 (변경 감지용)
+                savedPresetData = data.slots.map(s => ({ name: s.name || '', content: s.content || '', locked: s.locked || false }));
+                presetNameSpan.classList.remove('modified');
+
                 showToast(`Loaded: ${data.name}`, 'success');
             } catch (e) {
                 showToast('프리셋 로드 실패', 'error');
@@ -6369,8 +6616,8 @@
         newPresetBtn.onclick = async () => {
             const name = prompt('프리셋 이름 입력:');
             if (!name) return;
-            
-            const slots = getSlotList().map(s => ({ name: s.name, content: s.content }));
+
+            const slots = getAllSlotList().map(s => ({ name: s.name, content: s.content, locked: s.locked }));
             const folder = getOutputFolder();
 
             try {
@@ -6380,10 +6627,12 @@
                     body: JSON.stringify({ name, slots, folder })
                 });
                 const data = await res.json();
-                
+
                 currentPreset = { filename: data.filename, name: data.name };
                 presetNameSpan.textContent = data.name;
-                
+                savedPresetData = slots;
+                presetNameSpan.classList.remove('modified');
+
                 loadPresetList();
                 showToast(`Saved: ${name}`, 'success');
             } catch (e) {
@@ -6397,8 +6646,8 @@
                 showToast('프리셋이 선택되지 않음', 'warning');
                 return;
             }
-            
-            const slots = getSlotList().map(s => ({ name: s.name, content: s.content }));
+
+            const slots = getAllSlotList().map(s => ({ name: s.name, content: s.content, locked: s.locked }));
             const folder = getOutputFolder();
 
             try {
@@ -6407,7 +6656,10 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name: currentPreset.name, slots, folder })
                 });
-                
+
+                savedPresetData = slots;
+                presetNameSpan.classList.remove('modified');
+
                 showToast(`Saved: ${currentPreset.name}`, 'success');
                 presetMenu.classList.remove('show');
             } catch (e) {
@@ -6643,12 +6895,52 @@
         const syncScrollBtn = document.getElementById('syncScrollBtn');
         let syncScrollEnabled = false;
         let isSyncScrolling = false;
-        
+
         syncScrollBtn.onclick = () => {
             syncScrollEnabled = !syncScrollEnabled;
             syncScrollBtn.classList.toggle('active', syncScrollEnabled);
         };
-        
+
+        // PIP 모드
+        const pipModeBtn = document.getElementById('pipModeBtn');
+        const pipPreview = document.getElementById('pipPreview');
+        const pipPreviewImg = document.getElementById('pipPreviewImg');
+        let pipModeEnabled = false;
+
+        pipModeBtn.onclick = () => {
+            pipModeEnabled = !pipModeEnabled;
+            pipModeBtn.classList.toggle('active', pipModeEnabled);
+            if (!pipModeEnabled) {
+                pipPreview.classList.remove('show');
+            }
+            autoSaveSettings();
+        };
+
+        // 슬롯 이미지 호버 시 PIP 프리뷰 표시
+        slotsContainer.addEventListener('mouseover', (e) => {
+            if (!pipModeEnabled) return;
+            const imgCard = e.target.closest('.slot-image-card');
+            if (imgCard) {
+                const img = imgCard.querySelector('img');
+                if (img && img.src) {
+                    pipPreviewImg.src = img.src;
+                    pipPreview.classList.add('show');
+                }
+            }
+        });
+
+        slotsContainer.addEventListener('mouseout', (e) => {
+            if (!pipModeEnabled) return;
+            const imgCard = e.target.closest('.slot-image-card');
+            if (imgCard) {
+                // 다른 이미지로 이동하는 경우는 유지
+                const relatedTarget = e.relatedTarget;
+                if (!relatedTarget || !relatedTarget.closest('.slot-image-card')) {
+                    pipPreview.classList.remove('show');
+                }
+            }
+        });
+
         function setupSlotImageScroll(slot) {
             const imagesContainer = slot.querySelector('.slot-images');
             
@@ -6695,12 +6987,13 @@
         let overscrollOffset = 0;
         
         slotsContainer.addEventListener('mousedown', (e) => {
-            // 텍스트 입력란, 버튼, 드래그 핸들만 제외
-            if (e.target.tagName === 'INPUT' || 
-                e.target.tagName === 'TEXTAREA' || 
+            // 텍스트 입력란, 버튼, 드래그 핸들, 리사이즈 핸들 제외
+            if (e.target.tagName === 'INPUT' ||
+                e.target.tagName === 'TEXTAREA' ||
                 e.target.tagName === 'BUTTON' ||
                 e.target.classList.contains('slot-drag') ||
-                e.target.classList.contains('slot-delete')) {
+                e.target.classList.contains('slot-delete') ||
+                e.target.classList.contains('slot-resize-handle')) {
                 return;
             }
             
@@ -7110,17 +7403,20 @@
             if (!e.target.closest('.prompt-preset-dropdown')) {
                 document.querySelectorAll('.prompt-preset-menu.show').forEach(m => m.classList.remove('show'));
             }
+            if (!e.target.closest('.char-preset-dropdown')) {
+                document.querySelectorAll('.char-preset-menu.show').forEach(m => m.classList.remove('show'));
+            }
         });
-        
+
         // === Characters ===
         const charactersList = document.getElementById('charactersList');
         const addCharBtn = document.getElementById('addCharBtn');
         
-        function createCharacterItem(content = '', collapsed = false, enabled = true) {
+        function createCharacterItem(content = '', collapsed = false, enabled = true, name = '') {
             const item = document.createElement('div');
             item.className = 'character-item' + (enabled ? '' : ' disabled');
 
-            // 헤더 (접기 + on/off + 번호 + 프리셋 + 삭제)
+            // 헤더 (접기 + on/off + 번호 + 이름 + 프리셋 + 삭제)
             const header = document.createElement('div');
             header.className = 'character-item-header';
 
@@ -7153,6 +7449,15 @@
             const charNum = document.createElement('span');
             charNum.className = 'char-num';
 
+            // 이름 입력 필드
+            const charName = document.createElement('input');
+            charName.type = 'text';
+            charName.className = 'char-name';
+            charName.placeholder = '이름';
+            charName.value = name;
+            charName.oninput = () => autoSaveSettings();
+            charName.ondblclick = (e) => e.stopPropagation();
+
             // 프리셋 드롭다운
             const presetDropdown = document.createElement('div');
             presetDropdown.className = 'prompt-preset-dropdown';
@@ -7181,6 +7486,7 @@
             header.appendChild(collapseBtn);
             header.appendChild(enableToggle);
             header.appendChild(charNum);
+            header.appendChild(charName);
             header.appendChild(presetDropdown);
             header.appendChild(deleteBtn);
 
@@ -7210,8 +7516,8 @@
 
             // 헤더 바 전체 클릭으로 접기/펴기
             header.addEventListener('click', (e) => {
-                // 체크박스, 프리셋, 삭제, 드래그 버튼 클릭은 무시
-                if (e.target.closest('.char-enable-toggle, .prompt-preset-dropdown, .delete-char-btn, .char-drag')) return;
+                // 체크박스, 프리셋, 삭제, 드래그 버튼, 이름 입력 클릭은 무시
+                if (e.target.closest('.char-enable-toggle, .prompt-preset-dropdown, .delete-char-btn, .char-drag, .char-name')) return;
                 collapseBtn.classList.toggle('collapsed');
                 contentDiv.classList.toggle('collapsed');
                 autoSaveSettings();
@@ -7284,9 +7590,207 @@
                 content: item.querySelector('textarea').value,
                 collapsed: item.querySelector('.collapsible-content').classList.contains('collapsed'),
                 height: item.querySelector('textarea').style.height || null,
-                enabled: item.querySelector('.char-enable-toggle').checked
+                enabled: item.querySelector('.char-enable-toggle').checked,
+                name: item.querySelector('.char-name').value || ''
             }));
         }
+
+        // === Character All Preset (캐릭터 전체 프리셋) ===
+        async function loadCharPresets() {
+            try {
+                const res = await fetch(`${API_BASE}/api/prompts/character-list`);
+                if (!res.ok) return [];
+                return await res.json();
+            } catch (e) {
+                return [];
+            }
+        }
+
+        async function saveCharPreset(name, data) {
+            const filename = name.replace(/[^a-zA-Z0-9가-힣_-]/g, '_') + '.json';
+            try {
+                const res = await fetch(`${API_BASE}/api/prompts/character-list/${filename}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (!res.ok) {
+                    showToast('저장 실패', 'error');
+                    return false;
+                }
+                showToast('캐릭터 프리셋 저장됨', 'success');
+                return true;
+            } catch (e) {
+                showToast('저장 실패: ' + e.message, 'error');
+                return false;
+            }
+        }
+
+        async function deleteCharPreset(filename) {
+            try {
+                await fetch(`${API_BASE}/api/prompts/character-list/${filename}`, { method: 'DELETE' });
+                showToast('삭제됨', 'success');
+                return true;
+            } catch (e) {
+                showToast('삭제 실패', 'error');
+                return false;
+            }
+        }
+
+        function applyCharPreset(data) {
+            charactersList.innerHTML = '';
+            if (data.characters && data.characters.length > 0) {
+                data.characters.forEach(charData => {
+                    const content = charData.content || '';
+                    const height = charData.height || null;
+                    const enabled = charData.enabled !== false;
+                    const name = charData.name || '';
+                    const collapsed = charData.collapsed || false;
+                    const item = createCharacterItem(content, collapsed, enabled, name);
+                    if (height) {
+                        item.querySelector('textarea').style.height = height;
+                    }
+                    charactersList.appendChild(item);
+                });
+                updateCharacterNumbers();
+            }
+            // 원본 데이터 저장 (변경 감지용)
+            savedCharPresetData = JSON.stringify(data.characters || []);
+            document.getElementById('charPresetName').classList.remove('modified');
+            autoSaveSettings();
+            showToast('캐릭터 프리셋 적용됨', 'success');
+        }
+
+        // 캐릭터 프리셋 시스템
+        let currentCharPreset = null; // { filename, name }
+        let savedCharPresetData = null; // 프리셋 로드 시 저장된 원본 데이터
+
+        // 캐릭터 프리셋 변경 감지
+        function checkCharPresetModified() {
+            const charPresetNameSpan = document.getElementById('charPresetName');
+            if (!currentCharPreset || !savedCharPresetData) {
+                charPresetNameSpan.classList.remove('modified');
+                return;
+            }
+            const currentData = JSON.stringify(getCharacterPromptsWithLayout());
+            const isModified = currentData !== savedCharPresetData;
+            charPresetNameSpan.classList.toggle('modified', isModified);
+        }
+
+        (function setupCharPresetDropdown() {
+            const dropdown = document.getElementById('charPresetDropdown');
+            const btn = dropdown.querySelector('.char-preset-btn');
+            const menu = document.getElementById('charPresetMenu');
+            const list = document.getElementById('charPresetList');
+            const newBtn = document.getElementById('charPresetNewBtn');
+            const saveBtn = document.getElementById('charPresetSaveBtn');
+            const presetNameSpan = document.getElementById('charPresetName');
+
+            async function renderCharPresetList() {
+                const presets = await loadCharPresets();
+                if (presets.length === 0) {
+                    list.innerHTML = '<div class="char-preset-empty">저장된 캐릭터 프리셋 없음</div>';
+                } else {
+                    list.innerHTML = presets.map(p => {
+                        const charCount = (p.data.characters || []).length;
+                        const names = (p.data.characters || []).map(c => c.name || '').filter(n => n).slice(0, 3).join(', ');
+                        const preview = names || `캐릭터 ${charCount}개`;
+                        const isSelected = currentCharPreset?.filename === p.filename;
+                        return `
+                            <div class="char-preset-item ${isSelected ? 'selected' : ''}" data-filename="${p.filename}">
+                                <span class="check">${isSelected ? '✓' : ''}</span>
+                                <span class="label">${p.name}</span>
+                                <span class="preview">${preview}</span>
+                                <button class="delete-btn" title="삭제">×</button>
+                            </div>
+                        `;
+                    }).join('');
+
+                    list.querySelectorAll('.char-preset-item').forEach(item => {
+                        const filename = item.dataset.filename;
+                        const preset = presets.find(p => p.filename === filename);
+
+                        // 아이템 클릭 시 적용
+                        item.onclick = (e) => {
+                            if (e.target.classList.contains('delete-btn')) return;
+                            if (preset) {
+                                applyCharPreset(preset.data);
+                                currentCharPreset = { filename, name: preset.name };
+                                presetNameSpan.textContent = preset.name;
+                                autoSaveSettings();
+                            }
+                            menu.classList.remove('show');
+                        };
+
+                        item.querySelector('.delete-btn').onclick = (e) => {
+                            e.stopPropagation();
+                            showConfirmModal(
+                                '🗑️ 프리셋 삭제',
+                                `<p>"${preset.name}" 프리셋을 삭제하시겠습니까?</p>`,
+                                async () => {
+                                    if (await deleteCharPreset(filename)) {
+                                        if (currentCharPreset?.filename === filename) {
+                                            currentCharPreset = null;
+                                            presetNameSpan.textContent = 'Preset';
+                                            autoSaveSettings();
+                                        }
+                                        item.remove();
+                                        if (list.querySelectorAll('.char-preset-item').length === 0) {
+                                            list.innerHTML = '<div class="char-preset-empty">저장된 캐릭터 프리셋 없음</div>';
+                                        }
+                                    }
+                                }
+                            );
+                        };
+                    });
+                }
+            }
+
+            btn.onclick = async (e) => {
+                e.stopPropagation();
+                document.querySelectorAll('.char-preset-menu.show').forEach(m => {
+                    if (m !== menu) m.classList.remove('show');
+                });
+                menu.classList.toggle('show');
+
+                if (menu.classList.contains('show')) {
+                    await renderCharPresetList();
+                }
+            };
+
+            // + New: 새 프리셋 생성
+            newBtn.onclick = async (e) => {
+                e.stopPropagation();
+                const name = prompt('새 캐릭터 프리셋 이름:');
+                if (name && name.trim()) {
+                    const data = { characters: getCharacterPromptsWithLayout() };
+                    if (await saveCharPreset(name.trim(), data)) {
+                        const filename = name.trim().replace(/[^a-zA-Z0-9가-힣_-]/g, '_') + '.json';
+                        currentCharPreset = { filename, name: name.trim() };
+                        presetNameSpan.textContent = name.trim();
+                        savedCharPresetData = JSON.stringify(data.characters);
+                        presetNameSpan.classList.remove('modified');
+                        await renderCharPresetList();
+                        autoSaveSettings();
+                    }
+                }
+            };
+
+            // 💾 Save: 현재 프리셋에 덮어쓰기
+            saveBtn.onclick = async (e) => {
+                e.stopPropagation();
+                if (!currentCharPreset) {
+                    showToast('프리셋이 선택되지 않음', 'warning');
+                    return;
+                }
+                const data = { characters: getCharacterPromptsWithLayout() };
+                if (await saveCharPreset(currentCharPreset.name, data)) {
+                    savedCharPresetData = JSON.stringify(data.characters);
+                    presetNameSpan.classList.remove('modified');
+                    menu.classList.remove('show');
+                }
+            };
+        })();
 
         // 캐릭터 드래그 앤 드롭
         let draggedChar = null;
@@ -9395,7 +9899,7 @@
             // 토글 함수
             const toggleCollapse = (e) => {
                 // 프리셋 드롭다운 버튼, 기타 컨트롤 클릭은 무시
-                if (e && e.target.closest('.prompt-preset-dropdown, .add-char-btn, .section-toggle, .mode-toggle, .translate-mode-btn')) return;
+                if (e && e.target.closest('.prompt-preset-dropdown, .char-preset-dropdown, .add-char-btn, .section-toggle, .mode-toggle, .translate-mode-btn')) return;
                 // 이벤트 버블링 방지
                 if (e) e.stopPropagation();
 
@@ -11302,8 +11806,9 @@
                     const collapsed = charData.collapsed || false;
                     const height = charData.height || null;
                     const enabled = charData.enabled !== false;
-                    if (content.trim() || collapsed) {
-                        const item = createCharacterItem(content, collapsed, enabled);
+                    const name = charData.name || '';
+                    if (content.trim() || collapsed || name.trim()) {
+                        const item = createCharacterItem(content, collapsed, enabled, name);
                         if (height) {
                             item.querySelector('textarea').style.height = height;
                         }
@@ -11528,6 +12033,8 @@
                 basePromptCollapsed: document.getElementById('basePromptContent').classList.contains('collapsed'),
                 charactersCollapsed: document.getElementById('charactersContent').classList.contains('collapsed'),
                 negativePromptCollapsed: document.getElementById('negativePromptContent').classList.contains('collapsed'),
+                pipModeEnabled: pipModeEnabled,
+                currentCharPreset: currentCharPreset,
             };
             
             localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
@@ -11592,7 +12099,15 @@
                         document.getElementById('negativePromptContent').classList.add('collapsed');
                         document.querySelector('[data-target="negativePromptContent"]').classList.add('collapsed');
                     }
-                    
+                    if (settings.pipModeEnabled) {
+                        pipModeEnabled = true;
+                        document.getElementById('pipModeBtn').classList.add('active');
+                    }
+                    if (settings.currentCharPreset) {
+                        currentCharPreset = settings.currentCharPreset;
+                        document.getElementById('charPresetName').textContent = currentCharPreset.name;
+                    }
+
                     // 현재 provider 설정 적용 (NAI로 시작)
                     const currentSettings = currentProvider === 'nai' ? naiSettings : localSettings;
                     
@@ -11648,16 +12163,24 @@
                             addSlot(slot.name || '', slot.content || '', slot.locked || false);
                         });
                     }
-                    
+
                     // Preset
                     if (currentSettings.currentPreset) {
                         currentPreset = currentSettings.currentPreset;
                         presetNameSpan.textContent = currentPreset.name || 'Slot Set';
+                        // 슬롯 프리셋 변경 감지용 원본 데이터 설정
+                        if (currentSettings.slots) {
+                            savedPresetData = currentSettings.slots.map(s => ({ name: s.name || '', content: s.content || '', locked: s.locked || false }));
+                        }
                     }
-                    
+
                     // Character prompts
                     if (currentSettings.characterPromptsLayout && currentSettings.characterPromptsLayout.length > 0) {
                         window._pendingCharacterPromptsLayout = currentSettings.characterPromptsLayout;
+                        // 캐릭터 프리셋 변경 감지용 원본 데이터 설정
+                        if (settings.currentCharPreset) {
+                            savedCharPresetData = JSON.stringify(currentSettings.characterPromptsLayout);
+                        }
                     }
                     
                     // NAI-specific (시작 provider가 NAI일 때)
@@ -11946,6 +12469,9 @@
         function autoSaveSettings() {
             if (saveTimeout) clearTimeout(saveTimeout);
             saveTimeout = setTimeout(saveAppSettings, 500);
+            // 프리셋 변경 감지
+            checkSlotPresetModified();
+            checkCharPresetModified();
         }
         
         // 주요 입력 요소에 자동 저장 연결
@@ -12067,8 +12593,9 @@
                     const collapsed = charData.collapsed || false;
                     const height = charData.height || null;
                     const enabled = charData.enabled !== false;  // 기본값 true (하위 호환)
-                    if (content.trim() || collapsed) {
-                        const item = createCharacterItem(content, collapsed, enabled);
+                    const name = charData.name || '';
+                    if (content.trim() || collapsed || name.trim()) {
+                        const item = createCharacterItem(content, collapsed, enabled, name);
                         if (height) {
                             item.querySelector('textarea').style.height = height;
                         }

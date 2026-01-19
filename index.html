@@ -5012,17 +5012,14 @@
                         <!-- NAI Advanced Settings -->
                         <div id="naiAdvancedSettings" class="provider-section" data-provider="nai">
                             <div class="row">
-                                <div style="flex: 1;">
-                                    <label style="display: flex; justify-content: space-between; align-items: center;">
-                                        <span>Prompt Guidance Rescale</span>
-                                        <span id="cfgRescaleValue" style="font-weight: 500;">0</span>
-                                    </label>
-                                    <input type="range" id="cfgRescale" value="0" min="0" max="1" step="0.02" style="width: 100%;">
+                                <div>
+                                    <label>Guidance Rescale</label>
+                                    <input type="number" id="cfgRescale" value="0" min="0" max="1" step="0.02">
                                 </div>
-                            </div>
-                            <div class="checkbox-row">
-                                <input type="checkbox" id="varietyPlus">
-                                <label for="varietyPlus">Variety+</label>
+                                <div class="checkbox-row" style="align-self: flex-end; padding-bottom: 8px;">
+                                    <input type="checkbox" id="varietyPlus">
+                                    <label for="varietyPlus">Variety+</label>
+                                </div>
                             </div>
                         </div>
 
@@ -7557,7 +7554,22 @@
                 }
                 // Generation 설정도 동기화
                 saveCurrentProviderGenerationSettings();
-                
+
+                // 현재 provider의 슬롯 이미지 저장
+                const currentSlots = slotsContainer.querySelectorAll('.slot');
+                const currentImages = [];
+                currentSlots.forEach(slot => {
+                    const imagesContainer = slot.querySelector('.slot-images');
+                    if (imagesContainer) {
+                        currentImages.push(imagesContainer.cloneNode(true));
+                    }
+                });
+                if (currentProvider === 'nai') {
+                    naiSlotImages = currentImages;
+                } else {
+                    localSlotImages = currentImages;
+                }
+
                 // Provider 전환
                 const newProvider = tab.dataset.provider;
                 currentProvider = newProvider;
@@ -10111,10 +10123,7 @@
                 highlight('qualityTags');
             }
             if (metadata.cfg_rescale !== undefined) {
-                const cfgRescaleEl = document.getElementById('cfgRescale');
-                cfgRescaleEl.value = metadata.cfg_rescale;
-                document.getElementById('cfgRescaleValue').textContent = metadata.cfg_rescale;
-                updateSliderFill(cfgRescaleEl);
+                document.getElementById('cfgRescale').value = metadata.cfg_rescale;
                 highlight('cfgRescale');
             }
             if (metadata.variety_plus !== undefined) {
@@ -10443,9 +10452,14 @@
             document.getElementById('lutIntensityValue').textContent = this.value;
         };
 
-        // CFG Rescale slider value display
-        document.getElementById('cfgRescale').oninput = function() {
-            document.getElementById('cfgRescaleValue').textContent = this.value;
+        // CFG Rescale 최대값(1) 제한 - 포커스 벗어날 때 검증
+        document.getElementById('cfgRescale').onchange = function() {
+            let val = parseFloat(this.value);
+            if (isNaN(val) || val < 0) {
+                this.value = 0;
+            } else if (val > 1) {
+                this.value = 1;
+            }
         };
 
         // ============================================================
@@ -12116,6 +12130,10 @@
         // Provider별 설정 저장소
         let naiSettings = {};
         let localSettings = {};
+
+        // Provider별 슬롯 이미지 저장소 (DOM 요소 배열)
+        let naiSlotImages = [];
+        let localSlotImages = [];
         
         // 현재 provider의 모든 설정을 객체로 수집
         function collectCurrentProviderSettings() {
@@ -12297,16 +12315,35 @@
             }
             
             // Slots - provider별로 분리됨 (락 상태 포함)
+            // 이미지 카드도 provider별로 분리 (naiSlotImages / localSlotImages)
+            const savedImages = currentProvider === 'nai' ? naiSlotImages : localSlotImages;
+
             if (settings.slots && settings.slots.length > 0) {
                 slotsContainer.innerHTML = '';
-                settings.slots.forEach(slot => {
+                settings.slots.forEach((slot, index) => {
                     addSlot(slot.name || '', slot.content || '', slot.locked || false);
+                    // 해당 provider의 저장된 이미지 복원
+                    if (savedImages[index]) {
+                        const newSlot = slotsContainer.children[index];
+                        const newImagesContainer = newSlot.querySelector('.slot-images');
+                        if (newImagesContainer) {
+                            newImagesContainer.replaceWith(savedImages[index].cloneNode(true));
+                        }
+                    }
                 });
                 updateLockAllBtnState();
             } else if (isFullRestore) {
                 // 슬롯이 없으면 빈 상태로 (기본 슬롯 1개)
                 slotsContainer.innerHTML = '';
                 addSlot('', '');
+                // 첫 번째 슬롯에 이미지 복원
+                if (savedImages[0]) {
+                    const newSlot = slotsContainer.children[0];
+                    const newImagesContainer = newSlot.querySelector('.slot-images');
+                    if (newImagesContainer) {
+                        newImagesContainer.replaceWith(savedImages[0].cloneNode(true));
+                    }
+                }
                 updateLockAllBtnState();
             }
 
@@ -12335,10 +12372,7 @@
                     }
                 }
                 if (settings.cfgRescale !== undefined) {
-                    const cfgRescaleEl = document.getElementById('cfgRescale');
-                    cfgRescaleEl.value = settings.cfgRescale;
-                    document.getElementById('cfgRescaleValue').textContent = settings.cfgRescale;
-                    updateSliderFill(cfgRescaleEl);
+                    document.getElementById('cfgRescale').value = settings.cfgRescale;
                 }
                 if (settings.varietyPlus !== undefined) document.getElementById('varietyPlus').checked = settings.varietyPlus;
                 if (settings.enableVibeTransfer !== undefined) {
@@ -12360,8 +12394,20 @@
                 if (settings.charRefStyleAware !== undefined) {
                     document.getElementById('charRefStyleAware').checked = settings.charRefStyleAware;
                 }
+                // LUT settings (NAI)
+                if (settings.enableLut !== undefined) {
+                    document.getElementById('enableLut').checked = settings.enableLut;
+                    document.getElementById('lutSettings').style.display = settings.enableLut ? 'block' : 'none';
+                }
+                if (settings.lutFile) window._pendingLutFile = settings.lutFile;
+                if (settings.lutIntensity !== undefined) {
+                    const lutIntensityEl = document.getElementById('lutIntensity');
+                    lutIntensityEl.value = settings.lutIntensity;
+                    document.getElementById('lutIntensityValue').textContent = settings.lutIntensity;
+                    updateSliderFill(lutIntensityEl);
+                }
             }
-            
+
             // Local-specific
             if (currentProvider === 'local') {
                 if (settings.localModel) {
@@ -12643,10 +12689,7 @@
                             modeToggle.classList.add('furry');
                         }
                         if (naiSettings.cfgRescale !== undefined) {
-                            const cfgRescaleEl = document.getElementById('cfgRescale');
-                            cfgRescaleEl.value = naiSettings.cfgRescale;
-                            document.getElementById('cfgRescaleValue').textContent = naiSettings.cfgRescale;
-                            updateSliderFill(cfgRescaleEl);
+                            document.getElementById('cfgRescale').value = naiSettings.cfgRescale;
                         }
                         if (naiSettings.varietyPlus !== undefined) document.getElementById('varietyPlus').checked = naiSettings.varietyPlus;
                         if (naiSettings.enableVibeTransfer !== undefined) {
@@ -12844,10 +12887,7 @@
                     modeToggle.title = '퍼리 모드';
                     modeToggle.classList.add('furry');
                 }
-                const cfgRescaleEl = document.getElementById('cfgRescale');
-                cfgRescaleEl.value = naiSettings.cfgRescale;
-                document.getElementById('cfgRescaleValue').textContent = naiSettings.cfgRescale;
-                updateSliderFill(cfgRescaleEl);
+                document.getElementById('cfgRescale').value = naiSettings.cfgRescale;
                 document.getElementById('varietyPlus').checked = naiSettings.varietyPlus;
                 document.getElementById('enableVibeTransfer').checked = naiSettings.enableVibeTransfer;
                 document.getElementById('vibeTransferSettings').style.display = naiSettings.enableVibeTransfer ? 'block' : 'none';

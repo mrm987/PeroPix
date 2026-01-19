@@ -1844,6 +1844,32 @@
             background: var(--accent-hover);
         }
 
+        .lock-all-btn {
+            background: var(--bg-lighter);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+        }
+
+        .lock-all-btn:hover {
+            background: var(--bg-light);
+            border-color: var(--accent);
+        }
+
+        .lock-all-btn.all-locked {
+            background: var(--accent-gold-dim);
+            border-color: var(--accent-gold);
+            color: var(--accent-gold);
+        }
+
         /* 슬롯 사이즈 프리셋 */
         .slot-size-presets {
             display: flex;
@@ -5119,6 +5145,7 @@
             <div class="slots-toolbar" id="slotsToolbar">
                 <div class="toolbar-left">
                     <button type="button" class="add-slot-btn" id="addSlotBtn" title="슬롯 추가">+🎰</button>
+                    <button type="button" class="lock-all-btn" id="lockAllBtn" title="전체 슬롯 락 토글">🔓</button>
                     <div class="slot-size-presets">
                         <button type="button" class="slot-size-preset-btn" id="slotSizePreset1" title="좌클릭: 프리셋 1 적용 | 우클릭: 현재 크기 저장">150</button>
                         <button type="button" class="slot-size-preset-btn" id="slotSizePreset2" title="좌클릭: 프리셋 2 적용 | 우클릭: 현재 크기 저장">675</button>
@@ -6073,6 +6100,7 @@
                     updateSlotNumbers();
                     updateQueueButton();
                     updateAnlasCost();
+                    updateLockAllBtnState();
                     autoSaveSettings();
                 }
             };
@@ -6086,6 +6114,7 @@
                 lockBtn.title = isLocked ? '락 해제' : '락 (생성 제외)';
                 updateQueueButton();
                 updateAnlasCost();
+                updateLockAllBtnState();
                 autoSaveSettings();
             };
 
@@ -6584,9 +6613,47 @@
         
         addSlotBtn.onclick = () => {
             addSlot();
+            updateLockAllBtnState();
             autoSaveSettings();
         };
-        
+
+        // === Lock All Toggle ===
+        const lockAllBtn = document.getElementById('lockAllBtn');
+
+        function updateLockAllBtnState() {
+            const slots = slotsContainer.querySelectorAll('.slot');
+            const lockedSlots = slotsContainer.querySelectorAll('.slot.locked');
+            const allLocked = slots.length > 0 && lockedSlots.length === slots.length;
+            lockAllBtn.classList.toggle('all-locked', allLocked);
+            lockAllBtn.textContent = allLocked ? '🔒' : '🔓';
+            lockAllBtn.title = allLocked ? '전체 슬롯 락 해제' : '전체 슬롯 락 설정';
+        }
+
+        lockAllBtn.onclick = () => {
+            const slots = slotsContainer.querySelectorAll('.slot');
+            const lockedSlots = slotsContainer.querySelectorAll('.slot.locked');
+            const shouldLock = lockedSlots.length < slots.length;
+
+            slots.forEach(slot => {
+                const lockBtn = slot.querySelector('.slot-lock');
+                if (shouldLock) {
+                    slot.classList.add('locked');
+                    lockBtn.classList.add('locked');
+                    lockBtn.textContent = '🔒';
+                    lockBtn.title = '락 해제';
+                } else {
+                    slot.classList.remove('locked');
+                    lockBtn.classList.remove('locked');
+                    lockBtn.textContent = '🔓';
+                    lockBtn.title = '락 (생성 제외)';
+                }
+            });
+
+            updateLockAllBtnState();
+            updateAnlasCost();
+            autoSaveSettings();
+        };
+
         // === Preset System ===
         const presetDropdown = document.getElementById('presetDropdown');
         const presetBtn = document.getElementById('presetBtn');
@@ -6695,22 +6762,22 @@
             try {
                 const res = await fetch(`${API_BASE}/api/presets/${filename}`);
                 const data = await res.json();
-                
+
                 // 현재 슬롯 모두 제거
                 slotsContainer.innerHTML = '';
-                
+
                 // 프리셋 슬롯들로 교체
                 data.slots.forEach(s => {
                     addSlot(s.name, s.content, s.locked || false);
                 });
-                
+
                 // 최소 1개 슬롯
                 if (data.slots.length === 0) {
                     addSlot();
                 }
-                
-                // 폴더 적용
-                setOutputFolder(data.folder || '');
+
+                // 폴더는 적용하지 않음 (유저가 직접 변경하지 않는 한 유지)
+                // setOutputFolder(data.folder || '');
 
                 currentPreset = { filename, name: data.name };
                 presetNameSpan.textContent = data.name;
@@ -6720,6 +6787,7 @@
                 savedPresetData = data.slots.map(s => ({ name: s.name || '', content: s.content || '', locked: s.locked || false }));
                 presetNameSpan.classList.remove('modified');
 
+                updateLockAllBtnState();
                 showToast(`Loaded: ${data.name}`, 'success');
             } catch (e) {
                 showToast('프리셋 로드 실패', 'error');
@@ -7764,6 +7832,15 @@
             enableToggle.checked = enabled;
             enableToggle.title = enabled ? '활성화됨 (클릭하여 비활성화)' : '비활성화됨 (클릭하여 활성화)';
             enableToggle.onchange = () => {
+                // 활성화하려는 경우 6명 제한 체크
+                if (enableToggle.checked) {
+                    const enabledCount = charactersList.querySelectorAll('.character-item:not(.disabled)').length;
+                    if (enabledCount >= 6) {
+                        enableToggle.checked = false;
+                        showToast('최대 6명의 캐릭터만 활성화 가능', 'warning');
+                        return;
+                    }
+                }
                 item.classList.toggle('disabled', !enableToggle.checked);
                 enableToggle.title = enableToggle.checked ? '활성화됨 (클릭하여 비활성화)' : '비활성화됨 (클릭하여 활성화)';
                 autoSaveSettings();
@@ -7866,22 +7943,13 @@
             items.forEach((item, index) => {
                 item.querySelector('.char-num').textContent = index + 1;
             });
-            // 최대 6개 제한
-            updateAddCharBtn();
         }
-        
-        function updateAddCharBtn() {
-            const count = charactersList.querySelectorAll('.character-item').length;
-            addCharBtn.disabled = count >= 6;
-            addCharBtn.title = count >= 6 ? 'Maximum 6 characters' : 'Add character';
+
+        function getEnabledCharacterCount() {
+            return charactersList.querySelectorAll('.character-item:not(.disabled)').length;
         }
-        
+
         function addCharacter(content = '') {
-            const count = charactersList.querySelectorAll('.character-item').length;
-            if (count >= 6) {
-                showToast('최대 6개의 캐릭터까지 가능', 'warning');
-                return;
-            }
             // Characters 섹션이 접혀있으면 펼치기
             const charactersContent = document.getElementById('charactersContent');
             if (charactersContent.classList.contains('collapsed')) {
@@ -7893,10 +7961,16 @@
                     localStorage.setItem('collapse_charactersContent', 'expanded');
                 }
             }
-            const item = createCharacterItem(content);
+            // 활성화된 캐릭터가 6명 이상이면 새 캐릭터는 비활성화 상태로 추가
+            const enabledCount = getEnabledCharacterCount();
+            const shouldBeEnabled = enabledCount < 6;
+            const item = createCharacterItem(content, false, shouldBeEnabled);
             charactersList.appendChild(item);
             updateCharacterNumbers();
             item.querySelector('textarea').focus();
+            if (!shouldBeEnabled) {
+                showToast('활성화된 캐릭터가 6명이므로 비활성화 상태로 추가됨', 'info');
+            }
         }
         
         function getCharacterPrompts() {
@@ -7963,10 +8037,16 @@
         function applyCharPreset(data) {
             charactersList.innerHTML = '';
             if (data.characters && data.characters.length > 0) {
+                let enabledCount = 0;
                 data.characters.forEach(charData => {
                     const content = charData.content || '';
                     const height = charData.height || null;
-                    const enabled = charData.enabled !== false;
+                    let enabled = charData.enabled !== false;
+                    // 활성화 6명 제한 적용
+                    if (enabled && enabledCount >= 6) {
+                        enabled = false;
+                    }
+                    if (enabled) enabledCount++;
                     const name = charData.name || '';
                     const collapsed = charData.collapsed || false;
                     const item = createCharacterItem(content, collapsed, enabled, name);
@@ -10655,9 +10735,18 @@
             const vibeCount = vibeEnabled ? vibeList.length : 0;
             const hasCharRef = document.getElementById('enableCharRef').checked && charRefData !== null;
             const repeatCount = parseInt(document.getElementById('repeatCount').value) || 1;
-            const slotCount = document.querySelectorAll('.slot').length || 1;
-            const totalCount = repeatCount * slotCount;
+            const slotCount = document.querySelectorAll('.slot:not(.locked)').length;
             const naiModel = document.getElementById('naiModel').value;
+
+            // 모든 슬롯이 잠긴 경우 - 비용 0 표시
+            if (slotCount === 0) {
+                document.getElementById('anlasCost').style.display = 'inline';
+                document.getElementById('anlasFreeTag').style.display = 'none';
+                document.getElementById('anlasCost').textContent = '0 (잠김)';
+                return;
+            }
+
+            const totalCount = repeatCount * slotCount;
 
             // Vibe 데이터 (캐시 체크용)
             const vibes = vibeEnabled ? vibeList.map(v => ({
@@ -12124,11 +12213,17 @@
             if (settings.characterPromptsLayout && settings.characterPromptsLayout.length > 0) {
                 const charactersList = document.getElementById('charactersList');
                 charactersList.innerHTML = '';
+                let enabledCount = 0;
                 settings.characterPromptsLayout.forEach(charData => {
                     const content = charData.content || '';
                     const collapsed = charData.collapsed || false;
                     const height = charData.height || null;
-                    const enabled = charData.enabled !== false;
+                    let enabled = charData.enabled !== false;
+                    // 활성화 6명 제한 적용
+                    if (enabled && enabledCount >= 6) {
+                        enabled = false;
+                    }
+                    if (enabled) enabledCount++;
                     const name = charData.name || '';
                     if (content.trim() || collapsed || name.trim()) {
                         const item = createCharacterItem(content, collapsed, enabled, name);
@@ -12207,12 +12302,14 @@
                 settings.slots.forEach(slot => {
                     addSlot(slot.name || '', slot.content || '', slot.locked || false);
                 });
+                updateLockAllBtnState();
             } else if (isFullRestore) {
                 // 슬롯이 없으면 빈 상태로 (기본 슬롯 1개)
                 slotsContainer.innerHTML = '';
                 addSlot('', '');
+                updateLockAllBtnState();
             }
-            
+
             // Preset
             if (settings.currentPreset !== undefined) {
                 currentPreset = settings.currentPreset;
@@ -12511,6 +12608,7 @@
                         currentSettings.slots.forEach(slot => {
                             addSlot(slot.name || '', slot.content || '', slot.locked || false);
                         });
+                        updateLockAllBtnState();
                     }
 
                     // Preset
@@ -12721,8 +12819,9 @@
                     naiSettings.slots.forEach(slot => {
                         addSlot(slot.name || '', slot.content || '', slot.locked || false);
                     });
+                    updateLockAllBtnState();
                 }
-                
+
                 // Preset
                 if (naiSettings.currentPreset) {
                     currentPreset = naiSettings.currentPreset;
@@ -12937,11 +13036,17 @@
             }
             // 캐릭터 프롬프트 복원 (레이아웃 포함)
             if (window._pendingCharacterPromptsLayout) {
+                let enabledCount = 0;
                 window._pendingCharacterPromptsLayout.forEach(charData => {
                     const content = charData.content || '';
                     const collapsed = charData.collapsed || false;
                     const height = charData.height || null;
-                    const enabled = charData.enabled !== false;  // 기본값 true (하위 호환)
+                    let enabled = charData.enabled !== false;  // 기본값 true (하위 호환)
+                    // 활성화 6명 제한 적용
+                    if (enabled && enabledCount >= 6) {
+                        enabled = false;
+                    }
+                    if (enabled) enabledCount++;
                     const name = charData.name || '';
                     if (content.trim() || collapsed || name.trim()) {
                         const item = createCharacterItem(content, collapsed, enabled, name);
@@ -12965,7 +13070,10 @@
         if (slotsContainer.children.length === 0) {
             addSlot();
         }
-        
+
+        // 전체 락 버튼 상태 초기화
+        updateLockAllBtnState();
+
         // 시드가 비어있으면 랜덤 생성
         if (!document.getElementById('seed').value) {
             document.getElementById('seed').value = Math.floor(Math.random() * 2147483647);

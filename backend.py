@@ -750,11 +750,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel
 
+class CharacterPromptWithCoordSimple(BaseModel):
+    prompt: str
+    coord: Optional[str] = None  # 'a1' ~ 'e5' 형식
+
 class GenerateRequest(BaseModel):
     provider: str = "nai"
     prompt: str
     negative_prompt: str = ""
     character_prompts: List[str] = []
+    character_prompts_with_coords: List[CharacterPromptWithCoordSimple] = []
     width: int = 832
     height: int = 1216
     steps: int = 28
@@ -821,6 +826,7 @@ class MultiGenerateRequest(BaseModel):
     base_prompt: str
     negative_prompt: str = ""
     character_prompts: List[str] = []
+    character_prompts_with_coords: List[CharacterPromptWithCoordSimple] = []
     prompt_list: List[PromptItem] = []
     width: int = 832
     height: int = 1216
@@ -883,6 +889,27 @@ class ConfigUpdate(BaseModel):
 # ============================================================
 # NAI API
 # ============================================================
+
+# 좌표 문자열(a1~e5)을 NAI API 좌표(x, y)로 변환
+def coord_to_xy(coord: str) -> dict:
+    """
+    5x5 그리드 좌표를 NAI API 좌표로 변환
+    a1 = (0.0, 0.0), c3 = (0.5, 0.5), e5 = (1.0, 1.0)
+    """
+    if not coord or len(coord) != 2:
+        return {"x": 0.5, "y": 0.5}  # 기본값: 중앙
+
+    col = coord[0].lower()
+    row = coord[1]
+
+    col_map = {'a': 0.0, 'b': 0.25, 'c': 0.5, 'd': 0.75, 'e': 1.0}
+    row_map = {'1': 0.0, '2': 0.25, '3': 0.5, '4': 0.75, '5': 1.0}
+
+    x = col_map.get(col, 0.5)
+    y = row_map.get(row, 0.5)
+
+    return {"x": x, "y": y}
+
 # KSampler -> NAI sampler 변환
 NAI_SAMPLER_MAP = {
     "euler_ancestral": "k_euler_ancestral",
@@ -1204,23 +1231,50 @@ async def call_nai_api(req: GenerateRequest):
         "negative_prompt": negative_for_nai,
         "prompt": prompt_for_nai,
         "extra_noise_seed": int(seed),
-        "use_coords": False,
-        "characterPrompts": [{"prompt": cp, "uc": "", "center": {"x": 0.5, "y": 0.5}, "enabled": True} for cp in req.character_prompts] if req.character_prompts else [],
-        "v4_prompt": {
-            "use_coords": False,
-            "use_order": True,
-            "caption": {
-                "base_caption": prompt_for_nai,
-                "char_captions": [{"char_caption": cp, "centers": [{"x": 0.5, "y": 0.5}]} for cp in req.character_prompts] if req.character_prompts else []
-            }
-        },
-        "v4_negative_prompt": {
-            "legacy_uc": False,
-            "caption": {
-                "base_caption": negative_for_nai,
-                "char_captions": [{"char_caption": "", "centers": [{"x": 0.5, "y": 0.5}]} for _ in req.character_prompts] if req.character_prompts else []
-            }
-        },
+    }
+
+    # 캐릭터 좌표 처리
+    # character_prompts_with_coords가 있으면 사용, 없으면 character_prompts 사용 (하위 호환)
+    char_data = []
+    use_coords = False
+
+    if req.character_prompts_with_coords:
+        for cp in req.character_prompts_with_coords:
+            coord_xy = coord_to_xy(cp.coord) if cp.coord else {"x": 0.5, "y": 0.5}
+            char_data.append({
+                "prompt": cp.prompt,
+                "coord": cp.coord,
+                "center": coord_xy
+            })
+            if cp.coord:
+                use_coords = True
+    elif req.character_prompts:
+        for cp in req.character_prompts:
+            char_data.append({
+                "prompt": cp,
+                "coord": None,
+                "center": {"x": 0.5, "y": 0.5}
+            })
+
+    if use_coords:
+        print(f"[NAI] Character coords enabled: {[(c['prompt'][:20] + '...', c['coord']) for c in char_data]}")
+
+    params["use_coords"] = use_coords
+    params["characterPrompts"] = [{"prompt": c["prompt"], "uc": "", "center": c["center"], "enabled": True} for c in char_data] if char_data else []
+    params["v4_prompt"] = {
+        "use_coords": use_coords,
+        "use_order": True,
+        "caption": {
+            "base_caption": prompt_for_nai,
+            "char_captions": [{"char_caption": c["prompt"], "centers": [c["center"]]} for c in char_data] if char_data else []
+        }
+    }
+    params["v4_negative_prompt"] = {
+        "legacy_uc": False,
+        "caption": {
+            "base_caption": negative_for_nai,
+            "char_captions": [{"char_caption": "", "centers": [c["center"]]} for c in char_data] if char_data else []
+        }
     }
 
     # Variety+ 옵션 (값이 있을 때만 추가)
@@ -2087,6 +2141,7 @@ async def process_job(job):
             prompt=full_prompt,
             negative_prompt=req.negative_prompt,
             character_prompts=req.character_prompts,
+            character_prompts_with_coords=req.character_prompts_with_coords,
             width=req.width,
             height=req.height,
             steps=req.steps,

@@ -786,6 +786,102 @@
             margin-left: auto;
         }
 
+        /* 캐릭터 좌표 버튼 */
+        .char-coord-btn {
+            background: var(--bg-light);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-dim);
+            cursor: pointer;
+            padding: 4px 6px;
+            font-size: 0.8rem;
+            border-radius: 4px;
+            transition: var(--transition-fast);
+            min-width: 32px;
+            text-align: center;
+            font-family: 'SF Mono', 'Consolas', monospace;
+            text-transform: uppercase;
+        }
+
+        .char-coord-btn:hover {
+            background: var(--bg-lighter);
+            border-color: var(--accent);
+            color: var(--text);
+        }
+
+        .char-coord-btn.active {
+            background: rgba(138, 180, 248, 0.15);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        /* 5x5 좌표 그리드 팝업 */
+        .coord-grid-popup {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            margin-top: 4px;
+            background: var(--bg-darker, #1a1a2e);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 8px;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        }
+
+        .coord-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 4px;
+        }
+
+        .coord-grid-cell {
+            width: 32px;
+            height: 32px;
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            font-family: 'SF Mono', 'Consolas', monospace;
+            transition: var(--transition-fast);
+            text-transform: uppercase;
+        }
+
+        .coord-grid-cell:hover {
+            background: var(--bg-lighter);
+            border-color: var(--accent);
+            color: var(--text);
+        }
+
+        .coord-grid-cell.selected {
+            background: rgba(138, 180, 248, 0.2);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .coord-grid-label {
+            margin-top: 8px;
+            padding-top: 6px;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+        }
+
+        .coord-label-num {
+            color: var(--accent-gold);
+            font-size: 0.75rem;
+            font-weight: 700;
+            font-family: 'SF Mono', 'Consolas', monospace;
+            background: rgba(245, 185, 66, 0.1);
+            padding: 1px 6px;
+            border-radius: 4px;
+        }
+
         .character-item .prompt-preset-btn {
             padding: 2px 6px;
             font-size: 0.7rem;
@@ -7815,9 +7911,10 @@
         const charactersList = document.getElementById('charactersList');
         const addCharBtn = document.getElementById('addCharBtn');
         
-        function createCharacterItem(content = '', collapsed = false, enabled = true, name = '') {
+        function createCharacterItem(content = '', collapsed = false, enabled = true, name = '', coord = null) {
             const item = document.createElement('div');
             item.className = 'character-item' + (enabled ? '' : ' disabled');
+            item.dataset.coord = coord || '';  // 좌표 저장 (예: 'c3', 'a1' 등)
 
             // 헤더 (접기 + on/off + 번호 + 이름 + 프리셋 + 삭제)
             const header = document.createElement('div');
@@ -7870,6 +7967,94 @@
             charName.oninput = () => autoSaveSettings();
             charName.ondblclick = (e) => e.stopPropagation();
 
+            // 좌표 버튼
+            const coordWrapper = document.createElement('div');
+            coordWrapper.className = 'char-coord-wrapper';
+            coordWrapper.style.position = 'relative';
+
+            const coordBtn = document.createElement('button');
+            coordBtn.type = 'button';
+            coordBtn.className = 'char-coord-btn' + (coord ? ' active' : '');
+            coordBtn.innerHTML = coord ? coord.toUpperCase() : '📍';
+            coordBtn.title = coord ? `위치: ${coord.toUpperCase()} (클릭하여 해제)` : '캐릭터 위치 지정';
+
+            coordBtn.onclick = (e) => {
+                e.stopPropagation();
+
+                // 이미 이 버튼의 팝업이 열려있으면 닫기
+                const existingPopup = coordWrapper.querySelector('.coord-grid-popup');
+                if (existingPopup) {
+                    existingPopup.remove();
+                    return;
+                }
+
+                // 이미 좌표가 있으면 해제
+                if (item.dataset.coord) {
+                    item.dataset.coord = '';
+                    coordBtn.innerHTML = '📍';
+                    coordBtn.classList.remove('active');
+                    coordBtn.title = '캐릭터 위치 지정';
+                    autoSaveSettings();
+                    return;
+                }
+
+                // 다른 팝업 닫기
+                document.querySelectorAll('.coord-grid-popup').forEach(p => p.remove());
+
+                // 5x5 그리드 팝업 생성
+                const popup = document.createElement('div');
+                popup.className = 'coord-grid-popup';
+
+                const grid = document.createElement('div');
+                grid.className = 'coord-grid';
+
+                const cols = ['a', 'b', 'c', 'd', 'e'];
+                const rows = ['1', '2', '3', '4', '5'];
+
+                rows.forEach(row => {
+                    cols.forEach(col => {
+                        const cell = document.createElement('button');
+                        cell.type = 'button';
+                        cell.className = 'coord-grid-cell';
+                        cell.textContent = col + row;
+                        cell.onclick = (evt) => {
+                            evt.stopPropagation();
+                            const coordValue = col + row;
+                            item.dataset.coord = coordValue;
+                            coordBtn.innerHTML = coordValue.toUpperCase();
+                            coordBtn.classList.add('active');
+                            coordBtn.title = `위치: ${coordValue.toUpperCase()} (클릭하여 해제)`;
+                            popup.remove();
+                            autoSaveSettings();
+                        };
+                        grid.appendChild(cell);
+                    });
+                });
+
+                popup.appendChild(grid);
+
+                // 라벨 추가
+                const label = document.createElement('div');
+                label.className = 'coord-grid-label';
+                const charNumEl = item.querySelector('.char-num');
+                const charNum = charNumEl ? charNumEl.textContent : '?';
+                label.innerHTML = `캐릭터 <span class="coord-label-num">${charNum}</span>의 위치`;
+                popup.appendChild(label);
+
+                coordWrapper.appendChild(popup);
+
+                // 외부 클릭 시 닫기
+                const closePopup = (evt) => {
+                    if (!popup.contains(evt.target) && evt.target !== coordBtn) {
+                        popup.remove();
+                        document.removeEventListener('click', closePopup);
+                    }
+                };
+                setTimeout(() => document.addEventListener('click', closePopup), 0);
+            };
+
+            coordWrapper.appendChild(coordBtn);
+
             // 프리셋 드롭다운
             const presetDropdown = document.createElement('div');
             presetDropdown.className = 'prompt-preset-dropdown';
@@ -7899,6 +8084,7 @@
             header.appendChild(enableToggle);
             header.appendChild(charNum);
             header.appendChild(charName);
+            header.appendChild(coordWrapper);
             header.appendChild(presetDropdown);
             header.appendChild(deleteBtn);
 
@@ -7928,8 +8114,8 @@
 
             // 헤더 바 전체 클릭으로 접기/펴기
             header.addEventListener('click', (e) => {
-                // 체크박스, 프리셋, 삭제, 드래그 버튼, 이름 입력 클릭은 무시
-                if (e.target.closest('.char-enable-toggle, .prompt-preset-dropdown, .delete-char-btn, .char-drag, .char-name')) return;
+                // 체크박스, 프리셋, 삭제, 드래그 버튼, 이름 입력, 좌표 버튼 클릭은 무시
+                if (e.target.closest('.char-enable-toggle, .prompt-preset-dropdown, .delete-char-btn, .char-drag, .char-name, .char-coord-wrapper')) return;
                 collapseBtn.classList.toggle('collapsed');
                 contentDiv.classList.toggle('collapsed');
                 autoSaveSettings();
@@ -7993,6 +8179,18 @@
                 .filter(v => v.trim());
         }
 
+        // 좌표 정보를 포함한 캐릭터 프롬프트 (API 전송용)
+        function getCharacterPromptsWithCoords() {
+            const items = charactersList.querySelectorAll('.character-item');
+            return Array.from(items)
+                .filter(item => item.querySelector('.char-enable-toggle').checked)  // enabled만
+                .filter(item => item.querySelector('textarea').value.trim())  // 내용 있는 것만
+                .map(item => ({
+                    prompt: item.querySelector('textarea').value,
+                    coord: item.dataset.coord || null
+                }));
+        }
+
         function getCharacterPromptsWithLayout() {
             const items = charactersList.querySelectorAll('.character-item');
             return Array.from(items).map(item => ({
@@ -8000,7 +8198,8 @@
                 collapsed: item.querySelector('.collapsible-content').classList.contains('collapsed'),
                 height: item.querySelector('textarea').style.height || null,
                 enabled: item.querySelector('.char-enable-toggle').checked,
-                name: item.querySelector('.char-name').value || ''
+                name: item.querySelector('.char-name').value || '',
+                coord: item.dataset.coord || null
             }));
         }
 
@@ -8061,7 +8260,8 @@
                     if (enabled) enabledCount++;
                     const name = charData.name || '';
                     const collapsed = charData.collapsed || false;
-                    const item = createCharacterItem(content, collapsed, enabled, name);
+                    const coord = charData.coord || null;
+                    const item = createCharacterItem(content, collapsed, enabled, name, coord);
                     if (height) {
                         item.querySelector('textarea').style.height = height;
                     }
@@ -8552,6 +8752,7 @@
                 base_prompt: document.getElementById('basePrompt').value,
                 negative_prompt: document.getElementById('negativePrompt').value,
                 character_prompts: getCharacterPrompts(),
+                character_prompts_with_coords: getCharacterPromptsWithCoords(),
                 prompt_list: promptData,
                 width: parseInt(document.getElementById('width').value),
                 height: parseInt(document.getElementById('height').value),
@@ -12243,8 +12444,9 @@
                     }
                     if (enabled) enabledCount++;
                     const name = charData.name || '';
+                    const coord = charData.coord || null;
                     if (content.trim() || collapsed || name.trim()) {
-                        const item = createCharacterItem(content, collapsed, enabled, name);
+                        const item = createCharacterItem(content, collapsed, enabled, name, coord);
                         if (height) {
                             item.querySelector('textarea').style.height = height;
                         }
@@ -13088,8 +13290,9 @@
                     }
                     if (enabled) enabledCount++;
                     const name = charData.name || '';
+                    const coord = charData.coord || null;
                     if (content.trim() || collapsed || name.trim()) {
-                        const item = createCharacterItem(content, collapsed, enabled, name);
+                        const item = createCharacterItem(content, collapsed, enabled, name, coord);
                         if (height) {
                             item.querySelector('textarea').style.height = height;
                         }

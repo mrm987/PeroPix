@@ -887,6 +887,12 @@
             font-size: 0.7rem;
         }
 
+        /* Local provider일 때 NAI 전용 기능 숨기기 */
+        body[data-provider="local"] .char-coord-wrapper,
+        body[data-provider="local"] #modeToggle {
+            display: none;
+        }
+
         .character-item textarea {
             background: var(--bg-light);
             margin-bottom: 0;
@@ -5972,6 +5978,7 @@
         const API_BASE = 'http://127.0.0.1:8765';
 
         let currentProvider = 'nai';
+        document.body.dataset.provider = 'nai';  // CSS 제어용 초기값
         let currentIndex = 0;
         let totalImages = 0;
         let resetTimer = null;
@@ -7669,6 +7676,7 @@
                 // Provider 전환
                 const newProvider = tab.dataset.provider;
                 currentProvider = newProvider;
+                document.body.dataset.provider = newProvider;  // CSS 제어용
                 tabs.forEach(t => t.classList.remove('active'));
                 tab.classList.add('active');
                 providerSections.forEach(s => {
@@ -9519,6 +9527,7 @@
                 if (window._pendingProvider === 'local') {
                     window._pendingProvider = null;
                     currentProvider = 'local';
+                    document.body.dataset.provider = 'local';  // CSS 제어용
                     tabs.forEach(t => t.classList.toggle('active', t.dataset.provider === 'local'));
                     providerSections.forEach(s => s.classList.toggle('active', s.dataset.provider === 'local'));
                     // Local의 전체 설정 복원
@@ -9533,9 +9542,20 @@
                 actionsEl.innerHTML = `<button class="btn" onclick="installLocalEnv()">Install Local Engine</button>`;
                 progressEl.style.display = 'none';
                 stopLocalEnvPolling();
-                
+
                 // Local 탭 비활성화
                 enableLocalTab(false);
+
+                // Local로 복원하려 했으나 설치 안 됨 -> NAI로 되돌리기
+                if (window._pendingProvider === 'local' || currentProvider === 'local') {
+                    window._pendingProvider = null;
+                    currentProvider = 'nai';
+                    document.body.dataset.provider = 'nai';
+                    tabs.forEach(t => t.classList.toggle('active', t.dataset.provider === 'nai'));
+                    providerSections.forEach(s => s.classList.toggle('active', s.dataset.provider === 'nai'));
+                    updateAnlasVisibility();
+                    updateProviderLabels();
+                }
             }
         }
         
@@ -9640,6 +9660,7 @@
                                     // 로컬에서 열었으면 로컬 탭으로 전환
                                     localEnvInstalled = true;
                                     currentProvider = 'local';
+                                    document.body.dataset.provider = 'local';  // CSS 제어용
                                     tabs.forEach(t => t.classList.toggle('active', t.dataset.provider === 'local'));
                                     providerSections.forEach(s => s.classList.toggle('active', s.dataset.provider === 'local'));
                                 }
@@ -12745,14 +12766,16 @@
                     naiSettings = settings.nai || {};
                     localSettings = settings.local || {};
                     
-                    // Provider 결정 (local은 설치 확인 후 적용)
+                    // Provider 결정 (local은 설치 확인 후 최종 적용, UI는 먼저 보여줌)
                     if (settings.provider === 'local') {
                         window._pendingProvider = 'local';
-                        currentProvider = 'nai'; // 일단 NAI로
+                        currentProvider = 'local';  // UI는 바로 Local로 (설치 실패 시 NAI로 전환)
+                        document.body.dataset.provider = 'local';
                     } else {
                         currentProvider = settings.provider || 'nai';
+                        document.body.dataset.provider = currentProvider;
                     }
-                    
+
                     // UI 탭 활성화
                     tabs.forEach(t => t.classList.toggle('active', t.dataset.provider === currentProvider));
                     providerSections.forEach(s => s.classList.toggle('active', s.dataset.provider === currentProvider));

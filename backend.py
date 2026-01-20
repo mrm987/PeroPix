@@ -3879,7 +3879,18 @@ async def get_output_image(filepath: str):
     file_path = OUTPUT_DIR / filepath
     if not file_path.exists() or not file_path.is_file():
         return {"error": "File not found"}
-    return FileResponse(file_path, media_type="image/png")
+
+    # 확장자에 따라 적절한 MIME 타입 반환
+    ext = file_path.suffix.lower()
+    media_type_map = {
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.webp': 'image/webp'
+    }
+    media_type = media_type_map.get(ext, 'image/png')
+
+    return FileResponse(file_path, media_type=media_type)
 
 
 # === Output Folder API ===

@@ -4184,6 +4184,399 @@
             box-shadow: var(--shadow-md);
         }
 
+        /* ============================================================
+           Utility Mode (보조 도구)
+           ============================================================ */
+        .utility-container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            flex: 1 1 0;
+            min-height: 0;
+            background: var(--bg);
+        }
+        .utility-tab-content {
+            flex: 1 1 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .utility-main-area {
+            flex: 1 1 0;
+            display: flex;
+            flex-direction: row;
+            overflow: hidden;
+            min-height: 0;
+        }
+        .utility-file-area,
+        .utility-preview-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+            overflow: hidden;
+        }
+        .utility-side-panel {
+            width: 280px;
+            flex-shrink: 0;
+            background: var(--bg-light);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+            gap: 16px;
+            overflow-y: auto;
+        }
+        .utility-side-section {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .utility-side-section .side-section-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-dim);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .utility-side-actions {
+            margin-top: auto;
+            padding-top: 16px;
+        }
+        .utility-select {
+            width: 100%;
+            padding: 8px 12px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 0.9rem;
+        }
+        .utility-slider {
+            width: 100%;
+            accent-color: var(--accent);
+        }
+        .save-location-info {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            padding: 8px 12px;
+            background: var(--bg);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border);
+        }
+
+        /* Utility Dropzone */
+        .utility-dropzone {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px dashed var(--border);
+            border-radius: var(--radius-lg);
+            background: var(--bg-lighter);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .utility-dropzone:hover,
+        .utility-dropzone.drag-over {
+            border-color: var(--accent);
+            background: rgba(99, 102, 241, 0.05);
+        }
+        .utility-dropzone .dropzone-content {
+            text-align: center;
+            color: var(--text-dim);
+        }
+        .utility-dropzone .dropzone-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+        .utility-dropzone p {
+            font-size: 1rem;
+            margin-bottom: 4px;
+        }
+        .utility-dropzone small {
+            font-size: 0.8rem;
+            opacity: 0.7;
+        }
+
+        /* Utility File List (변환 탭) */
+        .utility-file-list {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            background: var(--bg-light);
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .utility-file-list.drag-over {
+            border-color: var(--accent);
+            background: rgba(99, 102, 241, 0.05);
+        }
+        .file-list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+        }
+        .file-list-header .file-count {
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        .file-list-items {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+        .file-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 12px;
+            border-radius: var(--radius-md);
+            transition: background 0.15s;
+        }
+        .file-item:hover {
+            background: var(--bg-lighter);
+        }
+        .file-item-thumb {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+        .file-item-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .file-item-name {
+            font-size: 0.85rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .file-item-meta {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+        }
+        .file-item .remove-btn {
+            opacity: 0;
+            transition: opacity 0.15s;
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            padding: 4px 8px;
+            font-size: 0.9rem;
+        }
+        .file-item:hover .remove-btn {
+            opacity: 1;
+        }
+        .file-item .remove-btn:hover {
+            color: var(--error);
+        }
+
+        /* Utility Progress */
+        .utility-progress {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 16px;
+        }
+        .utility-progress .progress-bar {
+            height: 8px;
+            background: var(--bg);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .utility-progress .progress-fill {
+            height: 100%;
+            background: var(--accent);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .utility-progress .progress-text {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            text-align: center;
+        }
+
+        /* EXIF Reader Styles */
+        .exif-reader-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-light);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+        }
+        .exif-reader-container.drag-over {
+            border: 2px dashed var(--accent);
+            background: rgba(99, 102, 241, 0.1);
+        }
+        .exif-drop-guide {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-dim);
+            gap: 8px;
+            cursor: pointer;
+        }
+        .exif-drop-guide .dropzone-icon {
+            font-size: 3rem;
+        }
+        .exif-drop-guide p {
+            font-size: 1rem;
+            margin: 0;
+        }
+        .exif-drop-guide small {
+            font-size: 0.8rem;
+            opacity: 0.7;
+        }
+        .exif-loaded-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+            gap: 16px;
+            overflow: hidden;
+        }
+        .exif-image-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+        .exif-image-row img {
+            max-width: 200px;
+            max-height: 200px;
+            object-fit: contain;
+            border-radius: var(--radius-sm);
+            background: var(--bg);
+        }
+        .exif-image-info {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .exif-format {
+            font-weight: 600;
+            padding: 4px 10px;
+            background: var(--accent);
+            color: white;
+            border-radius: var(--radius-sm);
+            font-size: 0.8rem;
+            display: inline-block;
+            width: fit-content;
+        }
+        .exif-btn-row {
+            display: flex;
+            gap: 6px;
+        }
+        .exif-action-btn {
+            padding: 4px 10px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+            font-size: 0.8rem;
+            cursor: pointer;
+            border-radius: var(--radius-sm);
+            transition: all 0.15s;
+        }
+        .exif-action-btn:hover {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+        .exif-action-btn.exif-close-btn:hover {
+            background: var(--error);
+            border-color: var(--error);
+        }
+        .exif-columns {
+            flex: 1;
+            display: flex;
+            gap: 16px;
+            overflow: hidden;
+        }
+        .exif-column {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        .exif-column.exif-prompts {
+            flex: 1.2;
+        }
+        .exif-section {
+            margin-bottom: 16px;
+        }
+        .exif-section-title {
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--accent);
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .exif-field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 8px 10px;
+            background: var(--bg);
+            border-radius: var(--radius-sm);
+            margin-bottom: 8px;
+            position: relative;
+        }
+        .exif-field-label {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+        }
+        .exif-field-value {
+            font-size: 0.85rem;
+            word-break: break-word;
+            white-space: pre-wrap;
+        }
+        .exif-field-value.prompt {
+            flex: 1;
+            overflow-y: auto;
+        }
+        /* 프롬프트 필드는 남은 공간 채우기 */
+        .exif-prompts .exif-field {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .exif-copy-btn {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 0.75rem;
+            padding: 2px 6px;
+            border-radius: var(--radius-sm);
+            opacity: 0;
+            transition: opacity 0.15s, background 0.15s;
+        }
+        .exif-field:hover .exif-copy-btn {
+            opacity: 1;
+        }
+        .exif-copy-btn:hover {
+            background: var(--bg-lighter);
+            color: var(--text);
+        }
+
         /* Gallery */
         .gallery-container {
             flex: 1;
@@ -5194,7 +5587,7 @@
                                 </select>
                             </div>
                             <div>
-                                <label>JPG Quality</label>
+                                <label>JPG/WebP Quality</label>
                                 <input type="number" id="jpgQuality" value="95" min="1" max="100" step="1">
                             </div>
                         </div>
@@ -5249,6 +5642,7 @@
                     <button type="button" class="mode-btn active" id="slotModeBtn">🎰 슬롯 모드</button>
                     <button type="button" class="mode-btn" id="galleryModeBtn">🖼️ 갤러리</button>
                     <button type="button" class="mode-btn" id="censorModeBtn">🔍 자동검열</button>
+                    <button type="button" class="mode-btn" id="utilityModeBtn">🔧 보조 도구</button>
                 </div>
             </div>
 
@@ -5548,7 +5942,121 @@
                     <div class="censor-options-after" id="censorOptionsAfter" style="display: none;"></div>
                 </div>
             </div>
-            
+
+            <!-- 보조 도구 모드 -->
+            <div class="utility-container" id="utilityContainer" style="display: none;">
+                <!-- 툴바 (탭 버튼) -->
+                <div class="slots-toolbar" id="utilityToolbar">
+                    <div class="toolbar-left">
+                        <button type="button" class="header-btn active" id="utilityTabConvert">🔄 이미지 변환</button>
+                        <button type="button" class="header-btn" id="utilityTabExif">📋 EXIF 리더</button>
+                    </div>
+                </div>
+
+                <!-- 이미지 변환 탭 -->
+                <div class="utility-tab-content" id="utilityConvertContent">
+                    <div class="utility-main-area">
+                        <!-- 좌측: 파일 영역 -->
+                        <div class="utility-file-area">
+                            <div class="utility-dropzone" id="convertDropzone">
+                                <div class="dropzone-content">
+                                    <div class="dropzone-icon">📁</div>
+                                    <p>변환할 이미지를 여기에 드롭하세요</p>
+                                    <small>또는 클릭하여 파일 선택</small>
+                                </div>
+                                <input type="file" id="convertFileInput" multiple accept="image/*" style="display: none;">
+                            </div>
+                            <div class="utility-file-list" id="convertFileList" style="display: none;">
+                                <div class="file-list-header">
+                                    <span class="file-count" id="convertFileCount">0개 파일</span>
+                                    <button type="button" class="header-btn" id="convertClearBtn">🧹 Clear</button>
+                                </div>
+                                <div class="file-list-items" id="convertFileItems">
+                                    <!-- 파일 항목들 -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 우측: 설정 패널 -->
+                        <div class="utility-side-panel">
+                            <div class="utility-side-section">
+                                <div class="side-section-title">📦 출력 형식</div>
+                                <select id="convertFormat" class="utility-select">
+                                    <option value="png">PNG</option>
+                                    <option value="jpg">JPEG</option>
+                                    <option value="webp">WebP</option>
+                                </select>
+                            </div>
+
+                            <div class="utility-side-section" id="convertQualitySection" style="display: none;">
+                                <div class="side-section-title">
+                                    <span>품질</span>
+                                    <span id="convertQualityValue">95</span>
+                                </div>
+                                <input type="range" id="convertQuality" min="1" max="100" value="95" class="utility-slider">
+                            </div>
+
+                            <div class="utility-side-section">
+                                <div class="side-section-title">⚙️ 옵션</div>
+                                <div class="checkbox-row">
+                                    <input type="checkbox" id="convertStripMetadata">
+                                    <label for="convertStripMetadata">메타데이터 제거</label>
+                                </div>
+                                <div class="checkbox-row">
+                                    <input type="checkbox" id="convertOpenFolder" checked>
+                                    <label for="convertOpenFolder">완료 후 폴더 열기</label>
+                                </div>
+                            </div>
+
+                            <div class="utility-side-section">
+                                <button type="button" class="btn btn-primary" id="convertRunBtn" disabled>🔄 변환 시작</button>
+                            </div>
+
+                            <div class="utility-progress" id="convertProgress" style="display: none;">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="convertProgressFill"></div>
+                                </div>
+                                <span class="progress-text" id="convertProgressText">0 / 0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- EXIF 리더 탭 -->
+                <div class="utility-tab-content" id="utilityExifContent" style="display: none;">
+                    <div class="exif-reader-container" id="exifReaderContainer">
+                        <input type="file" id="exifFileInput" accept="image/*" style="display: none;">
+
+                        <!-- 초기 상태: 드롭 안내 -->
+                        <div class="exif-drop-guide" id="exifDropGuide">
+                            <div class="dropzone-icon">🖼️</div>
+                            <p>이미지를 여기에 드롭하세요</p>
+                            <small>또는 클릭하여 파일 선택</small>
+                        </div>
+
+                        <!-- 이미지 로드 후: 프리뷰 + 메타데이터 -->
+                        <div class="exif-loaded-content" id="exifLoadedContent" style="display: none;">
+                            <!-- 상단: 이미지 프리뷰 -->
+                            <div class="exif-image-row">
+                                <img id="exifPreviewImg" src="" alt="Preview">
+                                <div class="exif-image-info">
+                                    <span class="exif-format" id="exifFormat">Unknown</span>
+                                    <div class="exif-btn-row">
+                                        <button type="button" class="exif-action-btn" id="exifReplaceBtn">🔄 교체</button>
+                                        <button type="button" class="exif-action-btn exif-close-btn" id="exifClearBtn">✕ 닫기</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- 하단: 메타데이터 (2열) -->
+                            <div class="exif-columns">
+                                <div class="exif-column exif-prompts" id="exifPrompts"></div>
+                                <div class="exif-column exif-settings" id="exifSettings"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- 검열 편집 모달 -->
             <div class="censor-edit-modal" id="censorEditModal">
                 <div class="censor-edit-modal-header">
@@ -12767,8 +13275,14 @@
                     } : null
                 },
                 currentCharPreset: currentCharPreset,
+                utilityTab: utilityState.currentTab || 'convert',
+                utilityLastSavePath: utilityState.lastSavePath || '',
+                utilityStripMetadata: document.getElementById('convertStripMetadata')?.checked ?? false,
+                utilityOpenFolder: document.getElementById('convertOpenFolder')?.checked ?? true,
+                utilityFormat: document.getElementById('convertFormat')?.value || 'png',
+                utilityQuality: document.getElementById('convertQuality')?.value || '95',
             };
-            
+
             localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
         }
         
@@ -12859,6 +13373,24 @@
                     if (settings.currentCharPreset) {
                         currentCharPreset = settings.currentCharPreset;
                         document.getElementById('charPresetName').textContent = currentCharPreset.name;
+                    }
+                    if (settings.utilityTab) {
+                        window._pendingUtilityTab = settings.utilityTab;
+                    }
+                    if (settings.utilityLastSavePath) {
+                        window._pendingUtilityLastSavePath = settings.utilityLastSavePath;
+                    }
+                    if (settings.utilityStripMetadata !== undefined) {
+                        window._pendingUtilityStripMetadata = settings.utilityStripMetadata;
+                    }
+                    if (settings.utilityOpenFolder !== undefined) {
+                        window._pendingUtilityOpenFolder = settings.utilityOpenFolder;
+                    }
+                    if (settings.utilityFormat) {
+                        window._pendingUtilityFormat = settings.utilityFormat;
+                    }
+                    if (settings.utilityQuality) {
+                        window._pendingUtilityQuality = settings.utilityQuality;
                     }
 
                     // 현재 provider 설정 적용 (NAI로 시작)
@@ -13401,15 +13933,17 @@
         const slotModeBtn = document.getElementById('slotModeBtn');
         const galleryModeBtn = document.getElementById('galleryModeBtn');
         const censorModeBtn = document.getElementById('censorModeBtn');
+        const utilityModeBtn = document.getElementById('utilityModeBtn');
         const slotsToolbar = document.getElementById('slotsToolbar');
         const galleryContainer = document.getElementById('galleryContainer');
         const censorContainer = document.getElementById('censorContainer');
+        const utilityContainer = document.getElementById('utilityContainer');
         const galleryGrid = document.getElementById('galleryGrid');
         const galleryEmpty = document.getElementById('galleryEmpty');
         const gallerySubfolders = document.getElementById('gallerySubfolders');
         const galleryRootBtn = document.getElementById('galleryRootBtn');
 
-        let currentMode = 'slot'; // 'slot' | 'gallery' | 'censor'
+        let currentMode = 'slot'; // 'slot' | 'gallery' | 'censor' | 'utility'
         let currentGalleryFolder = ''; // 현재 선택된 폴더 (빈 문자열 = gallery 루트)
         let isVibeMode = false; // vibe cache mode
 
@@ -13419,10 +13953,12 @@
             slotModeBtn.classList.add('active');
             galleryModeBtn.classList.remove('active');
             censorModeBtn.classList.remove('active');
+            utilityModeBtn.classList.remove('active');
             slotsToolbar.style.display = 'flex';
             slotsWrapper.style.display = 'flex';
             galleryContainer.style.display = 'none';
             censorContainer.style.display = 'none';
+            utilityContainer.style.display = 'none';
         };
 
         galleryModeBtn.onclick = () => {
@@ -13431,10 +13967,12 @@
             galleryModeBtn.classList.add('active');
             slotModeBtn.classList.remove('active');
             censorModeBtn.classList.remove('active');
+            utilityModeBtn.classList.remove('active');
             slotsToolbar.style.display = 'none';
             slotsWrapper.style.display = 'none';
             galleryContainer.style.display = 'flex';
             censorContainer.style.display = 'none';
+            utilityContainer.style.display = 'none';
 
             // 갤러리가 이미 로드되어 있으면 스킵 (폴더는 첫 진입 시 로드됨)
             if (!window.galleryInitialized) {
@@ -13451,14 +13989,37 @@
             censorModeBtn.classList.add('active');
             slotModeBtn.classList.remove('active');
             galleryModeBtn.classList.remove('active');
+            utilityModeBtn.classList.remove('active');
             slotsToolbar.style.display = 'none';
             slotsWrapper.style.display = 'none';
             galleryContainer.style.display = 'none';
             censorContainer.style.display = 'flex';
+            utilityContainer.style.display = 'none';
 
             // 검열 모드 초기화 (내부에서 캐싱 처리)
             if (typeof initCensorMode === 'function') {
                 await initCensorMode();
+            }
+        };
+
+        // 보조 도구 모드
+        utilityModeBtn.onclick = () => {
+            if (currentMode === 'utility') return;
+
+            currentMode = 'utility';
+            utilityModeBtn.classList.add('active');
+            slotModeBtn.classList.remove('active');
+            galleryModeBtn.classList.remove('active');
+            censorModeBtn.classList.remove('active');
+            slotsToolbar.style.display = 'none';
+            slotsWrapper.style.display = 'none';
+            galleryContainer.style.display = 'none';
+            censorContainer.style.display = 'none';
+            utilityContainer.style.display = 'flex';
+
+            // 보조 도구 모드 초기화
+            if (typeof initUtilityMode === 'function') {
+                initUtilityMode();
             }
         };
 
@@ -14075,12 +14636,18 @@
             const censorContainer = document.getElementById('censorContainer');
             return censorContainer && censorContainer.style.display !== 'none';
         }
-        
+
+        // 보조 도구 모드인지 확인하는 헬퍼
+        function isInUtilityMode() {
+            const utilityContainer = document.getElementById('utilityContainer');
+            return utilityContainer && utilityContainer.style.display !== 'none';
+        }
+
         document.addEventListener('dragenter', (e) => {
             e.preventDefault();
             dragCounter++;
-            // 자동검열 모드에서는 전역 드롭 오버레이 표시 안 함
-            if (e.dataTransfer.types.includes('Files') && !isInCensorMode()) {
+            // 자동검열/보조도구 모드에서는 전역 드롭 오버레이 표시 안 함
+            if (e.dataTransfer.types.includes('Files') && !isInCensorMode() && !isInUtilityMode()) {
                 dropOverlay.classList.add('active');
             }
         });
@@ -14101,9 +14668,9 @@
             e.preventDefault();
             dragCounter = 0;
             dropOverlay.classList.remove('active');
-            
-            // 자동검열 모드에서는 전역 드롭 처리 안 함 (검열용 드롭 핸들러에서 처리)
-            if (isInCensorMode()) return;
+
+            // 자동검열/보조도구 모드에서는 전역 드롭 처리 안 함 (각 모드 드롭 핸들러에서 처리)
+            if (isInCensorMode() || isInUtilityMode()) return;
 
             const files = e.dataTransfer.files;
             if (files.length === 0) return;
@@ -15565,9 +16132,757 @@
         })();
 
         // ============================================================
+        // Utility Mode (보조 도구)
+        // ============================================================
+
+        // 보조 도구 상태
+        const utilityState = {
+            currentTab: 'convert',  // 'convert' | 'exif'
+            convertFiles: [],       // 변환할 파일 목록 [{file: File, url: string}]
+            isConverting: false,
+            initialized: false,
+            lastSavePath: ''        // 마지막 저장 경로
+        };
+
+        // 보조 도구 모드 초기화
+        function initUtilityMode() {
+            if (utilityState.initialized) return;
+            utilityState.initialized = true;
+
+            initConvertTab();
+            initExifTab();
+
+            // 탭 전환 이벤트
+            document.getElementById('utilityTabConvert').onclick = () => switchUtilityTab('convert');
+            document.getElementById('utilityTabExif').onclick = () => switchUtilityTab('exif');
+
+            // 저장된 탭 복원
+            const savedTab = window._pendingUtilityTab || 'convert';
+            switchUtilityTab(savedTab);
+
+            // 마지막 저장 경로 복원
+            if (window._pendingUtilityLastSavePath) {
+                utilityState.lastSavePath = window._pendingUtilityLastSavePath;
+            }
+
+            // 옵션 복원
+            if (window._pendingUtilityStripMetadata !== undefined) {
+                document.getElementById('convertStripMetadata').checked = window._pendingUtilityStripMetadata;
+            }
+            if (window._pendingUtilityOpenFolder !== undefined) {
+                document.getElementById('convertOpenFolder').checked = window._pendingUtilityOpenFolder;
+            }
+            if (window._pendingUtilityFormat) {
+                document.getElementById('convertFormat').value = window._pendingUtilityFormat;
+                // 형식에 따라 퀄리티 섹션 표시/숨김
+                const qualitySection = document.getElementById('convertQualitySection');
+                qualitySection.style.display = (window._pendingUtilityFormat === 'jpg' || window._pendingUtilityFormat === 'webp') ? 'block' : 'none';
+            }
+            if (window._pendingUtilityQuality) {
+                document.getElementById('convertQuality').value = window._pendingUtilityQuality;
+                document.getElementById('convertQualityValue').textContent = window._pendingUtilityQuality;
+            }
+        }
+
+        // 탭 전환
+        function switchUtilityTab(tab) {
+            utilityState.currentTab = tab;
+
+            document.getElementById('utilityTabConvert').classList.toggle('active', tab === 'convert');
+            document.getElementById('utilityTabExif').classList.toggle('active', tab === 'exif');
+
+            document.getElementById('utilityConvertContent').style.display = tab === 'convert' ? 'flex' : 'none';
+            document.getElementById('utilityExifContent').style.display = tab === 'exif' ? 'flex' : 'none';
+        }
+
+        // ============================================================
+        // 이미지 변환 탭
+        // ============================================================
+        function initConvertTab() {
+            const dropzone = document.getElementById('convertDropzone');
+            const fileList = document.getElementById('convertFileList');
+            const fileInput = document.getElementById('convertFileInput');
+            const formatSelect = document.getElementById('convertFormat');
+            const qualitySlider = document.getElementById('convertQuality');
+            const qualitySection = document.getElementById('convertQualitySection');
+            const clearBtn = document.getElementById('convertClearBtn');
+            const runBtn = document.getElementById('convertRunBtn');
+
+            // 드롭존 클릭
+            dropzone.onclick = () => fileInput.click();
+
+            // 드래그 이벤트 (초기 드롭존)
+            dropzone.ondragover = (e) => {
+                e.preventDefault();
+                dropzone.classList.add('drag-over');
+            };
+            dropzone.ondragleave = () => dropzone.classList.remove('drag-over');
+            dropzone.ondrop = (e) => {
+                e.preventDefault();
+                dropzone.classList.remove('drag-over');
+                const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+                addConvertFiles(files);
+            };
+
+            // 파일 목록 영역에서도 드롭 가능 (추가)
+            fileList.ondragover = (e) => {
+                e.preventDefault();
+                fileList.classList.add('drag-over');
+            };
+            fileList.ondragleave = () => fileList.classList.remove('drag-over');
+            fileList.ondrop = (e) => {
+                e.preventDefault();
+                fileList.classList.remove('drag-over');
+                const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+                addConvertFiles(files);
+            };
+
+            // 파일 선택
+            fileInput.onchange = (e) => {
+                if (e.target.files.length > 0) {
+                    addConvertFiles(Array.from(e.target.files));
+                    fileInput.value = '';
+                }
+            };
+
+            // 형식 변경 시 품질 슬라이더 표시/숨김
+            formatSelect.onchange = (e) => {
+                qualitySection.style.display = (e.target.value === 'jpg' || e.target.value === 'webp') ? 'block' : 'none';
+            };
+
+            // 품질 슬라이더
+            qualitySlider.oninput = (e) => {
+                document.getElementById('convertQualityValue').textContent = e.target.value;
+            };
+
+            // Clear 버튼
+            clearBtn.onclick = () => {
+                // URL 해제
+                utilityState.convertFiles.forEach(item => URL.revokeObjectURL(item.url));
+                utilityState.convertFiles = [];
+                updateConvertFileList();
+            };
+
+            // 변환 실행
+            runBtn.onclick = runConversion;
+        }
+
+        // 파일 추가
+        function addConvertFiles(files) {
+            files.forEach(file => {
+                // 중복 체크 (파일명 + 크기)
+                if (!utilityState.convertFiles.find(f => f.file.name === file.name && f.file.size === file.size)) {
+                    utilityState.convertFiles.push({
+                        file: file,
+                        url: URL.createObjectURL(file)
+                    });
+                }
+            });
+            updateConvertFileList();
+        }
+
+        // 파일 제거
+        function removeConvertFile(idx) {
+            const item = utilityState.convertFiles[idx];
+            if (item) {
+                URL.revokeObjectURL(item.url);
+                utilityState.convertFiles.splice(idx, 1);
+                updateConvertFileList();
+            }
+        }
+
+        // 파일 크기 포맷
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        // 파일 목록 UI 업데이트
+        function updateConvertFileList() {
+            const dropzone = document.getElementById('convertDropzone');
+            const fileList = document.getElementById('convertFileList');
+            const fileItems = document.getElementById('convertFileItems');
+            const fileCount = document.getElementById('convertFileCount');
+            const runBtn = document.getElementById('convertRunBtn');
+
+            const hasFiles = utilityState.convertFiles.length > 0;
+            dropzone.style.display = hasFiles ? 'none' : 'flex';
+            fileList.style.display = hasFiles ? 'flex' : 'none';
+            runBtn.disabled = !hasFiles || utilityState.isConverting;
+
+            if (hasFiles) {
+                fileCount.textContent = `${utilityState.convertFiles.length}개 파일`;
+                fileItems.innerHTML = utilityState.convertFiles.map((item, idx) => `
+                    <div class="file-item">
+                        <img class="file-item-thumb" src="${item.url}" alt="">
+                        <div class="file-item-info">
+                            <div class="file-item-name">${item.file.name}</div>
+                            <div class="file-item-meta">${formatFileSize(item.file.size)}</div>
+                        </div>
+                        <button type="button" class="remove-btn" onclick="removeConvertFile(${idx})">✕</button>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // 변환 실행
+        async function runConversion() {
+            if (utilityState.isConverting || utilityState.convertFiles.length === 0) return;
+
+            // 마지막 저장 경로 또는 outputs 기본값
+            const defaultPath = utilityState.lastSavePath || 'outputs';
+
+            // 저장 위치 선택 다이얼로그
+            try {
+                const folderResponse = await fetch(`${API_BASE}/api/select-folder`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ default_path: defaultPath })
+                });
+                const folderResult = await folderResponse.json();
+                if (!folderResult.success || !folderResult.path) {
+                    // 사용자가 취소함
+                    return;
+                }
+                var savePath = folderResult.path;
+
+                // 마지막 저장 경로 기억
+                utilityState.lastSavePath = savePath;
+                localStorage.setItem('utility_lastSavePath', savePath);
+            } catch (err) {
+                showToast('폴더 선택 실패', 'error');
+                return;
+            }
+
+            utilityState.isConverting = true;
+            const runBtn = document.getElementById('convertRunBtn');
+            const progress = document.getElementById('convertProgress');
+            const progressFill = document.getElementById('convertProgressFill');
+            const progressText = document.getElementById('convertProgressText');
+
+            runBtn.disabled = true;
+            progress.style.display = 'block';
+
+            const format = document.getElementById('convertFormat').value;
+            const quality = parseInt(document.getElementById('convertQuality').value);
+            const stripMetadata = document.getElementById('convertStripMetadata').checked;
+
+            const total = utilityState.convertFiles.length;
+            let completed = 0;
+            let errors = 0;
+
+            for (const item of utilityState.convertFiles) {
+                try {
+                    const base64 = await fileToBase64(item.file);
+                    const response = await fetch(`${API_BASE}/api/utility/convert`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            image: base64,
+                            filename: item.file.name,
+                            format: format,
+                            quality: quality,
+                            strip_metadata: stripMetadata,
+                            save_path: savePath
+                        })
+                    });
+
+                    const result = await response.json();
+                    if (!result.success) {
+                        console.error(`변환 실패: ${item.file.name}`, result.error);
+                        errors++;
+                    }
+                } catch (err) {
+                    console.error(`변환 오류: ${item.file.name}`, err);
+                    errors++;
+                }
+
+                completed++;
+                progressFill.style.width = `${(completed / total) * 100}%`;
+                progressText.textContent = `${completed} / ${total}`;
+            }
+
+            utilityState.isConverting = false;
+
+            if (errors > 0) {
+                showToast(`${completed - errors}개 성공, ${errors}개 실패`, 'warning');
+            } else {
+                showToast(`${completed}개 파일 변환 완료`, 'success');
+            }
+
+            // 완료 후 폴더 열기 옵션 확인
+            const openFolder = document.getElementById('convertOpenFolder').checked;
+            if (openFolder && savePath) {
+                fetch(`${API_BASE}/api/open-folder`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: savePath })
+                });
+            }
+
+            // 완료 후 프로그레스바만 숨기고 리스트는 유지
+            setTimeout(() => {
+                progress.style.display = 'none';
+                progressFill.style.width = '0%';
+                runBtn.disabled = utilityState.convertFiles.length === 0;
+            }, 1500);
+        }
+
+        // File to Base64 (data URL prefix 없이)
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const result = reader.result;
+                    // data:image/png;base64, 부분 제거
+                    const base64 = result.split(',')[1];
+                    resolve(base64);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // ============================================================
+        // EXIF 리더 탭
+        // ============================================================
+        function initExifTab() {
+            const container = document.getElementById('exifReaderContainer');
+            const dropGuide = document.getElementById('exifDropGuide');
+            const fileInput = document.getElementById('exifFileInput');
+            const clearBtn = document.getElementById('exifClearBtn');
+            const replaceBtn = document.getElementById('exifReplaceBtn');
+
+            // 드롭 안내 영역만 클릭 시 파일 선택
+            dropGuide.onclick = () => fileInput.click();
+
+            // 전체 컨테이너 드래그 이벤트
+            container.ondragover = (e) => {
+                e.preventDefault();
+                container.classList.add('drag-over');
+            };
+            container.ondragleave = (e) => {
+                // 자식 요소로 이동할 때는 무시
+                if (container.contains(e.relatedTarget)) return;
+                container.classList.remove('drag-over');
+            };
+            container.ondrop = (e) => {
+                e.preventDefault();
+                container.classList.remove('drag-over');
+                const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+                if (files.length > 0) loadExifImage(files[0]);
+            };
+
+            // 파일 선택
+            fileInput.onchange = (e) => {
+                if (e.target.files.length > 0) {
+                    loadExifImage(e.target.files[0]);
+                    fileInput.value = '';
+                }
+            };
+
+            // 이미지 교체 버튼
+            replaceBtn.onclick = (e) => {
+                e.stopPropagation();
+                fileInput.click();
+            };
+
+            // Clear 버튼
+            clearBtn.onclick = (e) => {
+                e.stopPropagation();
+                clearExifView();
+            };
+        }
+
+        // EXIF 이미지 로드
+        async function loadExifImage(file) {
+            const dropGuide = document.getElementById('exifDropGuide');
+            const loadedContent = document.getElementById('exifLoadedContent');
+            const previewImg = document.getElementById('exifPreviewImg');
+
+            // 프리뷰 표시
+            previewImg.src = URL.createObjectURL(file);
+            dropGuide.style.display = 'none';
+            loadedContent.style.display = 'flex';
+
+            // 메타데이터 추출
+            try {
+                const base64 = await fileToBase64(file);
+                const response = await fetch(`${API_BASE}/api/extract-metadata`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: base64 })
+                });
+
+                const result = await response.json();
+                renderExifContent(result, file);
+            } catch (err) {
+                console.error('메타데이터 추출 실패:', err);
+                showToast('메타데이터 추출 실패', 'error');
+            }
+        }
+
+        // EXIF 뷰 초기화
+        function clearExifView() {
+            const dropGuide = document.getElementById('exifDropGuide');
+            const loadedContent = document.getElementById('exifLoadedContent');
+            const previewImg = document.getElementById('exifPreviewImg');
+            const promptsEl = document.getElementById('exifPrompts');
+            const settingsEl = document.getElementById('exifSettings');
+
+            URL.revokeObjectURL(previewImg.src);
+            previewImg.src = '';
+            dropGuide.style.display = 'flex';
+            loadedContent.style.display = 'none';
+            promptsEl.innerHTML = '';
+            settingsEl.innerHTML = '';
+        }
+
+        // HTML 이스케이프
+        function escapeHtmlForExif(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // EXIF 콘텐츠 렌더링 (2열 레이아웃)
+        function renderExifContent(result, file) {
+            const formatEl = document.getElementById('exifFormat');
+            const promptsEl = document.getElementById('exifPrompts');
+            const settingsEl = document.getElementById('exifSettings');
+
+            // 형식 판별
+            let formatText = 'Unknown';
+            const rawMeta = result.nai_metadata || {};
+
+            // ComfyUI 형식 감지
+            const isComfyUI = rawMeta._comfyui === true;
+
+            if (result.is_vibe) {
+                formatText = 'Vibe Cache';
+            } else if (isComfyUI) {
+                formatText = 'ComfyUI';
+            } else if (rawMeta.peropix) {
+                formatText = rawMeta.peropix.provider === 'local' ? 'PeroPix Local' : 'PeroPix NAI';
+            } else if (rawMeta.prompt || rawMeta.uc) {
+                formatText = 'NAI';
+            } else if (result.raw_metadata && Object.keys(result.raw_metadata).length > 0) {
+                formatText = 'Custom';
+            }
+
+            formatEl.textContent = formatText;
+
+            // ComfyUI 형식은 별도 처리
+            if (isComfyUI) {
+                renderComfyUIContent(rawMeta, promptsEl, settingsEl);
+                return;
+            }
+
+            // normalizeMetadata를 사용하여 프롬프트 분리 (Base/Character/Slot/Negative)
+            const parsed = normalizeMetadata(rawMeta);
+
+            // 프롬프트 필드 생성 헬퍼 (값이 없어도 빈 칸으로 표시)
+            const createPromptSection = (title, value, icon = '✨') => {
+                const escaped = value ? escapeHtmlForExif(value) : '';
+                const copyValue = escaped.replace(/`/g, '\\`').replace(/\\/g, '\\\\');
+                return `
+                    <div class="exif-section">
+                        <div class="exif-section-title">${icon} ${title}</div>
+                        <div class="exif-field">
+                            <div class="exif-field-value prompt">${escaped || '<span style="color:#666">(없음)</span>'}</div>
+                            ${escaped ? `<button type="button" class="exif-copy-btn" onclick="copyExifField(\`${copyValue}\`)">📋</button>` : ''}
+                        </div>
+                    </div>
+                `;
+            };
+
+            // 좌측: 프롬프트 (Base / Character / Slot / Negative)
+            let promptsHtml = '';
+
+            // Base Prompt
+            promptsHtml += createPromptSection('Base Prompt', parsed.prompt, '✨');
+
+            // Character Prompts
+            const charPromptText = (parsed.character_prompts && parsed.character_prompts.length > 0)
+                ? parsed.character_prompts.join('\n---\n')
+                : '';
+            promptsHtml += createPromptSection('Character Prompt', charPromptText, '👤');
+
+            // Slot Prompt
+            promptsHtml += createPromptSection('Slot Prompt', parsed.slot_prompt, '🎰');
+
+            // Negative Prompt
+            promptsHtml += createPromptSection('Negative Prompt', parsed.negative_prompt, '🚫');
+
+            promptsEl.innerHTML = promptsHtml;
+
+            // 우측: 설정 및 기타 정보
+            let settingsHtml = '';
+
+            // 생성 설정 (parsed 값 우선 사용)
+            const settingsFields = [
+                { value: parsed.seed, label: 'Seed' },
+                { value: parsed.width, label: 'Width' },
+                { value: parsed.height, label: 'Height' },
+                { value: parsed.steps, label: 'Steps' },
+                { value: parsed.cfg, label: 'CFG Scale' },
+                { value: parsed.sampler, label: 'Sampler' },
+                { value: parsed.scheduler, label: 'Scheduler' },
+                { value: parsed.nai_model, label: 'Model' },
+                { value: parsed.cfg_rescale, label: 'CFG Rescale' },
+                { value: parsed.smea, label: 'SMEA' },
+                { value: parsed.uc_preset, label: 'UC Preset' },
+                { value: parsed.quality_tags, label: 'Quality Tags' },
+                { value: parsed.variety_plus, label: 'Variety+' }
+            ];
+
+            const activeSettings = settingsFields.filter(f => f.value !== undefined && f.value !== null && f.value !== '' && f.value !== 'none');
+            if (activeSettings.length > 0) {
+                settingsHtml += `
+                    <div class="exif-section">
+                        <div class="exif-section-title">⚙️ Settings</div>
+                        ${activeSettings.map(f => `
+                            <div class="exif-field">
+                                <div class="exif-field-label">${f.label}</div>
+                                <div class="exif-field-value">${f.value === true ? 'On' : f.value === false ? 'Off' : f.value}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+            // PeroPix 확장 정보
+            if (rawMeta.peropix) {
+                const ext = rawMeta.peropix;
+                let extHtml = '';
+
+                if (ext.provider) extHtml += `<div class="exif-field"><div class="exif-field-label">Provider</div><div class="exif-field-value">${ext.provider}</div></div>`;
+                if (ext.local_model) extHtml += `<div class="exif-field"><div class="exif-field-label">Local Model</div><div class="exif-field-value">${ext.local_model}</div></div>`;
+                if (ext.vibe_transfer && ext.vibe_transfer.length > 0) {
+                    extHtml += `<div class="exif-field"><div class="exif-field-label">Vibe Transfer</div><div class="exif-field-value">${ext.vibe_transfer.length}개</div></div>`;
+                }
+
+                if (extHtml) {
+                    settingsHtml += `
+                        <div class="exif-section">
+                            <div class="exif-section-title">🔷 PeroPix Info</div>
+                            ${extHtml}
+                        </div>
+                    `;
+                }
+            }
+
+            // Vibe 정보
+            if (result.is_vibe) {
+                settingsHtml += `
+                    <div class="exif-section">
+                        <div class="exif-section-title">🎨 Vibe Data</div>
+                        <div class="exif-field"><div class="exif-field-label">Model</div><div class="exif-field-value">${result.vibe_model || 'Unknown'}</div></div>
+                        <div class="exif-field"><div class="exif-field-label">Strength</div><div class="exif-field-value">${result.vibe_strength || 0.6}</div></div>
+                        <div class="exif-field"><div class="exif-field-label">Info Extracted</div><div class="exif-field-value">${result.vibe_info_extracted || 1.0}</div></div>
+                    </div>
+                `;
+            }
+
+            // Raw 메타데이터 (기타 필드)
+            if (result.raw_metadata && Object.keys(result.raw_metadata).length > 0) {
+                const knownKeys = ['Comment', 'vibe_data', 'cache_key', 'model', 'strength', 'info_extracted', 'peropix'];
+                const otherKeys = Object.keys(result.raw_metadata).filter(k => !knownKeys.includes(k));
+
+                if (otherKeys.length > 0) {
+                    settingsHtml += `
+                        <div class="exif-section">
+                            <div class="exif-section-title">📄 Raw Metadata</div>
+                            ${otherKeys.map(k => `
+                                <div class="exif-field">
+                                    <div class="exif-field-label">${k}</div>
+                                    <div class="exif-field-value">${escapeHtmlForExif(String(result.raw_metadata[k]).substring(0, 500))}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+            }
+
+            if (!settingsHtml) {
+                settingsHtml = '<div class="exif-empty">설정 정보 없음</div>';
+            }
+
+            settingsEl.innerHTML = settingsHtml;
+        }
+
+        // ComfyUI 메타데이터 렌더링
+        function renderComfyUIContent(comfyMeta, promptsEl, settingsEl) {
+            const prompt = comfyMeta.prompt || {};
+            const workflow = comfyMeta.workflow;
+
+            // ComfyUI 노드에서 프롬프트/설정 추출
+            let positivePrompts = [];
+            let negativePrompts = [];
+            let settings = {};
+
+            // 노드 참조를 따라가서 텍스트 추출하는 헬퍼 함수
+            const getTextFromNodeRef = (ref, visited = new Set()) => {
+                if (!ref || !Array.isArray(ref)) return null;
+                const [nodeId, outputIndex] = ref;
+                if (visited.has(nodeId)) return null; // 순환 방지
+                visited.add(nodeId);
+
+                const node = prompt[nodeId];
+                if (!node || !node.inputs) return null;
+
+                // CLIPTextEncode 노드면 text 반환
+                if (node.class_type && (node.class_type.includes('CLIPTextEncode') || node.class_type.includes('PromptEncode'))) {
+                    const text = node.inputs.text;
+                    if (typeof text === 'string') return text;
+                }
+
+                return null;
+            };
+
+            // KSampler 노드 찾아서 positive/negative 연결 따라가기
+            for (const [nodeId, node] of Object.entries(prompt)) {
+                if (!node.inputs) continue;
+                const classType = node.class_type || '';
+
+                // KSampler 노드에서 설정 및 프롬프트 추출
+                if (classType === 'KSampler' || classType === 'KSamplerAdvanced') {
+                    // positive/negative 연결 따라가기
+                    const posText = getTextFromNodeRef(node.inputs.positive);
+                    const negText = getTextFromNodeRef(node.inputs.negative);
+
+                    if (posText && !positivePrompts.includes(posText)) {
+                        positivePrompts.push(posText);
+                    }
+                    if (negText && !negativePrompts.includes(negText)) {
+                        negativePrompts.push(negText);
+                    }
+
+                    // seed가 배열(다른 노드 참조)인 경우 처리
+                    const seedVal = node.inputs.seed;
+                    if (seedVal !== undefined) {
+                        if (Array.isArray(seedVal)) {
+                            // 시드 노드 참조 - 값을 직접 가져오기 어려우므로 표시만
+                            if (!settings.seed) settings.seed = '(dynamic)';
+                        } else {
+                            settings.seed = seedVal;
+                        }
+                    }
+                    if (node.inputs.steps !== undefined) settings.steps = node.inputs.steps;
+                    if (node.inputs.cfg !== undefined) settings.cfg = node.inputs.cfg;
+                    if (node.inputs.sampler_name) settings.sampler = node.inputs.sampler_name;
+                    if (node.inputs.scheduler) settings.scheduler = node.inputs.scheduler;
+                    if (node.inputs.denoise !== undefined) settings.denoise = node.inputs.denoise;
+                }
+
+                // 이미지 크기 노드
+                if (classType === 'EmptyLatentImage') {
+                    if (node.inputs.width) settings.width = node.inputs.width;
+                    if (node.inputs.height) settings.height = node.inputs.height;
+                }
+
+                // 체크포인트 로더
+                if (classType.includes('CheckpointLoader')) {
+                    if (node.inputs.ckpt_name) settings.model = node.inputs.ckpt_name;
+                }
+            }
+
+            // 프롬프트 HTML 생성
+            const createSection = (title, value, icon) => {
+                if (!value) return '';
+                const escaped = escapeHtmlForExif(value);
+                const copyValue = escaped.replace(/`/g, '\\`').replace(/\\/g, '\\\\');
+                return `
+                    <div class="exif-section">
+                        <div class="exif-section-title">${icon} ${title}</div>
+                        <div class="exif-field">
+                            <div class="exif-field-value prompt">${escaped}</div>
+                            <button type="button" class="exif-copy-btn" onclick="copyExifField(\`${copyValue}\`)">📋</button>
+                        </div>
+                    </div>
+                `;
+            };
+
+            let promptsHtml = '';
+            if (positivePrompts.length > 0) {
+                promptsHtml += createSection('Positive Prompt', positivePrompts.join('\n---\n'), '✨');
+            }
+            if (negativePrompts.length > 0) {
+                promptsHtml += createSection('Negative Prompt', negativePrompts.join('\n---\n'), '🚫');
+            }
+
+            if (!promptsHtml) {
+                promptsHtml = '<div class="exif-empty">프롬프트를 추출할 수 없음</div>';
+            }
+            promptsEl.innerHTML = promptsHtml;
+
+            // 설정 HTML 생성
+            let settingsHtml = '';
+            const settingsFields = [
+                { value: settings.seed, label: 'Seed' },
+                { value: settings.width, label: 'Width' },
+                { value: settings.height, label: 'Height' },
+                { value: settings.steps, label: 'Steps' },
+                { value: settings.cfg, label: 'CFG Scale' },
+                { value: settings.sampler, label: 'Sampler' },
+                { value: settings.scheduler, label: 'Scheduler' },
+                { value: settings.denoise, label: 'Denoise' },
+                { value: settings.model, label: 'Model' }
+            ];
+
+            const activeSettings = settingsFields.filter(f => f.value !== undefined && f.value !== null);
+            if (activeSettings.length > 0) {
+                settingsHtml += `
+                    <div class="exif-section">
+                        <div class="exif-section-title">⚙️ Settings</div>
+                        ${activeSettings.map(f => `
+                            <div class="exif-field">
+                                <div class="exif-field-label">${f.label}</div>
+                                <div class="exif-field-value">${f.value}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+            // 워크플로우 정보
+            if (workflow) {
+                const nodeCount = workflow.nodes ? workflow.nodes.length : 0;
+                settingsHtml += `
+                    <div class="exif-section">
+                        <div class="exif-section-title">🔷 Workflow</div>
+                        <div class="exif-field">
+                            <div class="exif-field-label">Nodes</div>
+                            <div class="exif-field-value">${nodeCount}개</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (!settingsHtml) {
+                settingsHtml = '<div class="exif-empty">설정 정보 없음</div>';
+            }
+            settingsEl.innerHTML = settingsHtml;
+        }
+
+        // 개별 필드 복사
+        function copyExifField(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('클립보드에 복사됨', 'success');
+            }).catch(() => {
+                showToast('복사 실패', 'error');
+            });
+        }
+
+        // ============================================================
         // Censor Mode - New Implementation
         // ============================================================
-        
+
         // 검열 모드 상태
         const censorState = {
             currentTab: 'before',  // 'before' | 'processing' | 'after'

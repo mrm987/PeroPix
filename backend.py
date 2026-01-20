@@ -598,7 +598,33 @@ def read_metadata_from_image(image_bytes: bytes) -> dict:
             if hasattr(img, 'info'):
                 print(f"[EXIF] No Comment found. Available keys: {list(img.info.keys())}")
 
-        # 2. 레거시 peropix 필드 확인
+        # 2. ComfyUI 형식 확인 (prompt/workflow 키)
+        if hasattr(img, 'info') and 'prompt' in img.info:
+            try:
+                prompt_data = img.info['prompt']
+                if isinstance(prompt_data, bytes):
+                    prompt_data = prompt_data.decode('utf-8')
+                comfy_prompt = json.loads(prompt_data)
+
+                # workflow도 있으면 함께 저장
+                workflow_data = None
+                if 'workflow' in img.info:
+                    wf = img.info['workflow']
+                    if isinstance(wf, bytes):
+                        wf = wf.decode('utf-8')
+                    workflow_data = json.loads(wf)
+
+                # ComfyUI 형식으로 반환 (프론트엔드에서 처리)
+                return {
+                    "_comfyui": True,
+                    "prompt": comfy_prompt,
+                    "workflow": workflow_data
+                }
+            except Exception as e:
+                print(f"[EXIF] ComfyUI prompt parse error: {e}")
+                pass
+
+        # 3. 레거시 peropix 필드 확인
         if hasattr(img, 'info') and 'peropix' in img.info:
             try:
                 legacy = json.loads(img.info['peropix'])
@@ -2884,6 +2910,99 @@ async def extract_metadata(request: dict):
 
 
 # ============================================================
+# Utility API (보조 도구)
+# ============================================================
+
+@app.post("/api/utility/convert")
+async def convert_image(request: dict):
+    """이미지 형식 변환"""
+    image_base64 = request.get("image")
+    filename = request.get("filename", "image")
+    format_type = request.get("format", "png")  # png, jpg, webp
+    quality = request.get("quality", 95)
+    strip_metadata = request.get("strip_metadata", False)
+    save_dir = request.get("save_path")  # 사용자 지정 저장 경로
+
+    if not image_base64:
+        return {"success": False, "error": "No image provided"}
+
+    try:
+        # Base64 디코딩
+        image_data = base64.b64decode(image_base64)
+        image = Image.open(io.BytesIO(image_data))
+
+        # 형식 매핑
+        format_map = {'png': 'PNG', 'jpg': 'JPEG', 'webp': 'WEBP'}
+        pil_format = format_map.get(format_type, 'PNG')
+
+        # JPEG는 RGB만 지원
+        if format_type == 'jpg' and image.mode in ('RGBA', 'P', 'LA'):
+            image = image.convert('RGB')
+
+        # 출력 폴더 결정 (사용자 지정 경로 또는 기본 outputs)
+        if save_dir:
+            output_dir = Path(save_dir)
+        else:
+            output_dir = OUTPUT_DIR
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # 파일명 생성 (확장자 변경)
+        base_name = Path(filename).stem
+        new_filename = f"{base_name}.{format_type}"
+        save_path = output_dir / new_filename
+
+        # 파일명 중복 처리
+        counter = 1
+        while save_path.exists():
+            new_filename = f"{base_name}_{counter}.{format_type}"
+            save_path = output_dir / new_filename
+            counter += 1
+
+        # 메타데이터 처리
+        if strip_metadata:
+            # 메타데이터 제거: 깨끗한 이미지로 복사
+            clean_image = Image.new(image.mode, image.size)
+            clean_image.putdata(list(image.getdata()))
+
+            if format_type in ('jpg', 'webp'):
+                clean_image.save(save_path, format=pil_format, quality=quality)
+            else:
+                clean_image.save(save_path, format=pil_format)
+        else:
+            # 메타데이터 유지
+            original_metadata = read_metadata_from_image(image_data)
+
+            # 깨끗한 이미지 생성
+            clean_image = Image.new(image.mode, image.size)
+            clean_image.putdata(list(image.getdata()))
+
+            # 임시 버퍼에 저장
+            output = io.BytesIO()
+            if format_type in ('jpg', 'webp'):
+                clean_image.save(output, format=pil_format, quality=quality)
+            else:
+                clean_image.save(output, format=pil_format)
+            output_bytes = output.getvalue()
+
+            # 메타데이터가 있으면 추가
+            if original_metadata:
+                output_bytes = save_metadata_to_exif(output_bytes, original_metadata, pil_format)
+
+            # 파일에 쓰기
+            with open(save_path, 'wb') as f:
+                f.write(output_bytes)
+
+        return {
+            "success": True,
+            "saved_path": str(save_path),
+            "filename": new_filename
+        }
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ============================================================
 # Gallery API
 # ============================================================
 
@@ -3453,28 +3572,36 @@ async def get_config():
 @app.post("/api/open-folder")
 async def open_folder(request: dict):
     """폴더를 파일 탐색기로 열기 (Windows/macOS/Linux)"""
-    folder_type = request.get("folder", "")
-    subfolder = request.get("subfolder", "")  # outputs 서브폴더 지원
+    # 직접 경로가 제공된 경우
+    direct_path = request.get("path", "")
+    if direct_path:
+        folder_path = Path(direct_path)
+        if not folder_path.exists():
+            return {"error": "Folder does not exist"}
+    else:
+        # 폴더 타입으로 매핑
+        folder_type = request.get("folder", "")
+        subfolder = request.get("subfolder", "")  # outputs 서브폴더 지원
 
-    folder_map = {
-        "outputs": OUTPUT_DIR,
-        "vibe_cache": VIBE_CACHE_DIR,
-        "gallery": GALLERY_DIR,
-        "checkpoints": Path(CONFIG.get("checkpoints_dir", CHECKPOINTS_DIR)),
-        "loras": Path(CONFIG.get("lora_dir", LORA_DIR)),
-        "uncensored": UNCENSORED_DIR,
-        "censored": CENSORED_DIR,
-    }
+        folder_map = {
+            "outputs": OUTPUT_DIR,
+            "vibe_cache": VIBE_CACHE_DIR,
+            "gallery": GALLERY_DIR,
+            "checkpoints": Path(CONFIG.get("checkpoints_dir", CHECKPOINTS_DIR)),
+            "loras": Path(CONFIG.get("lora_dir", LORA_DIR)),
+            "uncensored": UNCENSORED_DIR,
+            "censored": CENSORED_DIR,
+        }
 
-    folder_path = folder_map.get(folder_type)
-    if not folder_path:
-        return {"error": "Unknown folder type"}
+        folder_path = folder_map.get(folder_type)
+        if not folder_path:
+            return {"error": "Unknown folder type"}
 
-    # 서브폴더가 지정된 경우
-    if subfolder and folder_type in ["outputs", "uncensored", "censored"]:
-        folder_path = folder_path / subfolder
+        # 서브폴더가 지정된 경우
+        if subfolder and folder_type in ["outputs", "uncensored", "censored"]:
+            folder_path = folder_path / subfolder
 
-    folder_path.mkdir(parents=True, exist_ok=True)
+        folder_path.mkdir(parents=True, exist_ok=True)
 
     try:
         abs_path = str(folder_path.resolve())
@@ -5925,6 +6052,181 @@ def select_folder_dialog(title: str = "폴더 선택") -> Optional[str]:
     except Exception as e:
         print(f"[FolderDialog] tkinter error: {e}")
         return None
+
+
+@app.post("/api/select-folder")
+async def select_folder(request: dict):
+    """폴더 선택 다이얼로그"""
+    default_path = request.get("default_path", "")
+    title = request.get("title", "폴더 선택")
+
+    # 기본 경로가 상대 경로면 APP_DIR 기준으로 변환
+    if default_path and not Path(default_path).is_absolute():
+        initial_dir = APP_DIR / default_path
+    else:
+        initial_dir = Path(default_path) if default_path else APP_DIR
+
+    # Windows: 모던 스타일 폴더 선택 다이얼로그 (IFileOpenDialog COM 인터페이스)
+    if sys.platform == 'win32':
+        try:
+            import subprocess
+            initial_dir_escaped = str(initial_dir).replace("'", "''")
+            title_escaped = title.replace("'", "''")
+            ps_script = f'''
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+
+[ComImport, Guid("DC1C5A9C-E88A-4dde-A5A1-60F82A20AEF7")]
+internal class FileOpenDialogInternal {{ }}
+
+[ComImport, Guid("42f85136-db7e-439c-85f1-e4075d135fc8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+internal interface IFileOpenDialog {{
+    [PreserveSig] int Show([In] IntPtr parent);
+    void SetFileTypes();
+    void SetFileTypeIndex([In] uint iFileType);
+    void GetFileTypeIndex(out uint piFileType);
+    void Advise();
+    void Unadvise();
+    void SetOptions([In] uint fos);
+    void GetOptions(out uint pfos);
+    void SetDefaultFolder(IShellItem psi);
+    void SetFolder(IShellItem psi);
+    void GetFolder(out IShellItem ppsi);
+    void GetCurrentSelection(out IShellItem ppsi);
+    void SetFileName([In, MarshalAs(UnmanagedType.LPWStr)] string pszName);
+    void GetFileName([MarshalAs(UnmanagedType.LPWStr)] out string pszName);
+    void SetTitle([In, MarshalAs(UnmanagedType.LPWStr)] string pszTitle);
+    void SetOkButtonLabel([In, MarshalAs(UnmanagedType.LPWStr)] string pszText);
+    void SetFileNameLabel([In, MarshalAs(UnmanagedType.LPWStr)] string pszLabel);
+    void GetResult(out IShellItem ppsi);
+    void AddPlace(IShellItem psi, int alignment);
+    void SetDefaultExtension([In, MarshalAs(UnmanagedType.LPWStr)] string pszDefaultExtension);
+    void Close(int hr);
+    void SetClientGuid();
+    void ClearClientData();
+    void SetFilter([MarshalAs(UnmanagedType.Interface)] IntPtr pFilter);
+    void GetResults();
+    void GetSelectedItems();
+}}
+
+[ComImport, Guid("43826D1E-E718-42EE-BC55-A1E261C37BFE"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+internal interface IShellItem {{
+    void BindToHandler();
+    void GetParent();
+    void GetDisplayName([In] uint sigdnName, [MarshalAs(UnmanagedType.LPWStr)] out string ppszName);
+    void GetAttributes();
+    void Compare();
+}}
+
+public class FolderPicker {{
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode, PreserveSig = false)]
+    private static extern void SHCreateItemFromParsingName(
+        [In, MarshalAs(UnmanagedType.LPWStr)] string pszPath,
+        [In] IntPtr pbc,
+        [In, MarshalAs(UnmanagedType.LPStruct)] Guid riid,
+        [Out, MarshalAs(UnmanagedType.Interface)] out IShellItem ppv);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+    [DllImport("user32.dll")]
+    private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
+
+    private const uint FOS_PICKFOLDERS = 0x00000020;
+    private const uint FOS_FORCEFILESYSTEM = 0x00000040;
+    private const uint FOS_NOVALIDATE = 0x00000100;
+    private const uint FOS_NOTESTFILECREATE = 0x00010000;
+    private const uint FOS_DONTADDTORECENT = 0x02000000;
+    private static readonly Guid IShellItemGuid = new Guid("43826D1E-E718-42EE-BC55-A1E261C37BFE");
+
+    public static string ShowDialog(string title, string initialPath) {{
+        IntPtr foregroundHwnd = GetForegroundWindow();
+        uint foregroundPid;
+        uint foregroundThread = GetWindowThreadProcessId(foregroundHwnd, out foregroundPid);
+        uint currentThread = GetCurrentThreadId();
+        AttachThreadInput(currentThread, foregroundThread, true);
+
+        try {{
+            var dialog = (IFileOpenDialog)new FileOpenDialogInternal();
+            dialog.SetOptions(FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_NOVALIDATE | FOS_NOTESTFILECREATE | FOS_DONTADDTORECENT);
+            dialog.SetTitle(title);
+
+            if (!string.IsNullOrEmpty(initialPath) && System.IO.Directory.Exists(initialPath)) {{
+                IShellItem folder;
+                SHCreateItemFromParsingName(initialPath, IntPtr.Zero, IShellItemGuid, out folder);
+                if (folder != null) {{
+                    dialog.SetFolder(folder);
+                }}
+            }}
+
+            int hr = dialog.Show(foregroundHwnd);
+            if (hr == 0) {{
+                IShellItem result;
+                dialog.GetResult(out result);
+                string path;
+                result.GetDisplayName(0x80058000, out path);
+                return path;
+            }}
+            return null;
+        }} finally {{
+            AttachThreadInput(currentThread, foregroundThread, false);
+        }}
+    }}
+}}
+"@
+
+$result = [FolderPicker]::ShowDialog('{title_escaped}', '{initial_dir_escaped}')
+if ($result) {{
+    Write-Output $result
+}}
+'''
+            result = subprocess.run(
+                ['powershell', '-NoProfile', '-Command', ps_script],
+                capture_output=True,
+                text=True,
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+            folder_path = result.stdout.strip()
+            if folder_path:
+                return {"success": True, "path": folder_path}
+            else:
+                return {"success": False, "cancelled": True}
+        except Exception as e:
+            print(f"[FolderDialog] PowerShell error: {e}")
+            return {"success": False, "error": str(e)}
+
+    # macOS/Linux: tkinter 시도
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes('-topmost', True)
+        root.update()
+
+        folder_path = filedialog.askdirectory(
+            title=title,
+            initialdir=str(initial_dir),
+            parent=root
+        )
+
+        root.destroy()
+
+        if folder_path:
+            return {"success": True, "path": folder_path}
+        else:
+            return {"success": False, "cancelled": True}
+    except Exception as e:
+        print(f"[FolderDialog] tkinter error: {e}")
+        return {"success": False, "error": str(e)}
 
 
 class SaveImageSetRequest(BaseModel):

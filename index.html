@@ -2744,6 +2744,12 @@
             color: var(--text-dim);
             margin-top: 2px;
         }
+        .slot-image-card .seed.clickable {
+            cursor: pointer;
+        }
+        .slot-image-card .seed.clickable:hover {
+            color: var(--text);
+        }
         
         .slot-empty {
             color: var(--text-dim);
@@ -4374,6 +4380,12 @@
         .gallery-item-info .seed {
             font-size: 0.75rem;
             color: var(--text-dim);
+        }
+        .gallery-item-info .seed.clickable {
+            cursor: pointer;
+        }
+        .gallery-item-info .seed.clickable:hover {
+            color: var(--text);
         }
         .gallery-item-actions {
             display: flex;
@@ -6450,9 +6462,21 @@
                         <button type="button" class="enhance-btn" title="Enhance (NAI)" style="display: none;">✨</button>
                         <button type="button" class="load-settings-btn" title="전체 설정 불러오기">📋</button>
                     </div>
-                    <div class="seed">${data.metadata ? 'Seed: ' + data.seed : '메타데이터 없음'}</div>
+                    <div class="seed${data.metadata && data.seed ? ' clickable' : ''}"${data.metadata && data.seed ? ` data-seed="${data.seed}" title="클릭하여 시드 복사"` : ''}>${data.metadata ? 'Seed: ' + data.seed : '메타데이터 없음'}</div>
                 </div>
             `;
+
+            // 시드 클릭 시 복사
+            const seedEl = card.querySelector('.seed.clickable');
+            if (seedEl) {
+                seedEl.onclick = (e) => {
+                    e.stopPropagation();
+                    const seed = seedEl.dataset.seed;
+                    navigator.clipboard.writeText(seed).then(() => {
+                        showToast(`시드 ${seed} 복사됨`, 'success');
+                    });
+                };
+            }
 
             // 이미지 데이터 저장 (갤러리 저장용 + 설정 불러오기용)
             // metadata가 null이면 seed/prompt도 null로 처리 (strip_metadata 옵션)
@@ -13636,7 +13660,7 @@
                             <span class="filename" title="${img.filename}">${img.filename.replace('.png', '')}</span>
                             <button class="rename-btn" title="이름 변경">✏️</button>
                         </div>
-                        <div class="seed">${img.seed ? 'Seed: ' + img.seed : '메타데이터 없음'}</div>
+                        <div class="seed${img.seed ? ' clickable' : ''}"${img.seed ? ` data-seed="${img.seed}" title="클릭하여 시드 복사"` : ''}>${img.seed ? 'Seed: ' + img.seed : '메타데이터 없음'}</div>
                     </div>
                     <div class="gallery-item-actions">
                         <button class="inpaint-btn" title="인페인트">🎨 Inpaint</button>
@@ -13693,12 +13717,24 @@
 
                 // 카드 클릭 - 라이트박스 (버튼 제외)
                 item.onclick = (e) => {
-                    // 버튼이나 입력 필드 클릭시 무시
-                    if (e.target.closest('.gallery-item-actions') || e.target.closest('.rename-btn') || e.target.tagName === 'INPUT') {
+                    // 버튼이나 입력 필드, 시드 클릭시 무시
+                    if (e.target.closest('.gallery-item-actions') || e.target.closest('.rename-btn') || e.target.closest('.seed.clickable') || e.target.tagName === 'INPUT') {
                         return;
                     }
                     showLightbox();
                 };
+
+                // 시드 클릭 시 복사
+                const seedEl = item.querySelector('.seed.clickable');
+                if (seedEl) {
+                    seedEl.onclick = (e) => {
+                        e.stopPropagation();
+                        const seed = seedEl.dataset.seed;
+                        navigator.clipboard.writeText(seed).then(() => {
+                            showToast(`시드 ${seed} 복사됨`, 'success');
+                        });
+                    };
+                }
 
                 // 이름 변경
                 item.querySelector('.rename-btn').onclick = (e) => {

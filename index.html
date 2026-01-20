@@ -6109,9 +6109,21 @@
                 document.body.classList.add('resizing-slot');
                 handle.classList.add('active');
 
+                // 리사이즈 중인 슬롯을 중앙에 유지
+                function scrollSlotToCenter() {
+                    const container = slotsContainer;
+                    const slotRect = slot.getBoundingClientRect();
+                    const containerRect = container.getBoundingClientRect();
+                    const slotCenter = slotRect.left + slotRect.width / 2;
+                    const containerCenter = containerRect.left + containerRect.width / 2;
+                    const scrollOffset = slotCenter - containerCenter;
+                    container.scrollLeft += scrollOffset;
+                }
+
                 function onMouseMove(e) {
                     const deltaX = e.clientX - startX;
                     setSlotWidth(startWidth + deltaX);
+                    scrollSlotToCenter();
                 }
 
                 function onMouseUp() {

@@ -4406,6 +4406,83 @@
             text-align: center;
         }
 
+        /* 리네이밍 설정 */
+        .rename-input-row {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 12px;
+        }
+        .rename-input-row label {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+        .rename-input-row input {
+            width: 100%;
+            padding: 8px 10px;
+            font-size: 0.85rem;
+        }
+        .rename-preview {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            background: var(--bg);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border);
+            margin-top: 4px;
+        }
+        .rename-preview-label {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            white-space: nowrap;
+        }
+        .rename-preview-value {
+            font-size: 0.85rem;
+            font-family: monospace;
+            color: var(--accent);
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .file-reorder-hint {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            margin-left: auto;
+            margin-right: 8px;
+        }
+
+        /* 드래그 앤 드롭 리오더 */
+        .file-item.draggable { cursor: grab; }
+        .file-item.draggable:active { cursor: grabbing; }
+        .file-item.dragging { opacity: 0.5; background: var(--bg-lighter); }
+        .file-item.drag-over { border-top: 2px solid var(--accent); margin-top: -2px; }
+        .file-item .drag-handle {
+            color: var(--text-dim);
+            opacity: 0.4;
+            cursor: grab;
+            padding: 4px;
+            flex-shrink: 0;
+        }
+        .file-item:hover .drag-handle { opacity: 0.8; }
+
+        /* 변경될 파일명 표시 */
+        .file-item-renamed {
+            font-size: 0.85rem;
+            color: var(--accent);
+            font-family: monospace;
+            margin-top: 2px;
+        }
+        /* 변환 결과 표시 */
+        .file-item-original {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            text-decoration: line-through;
+        }
+        .file-item-new {
+            font-size: 0.85rem;
+            color: var(--success);
+        }
+
         /* EXIF Reader Styles */
         .exif-reader-container {
             flex: 1;
@@ -5969,6 +6046,7 @@
                             <div class="utility-file-list" id="convertFileList" style="display: none;">
                                 <div class="file-list-header">
                                     <span class="file-count" id="convertFileCount">0개 파일</span>
+                                    <span class="file-reorder-hint" id="convertReorderHint" style="display: none;">드래그로 순서 변경</span>
                                     <button type="button" class="header-btn" id="convertClearBtn">🧹 Clear</button>
                                 </div>
                                 <div class="file-list-items" id="convertFileItems">
@@ -5994,6 +6072,33 @@
                                     <span id="convertQualityValue">95</span>
                                 </div>
                                 <input type="range" id="convertQuality" min="1" max="100" value="95" class="utility-slider">
+                            </div>
+
+                            <!-- 파일명 설정 섹션 -->
+                            <div class="utility-side-section">
+                                <div class="side-section-title">📝 파일명 설정</div>
+                                <div class="checkbox-row">
+                                    <input type="checkbox" id="convertRenameEnabled">
+                                    <label for="convertRenameEnabled">파일명 일괄 변경</label>
+                                </div>
+                                <div id="convertRenameOptions" style="display: none;">
+                                    <div class="rename-input-row">
+                                        <label>접두어</label>
+                                        <input type="text" id="convertRenamePrefix" placeholder="예: H" maxlength="50">
+                                    </div>
+                                    <div class="rename-input-row">
+                                        <label>시작 번호</label>
+                                        <input type="number" id="convertRenameStart" placeholder="예: 100" min="0">
+                                    </div>
+                                    <div class="rename-input-row">
+                                        <label>자릿수</label>
+                                        <input type="number" id="convertRenamePadding" placeholder="예: 3" min="1" max="10">
+                                    </div>
+                                    <div class="rename-preview">
+                                        <span class="rename-preview-label">미리보기:</span>
+                                        <span class="rename-preview-value" id="convertRenamePreview">-</span>
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="utility-side-section">
@@ -13281,6 +13386,11 @@
                 utilityOpenFolder: document.getElementById('convertOpenFolder')?.checked ?? true,
                 utilityFormat: document.getElementById('convertFormat')?.value || 'png',
                 utilityQuality: document.getElementById('convertQuality')?.value || '95',
+                // 리네이밍 옵션
+                utilityRenameEnabled: utilityState.renameEnabled || false,
+                utilityRenamePrefix: utilityState.renamePrefix || '',
+                utilityRenameStart: utilityState.renameStart || 1,
+                utilityRenamePadding: utilityState.renamePadding || 0,
             };
 
             localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
@@ -13391,6 +13501,19 @@
                     }
                     if (settings.utilityQuality) {
                         window._pendingUtilityQuality = settings.utilityQuality;
+                    }
+                    // 리네이밍 옵션
+                    if (settings.utilityRenameEnabled !== undefined) {
+                        window._pendingUtilityRenameEnabled = settings.utilityRenameEnabled;
+                    }
+                    if (settings.utilityRenamePrefix !== undefined) {
+                        window._pendingUtilityRenamePrefix = settings.utilityRenamePrefix;
+                    }
+                    if (settings.utilityRenameStart !== undefined) {
+                        window._pendingUtilityRenameStart = settings.utilityRenameStart;
+                    }
+                    if (settings.utilityRenamePadding !== undefined) {
+                        window._pendingUtilityRenamePadding = settings.utilityRenamePadding;
                     }
 
                     // 현재 provider 설정 적용 (NAI로 시작)
@@ -16141,7 +16264,12 @@
             convertFiles: [],       // 변환할 파일 목록 [{file: File, url: string}]
             isConverting: false,
             initialized: false,
-            lastSavePath: ''        // 마지막 저장 경로
+            lastSavePath: '',       // 마지막 저장 경로
+            // 리네이밍 설정
+            renameEnabled: false,
+            renamePrefix: '',
+            renameStart: 1,
+            renamePadding: 0
         };
 
         // 보조 도구 모드 초기화
@@ -16182,6 +16310,27 @@
                 document.getElementById('convertQuality').value = window._pendingUtilityQuality;
                 document.getElementById('convertQualityValue').textContent = window._pendingUtilityQuality;
             }
+
+            // 리네이밍 옵션 복원
+            if (window._pendingUtilityRenameEnabled !== undefined) {
+                const enabled = window._pendingUtilityRenameEnabled;
+                document.getElementById('convertRenameEnabled').checked = enabled;
+                utilityState.renameEnabled = enabled;
+                document.getElementById('convertRenameOptions').style.display = enabled ? 'block' : 'none';
+            }
+            if (window._pendingUtilityRenamePrefix !== undefined) {
+                document.getElementById('convertRenamePrefix').value = window._pendingUtilityRenamePrefix;
+                utilityState.renamePrefix = window._pendingUtilityRenamePrefix;
+            }
+            if (window._pendingUtilityRenameStart !== undefined) {
+                document.getElementById('convertRenameStart').value = window._pendingUtilityRenameStart;
+                utilityState.renameStart = window._pendingUtilityRenameStart;
+            }
+            if (window._pendingUtilityRenamePadding !== undefined) {
+                document.getElementById('convertRenamePadding').value = window._pendingUtilityRenamePadding;
+                utilityState.renamePadding = window._pendingUtilityRenamePadding;
+            }
+            updateRenamePreview();
         }
 
         // 탭 전환
@@ -16265,11 +16414,60 @@
 
             // 변환 실행
             runBtn.onclick = runConversion;
+
+            // 리네이밍 설정 이벤트
+            const renameEnabled = document.getElementById('convertRenameEnabled');
+            const renameOptions = document.getElementById('convertRenameOptions');
+            const renamePrefix = document.getElementById('convertRenamePrefix');
+            const renameStart = document.getElementById('convertRenameStart');
+            const renamePadding = document.getElementById('convertRenamePadding');
+
+            renameEnabled.onchange = () => {
+                utilityState.renameEnabled = renameEnabled.checked;
+                renameOptions.style.display = renameEnabled.checked ? 'block' : 'none';
+                document.getElementById('convertReorderHint').style.display =
+                    (renameEnabled.checked && utilityState.convertFiles.length > 1) ? 'inline' : 'none';
+                updateRenamePreview();
+                updateConvertFileList();
+            };
+
+            renamePrefix.oninput = () => {
+                utilityState.renamePrefix = renamePrefix.value;
+                updateRenamePreview();
+                updateConvertFileList();
+            };
+
+            renameStart.oninput = () => {
+                const val = parseInt(renameStart.value);
+                utilityState.renameStart = isNaN(val) ? 1 : Math.max(0, val);
+                updateRenamePreview();
+                updateConvertFileList();
+            };
+
+            renamePadding.oninput = () => {
+                const val = parseInt(renamePadding.value);
+                utilityState.renamePadding = isNaN(val) ? 0 : Math.max(0, Math.min(10, val));
+                updateRenamePreview();
+                updateConvertFileList();
+            };
+
+            // 포맷 변경 시 미리보기도 업데이트
+            const origFormatChange = formatSelect.onchange;
+            formatSelect.onchange = (e) => {
+                origFormatChange(e);
+                updateRenamePreview();
+                updateConvertFileList();
+            };
         }
 
         // 파일 추가
         function addConvertFiles(files) {
-            files.forEach(file => {
+            // 이름순 정렬
+            const sortedFiles = Array.from(files).sort((a, b) =>
+                a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+            );
+
+            sortedFiles.forEach(file => {
                 // 중복 체크 (파일명 + 크기)
                 if (!utilityState.convertFiles.find(f => f.file.name === file.name && f.file.size === file.size)) {
                     utilityState.convertFiles.push({
@@ -16305,25 +16503,138 @@
             const fileItems = document.getElementById('convertFileItems');
             const fileCount = document.getElementById('convertFileCount');
             const runBtn = document.getElementById('convertRunBtn');
+            const reorderHint = document.getElementById('convertReorderHint');
+            const format = document.getElementById('convertFormat').value;
 
             const hasFiles = utilityState.convertFiles.length > 0;
             dropzone.style.display = hasFiles ? 'none' : 'flex';
             fileList.style.display = hasFiles ? 'flex' : 'none';
             runBtn.disabled = !hasFiles || utilityState.isConverting;
 
+            // 순서 변경 힌트 표시
+            if (reorderHint) {
+                reorderHint.style.display =
+                    (utilityState.renameEnabled && utilityState.convertFiles.length > 1) ? 'inline' : 'none';
+            }
+
             if (hasFiles) {
                 fileCount.textContent = `${utilityState.convertFiles.length}개 파일`;
-                fileItems.innerHTML = utilityState.convertFiles.map((item, idx) => `
-                    <div class="file-item">
-                        <img class="file-item-thumb" src="${item.url}" alt="">
-                        <div class="file-item-info">
-                            <div class="file-item-name">${item.file.name}</div>
-                            <div class="file-item-meta">${formatFileSize(item.file.size)}</div>
+                const isDraggable = utilityState.renameEnabled;
+
+                fileItems.innerHTML = utilityState.convertFiles.map((item, idx) => {
+                    const previewName = utilityState.renameEnabled
+                        ? generateNewFilename(idx, format)
+                        : null;
+
+                    return `
+                        <div class="file-item${isDraggable ? ' draggable' : ''}"
+                             data-index="${idx}"
+                             ${isDraggable ? 'draggable="true"' : ''}>
+                            ${isDraggable ? '<span class="drag-handle">⠿</span>' : ''}
+                            <img class="file-item-thumb" src="${item.url}" alt="">
+                            <div class="file-item-info">
+                                <div class="file-item-name">${item.file.name}</div>
+                                <div class="file-item-meta">${formatFileSize(item.file.size)}</div>
+                                ${previewName ? `<div class="file-item-renamed">→ ${previewName}</div>` : ''}
+                            </div>
+                            <button type="button" class="remove-btn" onclick="removeConvertFile(${idx})">✕</button>
                         </div>
-                        <button type="button" class="remove-btn" onclick="removeConvertFile(${idx})">✕</button>
-                    </div>
-                `).join('');
+                    `;
+                }).join('');
+
+                // 드래그 리오더링 설정
+                if (isDraggable) {
+                    setupFileDragReorder();
+                }
             }
+        }
+
+        // 미리보기 업데이트
+        function updateRenamePreview() {
+            const previewEl = document.getElementById('convertRenamePreview');
+            const format = document.getElementById('convertFormat').value;
+
+            if (!utilityState.renameEnabled) {
+                previewEl.textContent = '-';
+                return;
+            }
+
+            const samples = [];
+            for (let i = 0; i < Math.min(3, Math.max(1, utilityState.convertFiles.length || 3)); i++) {
+                samples.push(generateNewFilename(i, format));
+            }
+            previewEl.textContent = samples.join(', ') + (utilityState.convertFiles.length > 3 ? '...' : '');
+        }
+
+        // 새 파일명 생성
+        function generateNewFilename(index, format) {
+            const prefix = utilityState.renamePrefix;
+            const start = utilityState.renameStart || 1;
+            const padding = utilityState.renamePadding || 0;
+
+            const num = start + index;
+            const paddedNum = padding > 0 ? String(num).padStart(padding, '0') : String(num);
+
+            return `${prefix}${paddedNum}.${format}`;
+        }
+
+        // 드래그 리오더링 설정
+        function setupFileDragReorder() {
+            const fileItems = document.getElementById('convertFileItems');
+            const items = fileItems.querySelectorAll('.file-item.draggable');
+
+            let draggedIndex = -1;
+
+            items.forEach((item) => {
+                item.ondragstart = (e) => {
+                    draggedIndex = parseInt(item.dataset.index);
+                    item.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', draggedIndex);
+                };
+
+                item.ondragend = () => {
+                    item.classList.remove('dragging');
+                    items.forEach(i => i.classList.remove('drag-over'));
+                    draggedIndex = -1;
+                };
+
+                item.ondragover = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (draggedIndex >= 0 && parseInt(item.dataset.index) !== draggedIndex) {
+                        items.forEach(i => i.classList.remove('drag-over'));
+                        item.classList.add('drag-over');
+                    }
+                };
+
+                item.ondragleave = () => {
+                    item.classList.remove('drag-over');
+                };
+
+                item.ondrop = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    item.classList.remove('drag-over');
+
+                    const targetIndex = parseInt(item.dataset.index);
+                    if (draggedIndex >= 0 && targetIndex !== draggedIndex) {
+                        reorderConvertFiles(draggedIndex, targetIndex);
+                    }
+                };
+            });
+        }
+
+        // 파일 순서 변경
+        function reorderConvertFiles(fromIndex, toIndex) {
+            if (fromIndex === toIndex) return;
+
+            const files = utilityState.convertFiles;
+            const [movedItem] = files.splice(fromIndex, 1);
+            files.splice(toIndex, 0, movedItem);
+
+            updateConvertFileList();
+            updateRenamePreview();
         }
 
         // 변환 실행
@@ -16371,8 +16682,16 @@
             const total = utilityState.convertFiles.length;
             let completed = 0;
             let errors = 0;
+            const results = [];  // 결과 추적
 
-            for (const item of utilityState.convertFiles) {
+            for (let i = 0; i < utilityState.convertFiles.length; i++) {
+                const item = utilityState.convertFiles[i];
+
+                // 커스텀 파일명 생성 (리네이밍 활성화 시)
+                const customFilename = utilityState.renameEnabled
+                    ? generateNewFilename(i, format)
+                    : null;
+
                 try {
                     const base64 = await fileToBase64(item.file);
                     const response = await fetch(`${API_BASE}/api/utility/convert`, {
@@ -16384,7 +16703,8 @@
                             format: format,
                             quality: quality,
                             strip_metadata: stripMetadata,
-                            save_path: savePath
+                            save_path: savePath,
+                            custom_filename: customFilename
                         })
                     });
 
@@ -16392,10 +16712,18 @@
                     if (!result.success) {
                         console.error(`변환 실패: ${item.file.name}`, result.error);
                         errors++;
+                        results.push({ original: item.file.name, newName: null, error: true });
+                    } else {
+                        results.push({
+                            original: item.file.name,
+                            newName: result.filename,
+                            error: false
+                        });
                     }
                 } catch (err) {
                     console.error(`변환 오류: ${item.file.name}`, err);
                     errors++;
+                    results.push({ original: item.file.name, newName: null, error: true });
                 }
 
                 completed++;
@@ -16404,6 +16732,9 @@
             }
 
             utilityState.isConverting = false;
+
+            // 결과 표시 (리네이밍 활성화 시 원본/새 파일명 함께 표시)
+            updateConvertFileListWithResults(results);
 
             if (errors > 0) {
                 showToast(`${completed - errors}개 성공, ${errors}개 실패`, 'warning');
@@ -16427,6 +16758,32 @@
                 progressFill.style.width = '0%';
                 runBtn.disabled = utilityState.convertFiles.length === 0;
             }, 1500);
+        }
+
+        // 변환 결과로 파일 목록 UI 업데이트 (DOM 직접 수정)
+        function updateConvertFileListWithResults(results) {
+            const fileItems = document.getElementById('convertFileItems');
+            const items = fileItems.querySelectorAll('.file-item');
+
+            items.forEach((item, idx) => {
+                const result = results[idx];
+                if (!result) return;
+
+                const infoDiv = item.querySelector('.file-item-info');
+                if (!infoDiv) return;
+
+                if (result.error) {
+                    infoDiv.innerHTML = `
+                        <div class="file-item-name" style="color: var(--error);">${result.original}</div>
+                        <div class="file-item-meta" style="color: var(--error);">변환 실패</div>
+                    `;
+                } else {
+                    infoDiv.innerHTML = `
+                        <div class="file-item-original">${result.original}</div>
+                        <div class="file-item-new">→ ${result.newName}</div>
+                    `;
+                }
+            });
         }
 
         // File to Base64 (data URL prefix 없이)

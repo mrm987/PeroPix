@@ -2922,6 +2922,7 @@ async def convert_image(request: dict):
     quality = request.get("quality", 95)
     strip_metadata = request.get("strip_metadata", False)
     save_dir = request.get("save_path")  # 사용자 지정 저장 경로
+    custom_filename = request.get("custom_filename")  # 커스텀 파일명 (리네이밍용)
 
     if not image_base64:
         return {"success": False, "error": "No image provided"}
@@ -2946,15 +2947,24 @@ async def convert_image(request: dict):
             output_dir = OUTPUT_DIR
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # 파일명 생성 (확장자 변경)
-        base_name = Path(filename).stem
-        new_filename = f"{base_name}.{format_type}"
+        # 파일명 생성
+        if custom_filename:
+            # 커스텀 파일명 사용 (이미 확장자 포함됨)
+            # 유효하지 않은 문자 제거
+            new_filename = re.sub(r'[<>:"/\\|?*]', '_', custom_filename)
+        else:
+            # 기본: 원본 파일명에서 확장자만 변경
+            base_name = Path(filename).stem
+            new_filename = f"{base_name}.{format_type}"
+
         save_path = output_dir / new_filename
 
         # 파일명 중복 처리
         counter = 1
+        base_for_dup = Path(new_filename).stem
+        ext_for_dup = Path(new_filename).suffix
         while save_path.exists():
-            new_filename = f"{base_name}_{counter}.{format_type}"
+            new_filename = f"{base_for_dup}_{counter}{ext_for_dup}"
             save_path = output_dir / new_filename
             counter += 1
 

@@ -904,6 +904,7 @@ class MultiGenerateRequest(BaseModel):
     save_format: str = "png"  # png, jpg, webp
     jpg_quality: int = 95
     strip_metadata: bool = False
+    auto_save: bool = True  # False면 파일 저장 안하고 미리보기만
 
 
 class ConfigUpdate(BaseModel):
@@ -2348,16 +2349,25 @@ async def process_job(job):
                 image_bytes = img_buffer.getvalue()
                 image_bytes = save_metadata_to_exif(image_bytes, unified_metadata, pil_format)
 
-            # 파일로 저장
-            save_path = save_dir / filename
-            with open(save_path, 'wb') as f:
-                f.write(image_bytes)
+            # auto_save 여부에 따라 파일 저장 또는 미리보기만
+            auto_save = getattr(req, 'auto_save', True)
+
+            if auto_save:
+                # 파일로 저장
+                save_path = save_dir / filename
+                with open(save_path, 'wb') as f:
+                    f.write(image_bytes)
+
+                # 이미지 경로 (output_folder 포함)
+                image_path = f"{req.output_folder}/{filename}" if req.output_folder else filename
+                image_base64 = None
+            else:
+                # 미리보기만: 파일 저장 안함, base64로 전송
+                image_path = None
+                image_base64 = base64.b64encode(image_bytes).decode('utf-8')
 
             # 진행 상황 업데이트
             gen_queue.completed_images += 1
-
-            # 이미지 경로 (output_folder 포함)
-            image_path = f"{req.output_folder}/{filename}" if req.output_folder else filename
 
             # 이미지 데이터 구성
             image_data = {
@@ -2366,9 +2376,12 @@ async def process_job(job):
                 "slot_idx": slot_index,
                 "seed": actual_seed,
                 "image_path": image_path,
-                "filename": filename,
+                "filename": filename if auto_save else None,
                 "prompt": full_prompt,
-                "metadata": None if strip_metadata else unified_metadata
+                "metadata": None if strip_metadata else unified_metadata,
+                "image_base64": image_base64,  # auto_save=False일 때만 포함
+                "save_format": save_format,
+                "output_folder": req.output_folder
             }
 
             # 재연결 동기화용 기록
@@ -4062,6 +4075,62 @@ async def create_output_folder(req: dict):
     try:
         folder_path.mkdir(parents=True, exist_ok=True)
         return {"success": True, "name": folder_name}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# === Save Preview Image API ===
+class SavePreviewRequest(BaseModel):
+    image_base64: str
+    slot_index: int = 0
+    slot_name: str = ""
+    save_format: str = "png"
+    output_folder: str = ""
+
+@app.post("/api/save-preview")
+async def save_preview_image(req: SavePreviewRequest):
+    """미리보기 이미지를 파일로 저장"""
+    try:
+        # 저장 경로 결정
+        if req.output_folder:
+            save_dir = OUTPUT_DIR / req.output_folder
+            save_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            save_dir = OUTPUT_DIR
+
+        # 확장자 결정
+        save_format = req.save_format.lower()
+        if save_format not in ['png', 'jpg', 'webp']:
+            save_format = 'png'
+        ext = 'jpg' if save_format == 'jpg' else save_format
+
+        # 파일명 생성
+        file_tag = ""
+        if req.slot_name:
+            file_tag = sanitize_filename(req.slot_name, max_length=100)
+
+        if file_tag:
+            category = f"{req.slot_index+1:03d}_{file_tag}"
+        else:
+            category = f"{req.slot_index+1:03d}"
+
+        file_num = get_next_image_number(category, save_dir, ext)
+        filename = f"{category}_{file_num:07d}.{ext}"
+
+        # base64 디코딩 및 저장
+        image_bytes = base64.b64decode(req.image_base64)
+        save_path = save_dir / filename
+        with open(save_path, 'wb') as f:
+            f.write(image_bytes)
+
+        # 이미지 경로 (output_folder 포함)
+        image_path = f"{req.output_folder}/{filename}" if req.output_folder else filename
+
+        return {
+            "success": True,
+            "filename": filename,
+            "image_path": image_path
+        }
     except Exception as e:
         return {"success": False, "error": str(e)}
 

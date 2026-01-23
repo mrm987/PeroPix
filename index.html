@@ -456,7 +456,8 @@
             box-sizing: border-box;
             overflow-wrap: break-word;
             word-break: break-word;
-            overflow: hidden;
+            overflow-y: auto;
+            overflow-x: hidden;
             pointer-events: none;
             z-index: 1;
             color: var(--text);
@@ -5009,6 +5010,26 @@
             color: white;
             border-color: #c0392b;
         }
+        .slot-image-card .save-preview-btn {
+            background: var(--bg-lighter);
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+            padding: 2px 6px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+        .slot-image-card .save-preview-btn:hover {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        .slot-image-card .filename.unsaved {
+            color: var(--text-dim);
+            font-style: italic;
+        }
 
         /* Settings Modal */
         .modal {
@@ -5708,12 +5729,10 @@
                             <input type="checkbox" id="stripMetadata">
                             <label for="stripMetadata">메타데이터 제거</label>
                         </div>
-                        <small style="color: var(--text-dim);">체크 시 이미지에서 생성 정보가 제거됩니다</small>
-                        <div class="checkbox-row" style="margin-top: 12px;">
+                        <div class="checkbox-row">
                             <input type="checkbox" id="autoSaveToggle" checked>
-                            <label for="autoSaveToggle">설정 자동 저장</label>
+                            <label for="autoSaveToggle">자동 저장</label>
                         </div>
-                        <small style="color: var(--text-dim);">끄면 수동으로 저장해야 합니다</small>
                     </div>
                 </div>
             </div>
@@ -6654,7 +6673,7 @@
         let totalImages = 0;
         let resetTimer = null;
         let naiTokenSet = false;  // NAI 토큰 설정 여부
-        let autoSaveEnabled = true;  // 자동 저장 활성화 여부
+        let autoSaveEnabled = true;  // 설정 자동 저장 (항상 true)
 
         // WebSocket 연결 관리
         let ws = null;
@@ -7098,20 +7117,28 @@
             const card = document.createElement('div');
             card.className = 'slot-image-card';
 
-            // image_path가 있으면 URL로, 없으면 base64로 (하위 호환)
+            // image_path가 있으면 URL로, image_base64가 있으면 base64로 (auto_save=false), 없으면 기존 data.image로 (하위 호환)
             // 캐시 버스터 추가 (삭제된 파일명 재사용 시 캐시 문제 방지)
             const cacheBuster = Date.now();
+            const isPreviewOnly = !data.image_path && data.image_base64;
             const imgSrc = data.image_path
                 ? `${API_BASE}/api/outputs/${data.image_path}?t=${cacheBuster}`
-                : `data:image/png;base64,${data.image}`;
+                : (data.image_base64 ? `data:image/png;base64,${data.image_base64}` : `data:image/png;base64,${data.image}`);
+
+            // 미리보기 전용인 경우 "미저장" 표시, 아니면 파일명 표시
+            const filenameDisplay = isPreviewOnly
+                ? `<div class="filename unsaved" title="저장되지 않음">미저장</div>`
+                : `<div class="filename" title="${data.filename}">${data.filename}</div>`;
+
             card.innerHTML = `
                 <img src="${imgSrc}" alt="" draggable="false">
                 <button type="button" class="save-gallery-btn" title="갤러리에 저장">☆</button>
                 <div class="info">
                     <div class="info-row">
                         <button type="button" class="clear-card-btn" title="미리보기 지우기">🧹</button>
-                        <button type="button" class="delete-file-btn" title="파일 삭제">🗑️</button>
-                        <div class="filename" title="${data.filename}">${data.filename}</div>
+                        <button type="button" class="save-preview-btn" title="파일로 저장"${isPreviewOnly ? '' : ' style="display:none"'}>💾</button>
+                        <button type="button" class="delete-file-btn" title="파일 삭제"${isPreviewOnly ? ' style="display:none"' : ''}>🗑️</button>
+                        ${filenameDisplay}
                         <button type="button" class="inpaint-btn" title="Inpaint">🎨</button>
                         <button type="button" class="enhance-btn" title="Enhance (NAI)" style="display: none;">✨</button>
                         <button type="button" class="load-settings-btn" title="전체 설정 불러오기">📋</button>
@@ -7138,11 +7165,67 @@
             card._imageData = {
                 image_path: data.image_path || null,
                 image: data.image || null,  // 하위 호환
+                image_base64: data.image_base64 || null,  // 미리보기 전용 이미지
                 filename: data.filename,
                 seed: hasMetadata ? data.seed : null,
                 prompt: hasMetadata ? (data.prompt || '') : null,
-                metadata: data.metadata || null  // 전체 설정 메타데이터
+                metadata: data.metadata || null,  // 전체 설정 메타데이터
+                save_format: data.save_format || 'png',
+                output_folder: data.output_folder || '',
+                slotIndex: slotIndex
             };
+
+            // 미리보기 저장 버튼 핸들러
+            const savePreviewBtn = card.querySelector('.save-preview-btn');
+            if (savePreviewBtn) {
+                savePreviewBtn.onclick = async (e) => {
+                    e.stopPropagation();
+                    try {
+                        // 슬롯 이름 가져오기
+                        const slotName = targetSlot.querySelector('.slot-name').value.trim();
+
+                        const response = await fetch(`${API_BASE}/api/save-preview`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                image_base64: card._imageData.image_base64,
+                                slot_index: card._imageData.slotIndex,
+                                slot_name: slotName,
+                                save_format: card._imageData.save_format,
+                                output_folder: card._imageData.output_folder
+                            })
+                        });
+
+                        const result = await response.json();
+                        if (result.success) {
+                            // 저장 버튼 숨기기
+                            savePreviewBtn.style.display = 'none';
+
+                            // 삭제 버튼 표시
+                            const deleteBtn = card.querySelector('.delete-file-btn');
+                            if (deleteBtn) deleteBtn.style.display = '';
+
+                            // 파일명 업데이트
+                            const filenameDiv = card.querySelector('.filename');
+                            if (filenameDiv) {
+                                filenameDiv.classList.remove('unsaved');
+                                filenameDiv.title = result.filename;
+                                filenameDiv.textContent = result.filename;
+                            }
+
+                            // _imageData 업데이트
+                            card._imageData.filename = result.filename;
+                            card._imageData.image_path = result.image_path;
+
+                            showToast(`저장됨: ${result.filename}`, 'success');
+                        } else {
+                            showToast(`저장 실패: ${result.error}`, 'error');
+                        }
+                    } catch (err) {
+                        showToast(`저장 오류: ${err.message}`, 'error');
+                    }
+                };
+            }
 
             // 갤러리 저장/제거 토글 버튼
             const saveBtn = card.querySelector('.save-gallery-btn');
@@ -9521,6 +9604,7 @@
             request.save_format = document.getElementById('saveFormat').value;
             request.jpg_quality = parseInt(document.getElementById('jpgQuality').value);
             request.strip_metadata = document.getElementById('stripMetadata').checked;
+            request.auto_save = document.getElementById('autoSaveToggle').checked;
 
             // Base Image (img2img / inpaint)
             if (baseImageData.enabled && baseImageData.image) {
@@ -13971,9 +14055,6 @@
             checkSlotPresetModified();
             checkCharPresetModified();
 
-            // 자동저장이 비활성화면 실제 저장은 하지 않음
-            if (!autoSaveEnabled) return;
-
             if (saveTimeout) clearTimeout(saveTimeout);
             saveTimeout = setTimeout(saveAppSettings, 500);
         }
@@ -14040,14 +14121,13 @@
                 });
             }
 
-            // Auto save toggle
+            // Auto save toggle (이미지 자동 저장 on/off)
             const autoSaveToggle = document.getElementById('autoSaveToggle');
             if (autoSaveToggle) {
                 autoSaveToggle.addEventListener('change', () => {
-                    autoSaveEnabled = autoSaveToggle.checked;
-                    // 자동저장 설정 자체는 항상 저장 (다음 시작 시 복원을 위해)
+                    // 이미지 자동 저장 설정 저장
                     saveAppSettings();
-                    if (autoSaveEnabled) {
+                    if (autoSaveToggle.checked) {
                         showToast('자동 저장이 활성화되었습니다', 'success');
                     } else {
                         showToast('자동 저장이 비활성화되었습니다 (수동 저장 필요)', 'warning');

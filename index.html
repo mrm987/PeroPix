@@ -5004,6 +5004,39 @@
             background: #e67e22;
             color: white;
         }
+        .slot-image-card .hiresfix-btn {
+            background: var(--bg-lighter);
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+            padding: 2px 6px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+        .slot-image-card .hiresfix-btn:hover {
+            background: #e67e22;
+            color: white;
+            border-color: #e67e22;
+        }
+        .slot-image-card .hiresfix-btn.processing {
+            background: #f39c12;
+            color: white;
+            border-color: #f39c12;
+            cursor: default;
+            animation: hiresfix-pulse 1s ease-in-out infinite;
+        }
+        .slot-image-card .hiresfix-btn.queued {
+            background: #3498db;
+            color: white;
+            border-color: #3498db;
+            cursor: default;
+        }
+        @keyframes hiresfix-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
         .slot-image-card .clear-card-btn:hover {
             background: var(--danger);
             color: white;
@@ -5562,6 +5595,11 @@
                                         <span>1</span>
                                     </div>
                                 </div>
+                            </div>
+
+                            <div class="checkbox-row" style="margin-top: 8px;">
+                                <input type="checkbox" id="lutHiresOnly">
+                                <label for="lutHiresOnly">HiresFix에만 적용</label>
                             </div>
                         </div>
                     </div>
@@ -7163,6 +7201,7 @@
                         ${filenameDisplay}
                         <button type="button" class="inpaint-btn" title="Inpaint">🎨</button>
                         <button type="button" class="enhance-btn" title="Enhance (NAI)" style="display: none;">✨</button>
+                        <button type="button" class="hiresfix-btn" title="HiresFix (Local)" style="display: none;">✨</button>
                         <button type="button" class="load-settings-btn" title="전체 설정 불러오기">📋</button>
                     </div>
                     <div class="seed${data.metadata && data.seed ? ' clickable' : ''}"${data.metadata && data.seed ? ` data-seed="${data.seed}" title="클릭하여 시드 복사"` : ''}>${data.metadata ? 'Seed: ' + data.seed : '메타데이터 없음'}</div>
@@ -7398,6 +7437,127 @@
                     openEnhanceModal('data:image/png;base64,' + imageBase64, card._imageData.metadata);
                 } else {
                     showToast('이미지 데이터가 없습니다', 'error');
+                }
+            };
+
+            // HiresFix 버튼 (Local 전용)
+            const hiresfixBtn = card.querySelector('.hiresfix-btn');
+            // Local 모드이고 메타데이터가 있을 때만 표시
+            if (currentProvider === 'local' && data.metadata) {
+                hiresfixBtn.style.display = 'inline-block';
+            }
+            hiresfixBtn.onclick = async (e) => {
+                e.stopPropagation();
+
+                // 이미 처리 중이면 무시
+                if (hiresfixBtn.classList.contains('processing') || hiresfixBtn.classList.contains('queued')) {
+                    return;
+                }
+
+                const metadata = card._imageData.metadata;
+                if (!metadata) {
+                    showToast('메타데이터가 없어 HiresFix를 실행할 수 없습니다', 'error');
+                    return;
+                }
+
+                // 이미지 base64 가져오기
+                let imageBase64 = card._imageData.image || card._imageData.image_base64;
+                if (!imageBase64 && card._imageData.image_path) {
+                    try {
+                        const response = await fetch(`${API_BASE}/api/outputs/${card._imageData.image_path}`);
+                        const blob = await response.blob();
+                        imageBase64 = await new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onload = () => resolve(reader.result.split(',')[1]);
+                            reader.readAsDataURL(blob);
+                        });
+                    } catch (err) {
+                        showToast('이미지 로드 실패', 'error');
+                        return;
+                    }
+                }
+
+                if (!imageBase64) {
+                    showToast('이미지 데이터가 없습니다', 'error');
+                    return;
+                }
+
+                // 현재 HiresFix 옵션 가져오기 (체크 여부와 상관없이)
+                const upscaleModel = document.getElementById('upscaleModel').value;
+                if (!upscaleModel) {
+                    showToast('업스케일 모델을 선택하세요', 'error');
+                    return;
+                }
+
+                // 버튼 상태 변경: 대기중
+                hiresfixBtn.classList.add('queued');
+                hiresfixBtn.textContent = '대기중...';
+                hiresfixBtn.title = 'HiresFix 대기 중 (큐에서 취소 가능)';
+                hiresfixBtn.disabled = true;
+
+                // HiresFix 요청 전송
+                try {
+                    const hiresRequest = {
+                        provider: 'local',
+                        base_image: imageBase64,
+                        base_prompt: metadata.prompt || '',
+                        negative_prompt: metadata.uc || '',
+                        width: metadata.width || parseInt(document.getElementById('width').value),
+                        height: metadata.height || parseInt(document.getElementById('height').value),
+                        seed: metadata.seed || -1,
+                        steps: metadata.steps || parseInt(document.getElementById('steps').value),
+                        cfg: metadata.scale || parseFloat(document.getElementById('cfg').value),
+                        sampler: metadata.sampler || document.getElementById('sampler').value,
+                        scheduler: metadata.noise_schedule || 'normal',
+                        model: metadata.peropix?.local_model || document.getElementById('localModel').value,
+                        // HiresFix 옵션 (현재 UI 세팅 사용)
+                        enable_upscale: true,
+                        upscale_model: upscaleModel,
+                        downscale_ratio: parseFloat(document.getElementById('downscaleRatio').value),
+                        upscale_steps: parseInt(document.getElementById('upscaleSteps').value),
+                        upscale_cfg: parseFloat(document.getElementById('upscaleCfg').value),
+                        upscale_denoise: parseFloat(document.getElementById('upscaleDenoise').value),
+                        size_alignment: document.getElementById('sizeAlignment').value,
+                        // LUT 옵션 (현재 UI 세팅 사용, HiresFix 버튼은 항상 2pass이므로 lut_hires_only 무시)
+                        enable_lut: document.getElementById('enableLut')?.checked || false,
+                        lut_file: document.getElementById('lutFile')?.value || '',
+                        lut_intensity: parseFloat(document.getElementById('lutIntensity')?.value) || 1.0,
+                        lut_hires_only: false,  // HiresFix 버튼은 항상 2pass 결과이므로 무조건 적용
+                        // 저장 옵션
+                        save_format: document.getElementById('saveFormat')?.value || 'png',
+                        output_folder: typeof getOutputFolder === 'function' ? getOutputFolder() : '',
+                        // HiresFix 전용 플래그: 1st pass 건너뛰고 base_image에 바로 HiresFix 적용
+                        hiresfix_only: true,
+                        source_card_id: card.dataset.cardId || Date.now().toString()
+                    };
+
+                    // 카드에 ID 저장 (나중에 상태 업데이트용)
+                    if (!card.dataset.cardId) {
+                        card.dataset.cardId = hiresRequest.source_card_id;
+                    }
+
+                    const response = await fetch(`${API_BASE}/api/generate/multi`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(hiresRequest)
+                    });
+
+                    const result = await response.json();
+                    if (!result.success) {
+                        throw new Error(result.error || 'HiresFix 요청 실패');
+                    }
+
+                    // job_id 저장
+                    card.dataset.hiresfixJobId = result.job_id;
+                    showToast('HiresFix 큐에 등록됨', 'success');
+
+                } catch (err) {
+                    // 에러 시 버튼 상태 복원
+                    hiresfixBtn.classList.remove('queued', 'processing');
+                    hiresfixBtn.textContent = '✨';
+                    hiresfixBtn.title = 'HiresFix (Local)';
+                    hiresfixBtn.disabled = false;
+                    showToast('HiresFix 오류: ' + err.message, 'error');
                 }
             };
 
@@ -8515,19 +8675,25 @@
                 // Generation 설정도 동기화
                 saveCurrentProviderGenerationSettings();
 
-                // 현재 provider의 슬롯 이미지 저장
+                // 현재 provider의 슬롯 이미지 데이터 저장 (_imageData 배열로 저장)
                 const currentSlots = slotsContainer.querySelectorAll('.slot');
-                const currentImages = [];
+                const currentImagesData = [];
                 currentSlots.forEach(slot => {
                     const imagesContainer = slot.querySelector('.slot-images');
+                    const slotImagesData = [];
                     if (imagesContainer) {
-                        currentImages.push(imagesContainer.cloneNode(true));
+                        imagesContainer.querySelectorAll('.slot-image-card').forEach(card => {
+                            if (card._imageData) {
+                                slotImagesData.push(card._imageData);
+                            }
+                        });
                     }
+                    currentImagesData.push(slotImagesData);
                 });
                 if (currentProvider === 'nai') {
-                    naiSlotImages = currentImages;
+                    naiSlotImages = currentImagesData;
                 } else {
-                    localSlotImages = currentImages;
+                    localSlotImages = currentImagesData;
                 }
 
                 // Provider 전환
@@ -9690,6 +9856,7 @@
             if (request.enable_lut) {
                 request.lut_file = document.getElementById('lutFile').value;
                 request.lut_intensity = parseFloat(document.getElementById('lutIntensity').value);
+                request.lut_hires_only = document.getElementById('lutHiresOnly').checked;
 
                 if (!request.lut_file) {
                     showToast('LUT 파일을 선택하세요', 'error');
@@ -9837,6 +10004,34 @@
             }
         }
 
+        // HiresFix 버튼 상태 업데이트 (job_id로 카드 찾아서 상태 변경)
+        function updateHiresFixButtonState(jobId, state) {
+            if (!jobId) return;
+
+            // 해당 job_id가 연결된 모든 카드 찾기
+            const cards = document.querySelectorAll(`.slot-image-card[data-hiresfix-job-id="${jobId}"]`);
+            cards.forEach(card => {
+                const btn = card.querySelector('.hiresfix-btn');
+                if (!btn) return;
+
+                switch (state) {
+                    case 'processing':
+                        btn.classList.remove('queued');
+                        btn.classList.add('processing');
+                        btn.textContent = '처리중...';
+                        btn.disabled = true;
+                        break;
+                    case 'done':
+                    case 'cancelled':
+                        btn.classList.remove('queued', 'processing');
+                        btn.textContent = '✨';
+                        btn.disabled = false;
+                        delete card.dataset.hiresfixJobId;
+                        break;
+                }
+            });
+        }
+
         function handleWebSocketMessage(data) {
             switch (data.type) {
                 case 'connected':
@@ -9877,6 +10072,8 @@
                 case 'job_start':
                     console.log(`[WS] Job started: ${data.job_id}, total: ${data.job_total}`);
                     updateProgressFromServer(data.progress);
+                    // HiresFix 버튼 상태 업데이트: 대기중 -> 처리중
+                    updateHiresFixButtonState(data.job_id, 'processing');
                     break;
 
                 case 'image':
@@ -9889,6 +10086,8 @@
                 case 'job_done':
                     console.log(`[WS] Job done: ${data.job_id}`);
                     updateProgressFromServer(data.progress);
+                    // HiresFix 버튼 상태 초기화 (완료)
+                    updateHiresFixButtonState(data.job_id, 'done');
 
                     // Anlas 잔액 및 비용 갱신 (생성 완료 시)
                     if (currentProvider === 'nai') {
@@ -9959,6 +10158,8 @@
                             console.log(`[WS] Removing hires preview card for cancelled job: ${data.job_id}`);
                             card.remove();
                         });
+                        // HiresFix 버튼 상태 초기화 (취소)
+                        updateHiresFixButtonState(data.job_id, 'cancelled');
                     }
                     // 실제로 취소된 이미지가 있을 때만 토스트 표시
                     if (data.cancelled_images > 0) {
@@ -13285,7 +13486,7 @@
         let naiSettings = {};
         let localSettings = {};
 
-        // Provider별 슬롯 이미지 저장소 (DOM 요소 배열)
+        // Provider별 슬롯 이미지 저장소 (_imageData 배열의 배열: [[slot0 images], [slot1 images], ...])
         let naiSlotImages = [];
         let localSlotImages = [];
         
@@ -13354,6 +13555,7 @@
                 enableLut: document.getElementById('enableLut').checked,
                 lutFile: document.getElementById('lutFile').value,
                 lutIntensity: document.getElementById('lutIntensity').value,
+                lutHiresOnly: document.getElementById('lutHiresOnly').checked,
 
                 // Tag Autocomplete
                 tagAutocompleteEnabled: tagAutocompleteEnabled,
@@ -13477,12 +13679,11 @@
                 slotsContainer.innerHTML = '';
                 settings.slots.forEach((slot, index) => {
                     addSlot(slot.name || '', slot.content || '', slot.locked || false);
-                    // 해당 provider의 저장된 이미지 복원
-                    if (savedImages[index]) {
-                        const newSlot = slotsContainer.children[index];
-                        const newImagesContainer = newSlot.querySelector('.slot-images');
-                        if (newImagesContainer) {
-                            newImagesContainer.replaceWith(savedImages[index].cloneNode(true));
+                    // 해당 provider의 저장된 이미지 복원 (addImageToSlot으로 다시 생성)
+                    if (savedImages[index] && savedImages[index].length > 0) {
+                        // 역순으로 추가 (가장 최근 이미지가 맨 위로)
+                        for (let i = savedImages[index].length - 1; i >= 0; i--) {
+                            addImageToSlot(index, savedImages[index][i]);
                         }
                     }
                 });
@@ -13492,11 +13693,9 @@
                 slotsContainer.innerHTML = '';
                 addSlot('', '');
                 // 첫 번째 슬롯에 이미지 복원
-                if (savedImages[0]) {
-                    const newSlot = slotsContainer.children[0];
-                    const newImagesContainer = newSlot.querySelector('.slot-images');
-                    if (newImagesContainer) {
-                        newImagesContainer.replaceWith(savedImages[0].cloneNode(true));
+                if (savedImages[0] && savedImages[0].length > 0) {
+                    for (let i = savedImages[0].length - 1; i >= 0; i--) {
+                        addImageToSlot(0, savedImages[0][i]);
                     }
                 }
                 updateLockAllBtnState();
@@ -13569,6 +13768,9 @@
                     document.getElementById('lutIntensityValue').textContent = settings.lutIntensity;
                     updateSliderFill(lutIntensityEl);
                 }
+                if (settings.lutHiresOnly !== undefined) {
+                    document.getElementById('lutHiresOnly').checked = settings.lutHiresOnly;
+                }
             }
 
             // Local-specific
@@ -13615,6 +13817,9 @@
                     lutIntensityEl.value = settings.lutIntensity;
                     document.getElementById('lutIntensityValue').textContent = settings.lutIntensity;
                     updateSliderFill(lutIntensityEl);
+                }
+                if (settings.lutHiresOnly !== undefined) {
+                    document.getElementById('lutHiresOnly').checked = settings.lutHiresOnly;
                 }
             }
 

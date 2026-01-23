@@ -829,11 +829,13 @@ class GenerateRequest(BaseModel):
     upscale_cfg: float = 5.0
     upscale_denoise: float = 0.5
     size_alignment: str = "none"  # "none", "8", "64"
+    hiresfix_only: bool = False  # True면 1st pass 건너뛰고 base_image에 HiresFix만 적용
 
     # LUT (Local only)
     enable_lut: bool = False
     lut_file: str = ""
     lut_intensity: float = 1.0
+    lut_hires_only: bool = False  # True면 1pass에는 미적용, 2pass/HiresFix에만 적용
 
     # Save Options
     save_format: str = "png"  # png, jpg, webp
@@ -895,11 +897,13 @@ class MultiGenerateRequest(BaseModel):
     upscale_cfg: float = 5.0
     upscale_denoise: float = 0.5
     size_alignment: str = "none"
+    hiresfix_only: bool = False  # True면 1st pass 건너뛰고 base_image에 HiresFix만 적용
 
     # LUT (Local only)
     enable_lut: bool = False
     lut_file: str = ""
     lut_intensity: float = 1.0
+    lut_hires_only: bool = False  # True면 1pass에는 미적용, 2pass/HiresFix에만 적용
 
     # Save Options
     save_format: str = "png"  # png, jpg, webp
@@ -1610,43 +1614,56 @@ def call_local_engine(req: GenerateRequest, cancel_check=None, preview_callback=
             mask = decode_base64_image(req.base_mask).convert("L")
             mask = mask.resize((req.width, req.height), Image.NEAREST)
 
-    logger.info(f"[LocalEngine] Generating: {req.width}x{req.height}, steps={req.steps}, cfg={req.cfg}, sampler={req.sampler}, seed={seed}")
-
-    # 진행률 콜백 (tqdm 프로그레스 바 + 취소 체크)
+    # 진행률 표시용 tqdm import (1st pass / 2nd pass 모두에서 사용)
     from tqdm import tqdm
-    pbar = tqdm(total=req.steps, desc="[LocalEngine]", ncols=80, leave=False)
 
-    def progress_callback(step, total):
-        pbar.update(1)
-        # 취소 체크
-        if cancel_check and cancel_check():
-            pbar.close()
-            raise GenerationCancelled("Generation cancelled by user")
+    # HiresFix Only 모드: 1st pass 건너뛰고 base_image에 바로 HiresFix 적용
+    if req.hiresfix_only and req.base_image and req.enable_upscale:
+        logger.info(f"[LocalEngine HiresFix] HiresFix-only mode: skipping 1st pass, applying HiresFix to base image")
+        image = base_image
+        used_seed = seed
+        # CLIP 인코딩만 수행 (2nd pass에서 사용)
+        cond, cond_pooled, uncond, uncond_pooled = _local_engine_generator.encode_prompt(req.prompt, req.negative_prompt)
+        cond_cache = (cond, cond_pooled, uncond, uncond_pooled)
+    else:
+        # 일반 모드: 1st pass 실행
+        logger.info(f"[LocalEngine] Generating: {req.width}x{req.height}, steps={req.steps}, cfg={req.cfg}, sampler={req.sampler}, seed={seed}")
 
-    # 이미지 생성
-    image, used_seed, cond_cache = _local_engine_generator.generate(
-        prompt=req.prompt,
-        negative_prompt=req.negative_prompt,
-        width=req.width,
-        height=req.height,
-        steps=req.steps,
-        cfg_scale=req.cfg,
-        seed=seed,
-        sampler=req.sampler,
-        scheduler=req.scheduler,
-        base_image=base_image,
-        mask=mask,
-        denoise=denoise,
-        callback=progress_callback
-    )
-    pbar.close()
+        # 진행률 콜백 (tqdm 프로그레스 바 + 취소 체크)
+        pbar = tqdm(total=req.steps, desc="[LocalEngine]", ncols=80, leave=False)
 
-    logger.info(f"[LocalEngine] 1st pass done, seed={used_seed}")
+        def progress_callback(step, total):
+            pbar.update(1)
+            # 취소 체크
+            if cancel_check and cancel_check():
+                pbar.close()
+                raise GenerationCancelled("Generation cancelled by user")
+
+        # 이미지 생성
+        image, used_seed, cond_cache = _local_engine_generator.generate(
+            prompt=req.prompt,
+            negative_prompt=req.negative_prompt,
+            width=req.width,
+            height=req.height,
+            steps=req.steps,
+            cfg_scale=req.cfg,
+            seed=seed,
+            sampler=req.sampler,
+            scheduler=req.scheduler,
+            base_image=base_image,
+            mask=mask,
+            denoise=denoise,
+            callback=progress_callback
+        )
+        pbar.close()
+
+        logger.info(f"[LocalEngine] 1st pass done, seed={used_seed}")
 
     # 2nd pass - 업스케일 (옵션)
+    did_2nd_pass = False  # LUT hires_only 옵션 처리용
     if req.enable_upscale and req.upscale_model:
-        # HiresFix 사용 시 1st pass 결과를 미리보기로 전송
-        if preview_callback:
+        # HiresFix 사용 시 1st pass 결과를 미리보기로 전송 (hiresfix_only 모드에서는 스킵)
+        if preview_callback and not req.hiresfix_only:
             preview_callback(image, used_seed)
         logger.info(f"[LocalEngine Upscale] Starting 2-pass upscale with {req.upscale_model}")
 
@@ -1661,12 +1678,15 @@ def call_local_engine(req: GenerateRequest, cancel_check=None, preview_callback=
         with torch.no_grad():
             upscaled_tensor = tiled_upscale(upscale_model, img_tensor, tile_size=512, overlap=32)
 
-        # 업스케일 모델 VRAM 해제
+        # 업스케일 모델 및 텐서 VRAM 해제
         upscale_cache.model.to("cpu")
+        del img_tensor
+        upscaled_np = (upscaled_tensor.squeeze(0).permute(1, 2, 0).cpu().float().numpy() * 255).clip(0, 255).astype(np.uint8)
+        del upscaled_tensor
         torch.cuda.empty_cache()
 
-        upscaled_np = (upscaled_tensor.squeeze(0).permute(1, 2, 0).cpu().float().numpy() * 255).clip(0, 255).astype(np.uint8)
         upscaled_image = Image.fromarray(upscaled_np)
+        del upscaled_np
 
         upscaled_w, upscaled_h = upscaled_image.size
         logger.info(f"[LocalEngine Upscale] Upscaled to {upscaled_w}x{upscaled_h}")
@@ -1721,13 +1741,18 @@ def call_local_engine(req: GenerateRequest, cancel_check=None, preview_callback=
         )
         pbar_2nd.close()
         logger.info(f"[LocalEngine Upscale] 2nd pass done, final size={image.size[0]}x{image.size[1]}")
+        did_2nd_pass = True
 
     # conditioning 캐시 해제
     del cond_cache
 
     # LUT 적용 (마지막 단계)
+    # lut_hires_only가 True면 2pass/HiresFix 결과에만 적용
     if req.enable_lut and req.lut_file:
-        image = apply_lut(image, req.lut_file, req.lut_intensity)
+        if req.lut_hires_only and not did_2nd_pass:
+            logger.info(f"[LocalEngine] LUT skipped (hires_only=True, no 2nd pass)")
+        else:
+            image = apply_lut(image, req.lut_file, req.lut_intensity)
 
     logger.info(f"[LocalEngine] Done, seed={used_seed}")
     return image, int(used_seed)
@@ -2223,10 +2248,12 @@ async def process_job(job):
             upscale_cfg=req.upscale_cfg,
             upscale_denoise=req.upscale_denoise,
             size_alignment=req.size_alignment,
+            hiresfix_only=req.hiresfix_only,
             # LUT (Local only)
             enable_lut=req.enable_lut,
             lut_file=req.lut_file,
             lut_intensity=req.lut_intensity,
+            lut_hires_only=req.lut_hires_only,
             # Save Options
             save_format=req.save_format,
             jpg_quality=req.jpg_quality,

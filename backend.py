@@ -37,6 +37,7 @@ if str(APP_DIR) not in sys.path:
 MODELS_DIR = APP_DIR / "models"
 CHECKPOINTS_DIR = MODELS_DIR / "checkpoints"
 LORA_DIR = MODELS_DIR / "loras"
+EMBEDDINGS_DIR = MODELS_DIR / "embeddings"  # 텍스트 임베딩 (Textual Inversion)
 UPSCALE_DIR = MODELS_DIR / "upscale_models"
 LUTS_DIR = MODELS_DIR / "luts"
 OUTPUT_DIR = APP_DIR / "outputs"
@@ -154,7 +155,7 @@ def get_next_image_number(category: str, save_dir: Path = None, ext: str = 'png'
     return next_num
 
 # 디렉토리 생성
-for d in [CHECKPOINTS_DIR, LORA_DIR, UPSCALE_DIR, OUTPUT_DIR, PRESETS_DIR, DATA_DIR, CENSOR_MODELS_DIR, CENSORED_DIR]:
+for d in [CHECKPOINTS_DIR, LORA_DIR, EMBEDDINGS_DIR, UPSCALE_DIR, OUTPUT_DIR, PRESETS_DIR, DATA_DIR, CENSOR_MODELS_DIR, CENSORED_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
 # Prompts 하위 폴더 생성
@@ -1545,7 +1546,7 @@ def get_local_engine_generator():
     global _local_engine_generator
     return _local_engine_generator
 
-def call_local_engine(req: GenerateRequest, cancel_check=None):
+def call_local_engine(req: GenerateRequest, cancel_check=None, preview_callback=None):
     """
     ComfyUI 기반 로컬 엔진으로 이미지 생성
 
@@ -1555,6 +1556,7 @@ def call_local_engine(req: GenerateRequest, cancel_check=None):
     Args:
         req: GenerateRequest 객체
         cancel_check: 취소 상태를 확인하는 함수 (callable). True를 반환하면 취소
+        preview_callback: 1st pass 완료 시 미리보기 이미지를 전달받는 함수 (HiresFix 사용 시)
     """
     global _local_engine_generator
 
@@ -1578,7 +1580,8 @@ def call_local_engine(req: GenerateRequest, cancel_check=None):
         _local_engine_generator = SDXLGenerator(
             model_path=str(model_path),
             device=device,
-            dtype=dtype
+            dtype=dtype,
+            embedding_directory=str(EMBEDDINGS_DIR)
         )
 
     # LoRA 적용 (항상 먼저 제거 후 다시 적용)
@@ -1642,6 +1645,9 @@ def call_local_engine(req: GenerateRequest, cancel_check=None):
 
     # 2nd pass - 업스케일 (옵션)
     if req.enable_upscale and req.upscale_model:
+        # HiresFix 사용 시 1st pass 결과를 미리보기로 전송
+        if preview_callback:
+            preview_callback(image, used_seed)
         logger.info(f"[LocalEngine Upscale] Starting 2-pass upscale with {req.upscale_model}")
 
         # 1. 업스케일 모델로 확대 (타일링 처리)
@@ -1684,7 +1690,20 @@ def call_local_engine(req: GenerateRequest, cancel_check=None):
         resized_image = upscaled_image.resize((target_w, target_h), Image.LANCZOS)
         logger.info(f"[LocalEngine Upscale] Resized to {target_w}x{target_h}")
 
+        # 취소 체크 (업스케일 후, 2nd pass 전)
+        if cancel_check and cancel_check():
+            raise GenerationCancelled("Generation cancelled by user (before 2nd pass)")
+
         # 3. 2nd pass - 로컬 엔진 img2img (conditioning 캐시 재사용)
+        # 2nd pass용 프로그레스 바
+        pbar_2nd = tqdm(total=req.upscale_steps, desc="[LocalEngine 2nd]", ncols=80, leave=False)
+
+        def progress_callback_2nd(step, total):
+            pbar_2nd.update(1)
+            if cancel_check and cancel_check():
+                pbar_2nd.close()
+                raise GenerationCancelled("Generation cancelled by user (2nd pass)")
+
         image, _, _ = _local_engine_generator.generate(
             prompt=req.prompt,
             negative_prompt=req.negative_prompt,
@@ -1697,8 +1716,10 @@ def call_local_engine(req: GenerateRequest, cancel_check=None):
             scheduler=req.scheduler,
             base_image=resized_image,
             denoise=req.upscale_denoise,
-            cached_cond=cond_cache  # CLIP 인코딩 스킵
+            cached_cond=cond_cache,  # CLIP 인코딩 스킵
+            callback=progress_callback_2nd
         )
+        pbar_2nd.close()
         logger.info(f"[LocalEngine Upscale] 2nd pass done, final size={image.size[0]}x{image.size[1]}")
 
     # conditioning 캐시 해제
@@ -2222,10 +2243,41 @@ async def process_job(job):
                 # 동기 함수를 executor에서 실행하여 이벤트 루프 블로킹 방지
                 import asyncio
                 loop = asyncio.get_event_loop()
+
+                # HiresFix 사용 시 1st pass 미리보기 콜백 정의
+                def send_preview(preview_image, preview_seed):
+                    """1st pass 완료 시 미리보기 이미지를 WebSocket으로 전송"""
+                    try:
+                        # 이미지를 base64로 변환
+                        preview_buffer = io.BytesIO()
+                        preview_image.save(preview_buffer, format='PNG')
+                        preview_base64 = base64.b64encode(preview_buffer.getvalue()).decode('utf-8')
+
+                        # 비동기 브로드캐스트를 스레드 안전하게 호출
+                        preview_data = {
+                            "type": "hires_preview",
+                            "job_id": job_id,
+                            "slot_idx": slot_index,
+                            "image_base64": preview_base64,
+                            "seed": preview_seed,
+                            "width": preview_image.size[0],
+                            "height": preview_image.size[1]
+                        }
+                        future = asyncio.run_coroutine_threadsafe(
+                            gen_queue.broadcast(preview_data),
+                            loop
+                        )
+                        future.result(timeout=5)  # 5초 타임아웃
+                        logger.info(f"[LocalEngine] Preview sent for slot {slot_index}")
+                    except Exception as e:
+                        logger.error(f"[LocalEngine] Failed to send preview: {e}")
+
                 # cancel_check 함수를 전달하여 각 step에서 취소 상태 확인
+                # HiresFix 사용 시에만 preview_callback 전달
+                preview_cb = send_preview if single_req.enable_upscale else None
                 image, actual_seed = await loop.run_in_executor(
                     None,
-                    lambda: call_local_engine(single_req, cancel_check=lambda: gen_queue.cancel_current)
+                    lambda: call_local_engine(single_req, cancel_check=lambda: gen_queue.cancel_current, preview_callback=preview_cb)
                 )
             image_time = time.time() - image_start_time
 

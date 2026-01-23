@@ -79,21 +79,25 @@ class SDXLGenerator:
     SDXL 이미지 생성기
 
     ComfyUI 방식의 샘플링으로 동일한 결과물 생성
+    임베딩 지원: embedding:name 구문으로 텍스트 임베딩 사용
     """
 
     def __init__(
         self,
         model_path: str,
         device: str = "cuda",
-        dtype: torch.dtype = torch.float16
+        dtype: torch.dtype = torch.float16,
+        embedding_directory: Optional[str] = None
     ):
         self.device = device
         self.dtype = dtype
         self.model_path = model_path
+        self.embedding_directory = embedding_directory
 
         # 모델 로드
         self.unet, self.vae, self.clip = load_sdxl_model(
-            model_path, dtype=dtype, device=device
+            model_path, dtype=dtype, device=device,
+            embedding_directory=embedding_directory
         )
 
         # 모델 샘플링 설정 (GPU에서 실행)

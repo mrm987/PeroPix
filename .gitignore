@@ -31,6 +31,9 @@ models/loras/*.safetensors
 models/upscale_models/*.pth
 models/upscale_models/*.safetensors
 models/censor/wenaka_yolov8s-seg.pt
+models/embeddings/*.safetensors
+models/embeddings/*.pt
+models/embeddings/*.bin
 
 # IDE
 .idea/

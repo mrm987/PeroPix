@@ -385,7 +385,7 @@ class SDXLModelLoader:
         clip = clip.to(device=self.device)
         return clip
 
-    def load_all(self, path: str) -> Tuple[UNetModel, AutoencoderKL, SDXLClipModel]:
+    def load_all(self, path: str, embedding_directory: Optional[str] = None) -> Tuple[UNetModel, AutoencoderKL, SDXLClipModel]:
         """UNet, VAE, CLIP 모두 로드 - 체크포인트 1회만 로드"""
         # 체크포인트를 1번만 로드하여 메모리 절약
         sd = self.load_checkpoint(path)
@@ -427,7 +427,7 @@ class SDXLModelLoader:
         # CLIP 로드 (ComfyUI 방식: fp32로 유지하여 정밀도 보장)
         clip_l_sd, clip_g_sd = extract_clip_state_dicts(sd)
         logging.info(f"CLIP-L extracted keys: {len(clip_l_sd)}, CLIP-G: {len(clip_g_sd)}")
-        clip = SDXLClipModel(device="cpu", dtype=torch.float32)  # fp32로 CLIP 유지
+        clip = SDXLClipModel(device="cpu", dtype=torch.float32, embedding_directory=embedding_directory)  # fp32로 CLIP 유지
         if clip_l_sd:
             clip.load_clip_l(clip_l_sd)
         if clip_g_sd:
@@ -476,12 +476,13 @@ class ModelCache:
         self._models: Dict[str, Any] = {}
         self._current_path: Optional[str] = None
 
-    def get_models(self, path: str) -> Tuple[UNetModel, AutoencoderKL, SDXLClipModel]:
+    def get_models(self, path: str, embedding_directory: Optional[str] = None) -> Tuple[UNetModel, AutoencoderKL, SDXLClipModel]:
         """
         모델 가져오기 (캐시된 경우 재사용)
 
         Args:
             path: 체크포인트 경로
+            embedding_directory: 임베딩 파일 디렉토리 (optional)
 
         Returns:
             (unet, vae, clip)
@@ -489,13 +490,17 @@ class ModelCache:
         path = str(Path(path).resolve())
 
         if self._current_path == path and path in self._models:
+            # 캐시된 모델이 있지만 임베딩 디렉토리가 다르면 설정 업데이트
+            unet, vae, clip = self._models[path]
+            if embedding_directory and clip.embedding_directory != embedding_directory:
+                clip.set_embedding_directory(embedding_directory)
             return self._models[path]
 
         # 이전 모델 언로드
         self.unload()
 
         # 새 모델 로드
-        unet, vae, clip = self.loader.load_all(path)
+        unet, vae, clip = self.loader.load_all(path, embedding_directory=embedding_directory)
         self._models[path] = (unet, vae, clip)
         self._current_path = path
 
@@ -539,7 +544,12 @@ def get_model_cache(dtype: torch.dtype = torch.float16, device: str = "cuda") ->
     return _model_cache
 
 
-def load_sdxl_model(path: str, dtype: torch.dtype = torch.float16, device: str = "cuda") -> Tuple[UNetModel, AutoencoderKL, SDXLClipModel]:
+def load_sdxl_model(
+    path: str,
+    dtype: torch.dtype = torch.float16,
+    device: str = "cuda",
+    embedding_directory: Optional[str] = None
+) -> Tuple[UNetModel, AutoencoderKL, SDXLClipModel]:
     """
     SDXL 모델 로드 (편의 함수)
 
@@ -547,9 +557,10 @@ def load_sdxl_model(path: str, dtype: torch.dtype = torch.float16, device: str =
         path: 체크포인트 경로
         dtype: 모델 dtype
         device: 디바이스
+        embedding_directory: 임베딩 파일 디렉토리 (optional)
 
     Returns:
         (unet, vae, clip)
     """
     cache = get_model_cache(dtype=dtype, device=device)
-    return cache.get_models(path)
+    return cache.get_models(path, embedding_directory=embedding_directory)

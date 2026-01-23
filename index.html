@@ -2756,7 +2756,22 @@
         .slot-image-card:hover {
             border-color: var(--accent);
         }
-        
+
+        /* HiresFix 미리보기 - 골드 하이라이트 */
+        .slot-image-card.hires-preview {
+            border: 2px solid #ffd700;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+            animation: hires-pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes hires-pulse {
+            0%, 100% { box-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(255, 215, 0, 0.8); }
+        }
+        .slot-image-card.hires-preview .hires-label {
+            color: #ffd700;
+            font-weight: bold;
+        }
+
         .slot-image-card img {
             width: 100%;
             height: auto;
@@ -7114,6 +7129,13 @@
             const empty = imagesContainer.querySelector('.slot-empty');
             if (empty) empty.remove();
 
+            // HiresFix 미리보기 카드가 있으면 제거 (최종 이미지로 교체)
+            const hiresPreviewCard = imagesContainer.querySelector('.slot-image-card.hires-preview');
+            if (hiresPreviewCard) {
+                console.log(`[addImageToSlot] Replacing hires preview card with final image`);
+                hiresPreviewCard.remove();
+            }
+
             const card = document.createElement('div');
             card.className = 'slot-image-card';
 
@@ -7465,6 +7487,78 @@
             };
             img.onload = insertCard;
             img.onerror = insertCard;  // 로드 실패 시에도 카드 표시
+        }
+
+        function addHiresPreviewToSlot(slotIndex, data) {
+            // HiresFix 1st pass 미리보기 이미지를 슬롯에 추가
+            // 골드 하이라이트로 표시하여 아직 처리 중임을 나타냄
+            const slots = slotsContainer.querySelectorAll('.slot');
+            console.log(`[addHiresPreviewToSlot] slotIndex=${slotIndex}, slots.length=${slots.length}`);
+
+            let targetSlot;
+            if (slotIndex >= slots.length || slotIndex < 0) {
+                console.warn(`[addHiresPreviewToSlot] Invalid slotIndex ${slotIndex}, falling back to slot 0`);
+                if (slots.length === 0) {
+                    console.error('[addHiresPreviewToSlot] No slots available!');
+                    return;
+                }
+                targetSlot = slots[0];
+            } else {
+                targetSlot = slots[slotIndex];
+            }
+
+            const imagesContainer = targetSlot.querySelector('.slot-images');
+
+            // 빈 상태 제거
+            const empty = imagesContainer.querySelector('.slot-empty');
+            if (empty) empty.remove();
+
+            const card = document.createElement('div');
+            card.className = 'slot-image-card hires-preview';  // hires-preview 클래스 추가
+            card.dataset.jobId = data.job_id;  // 나중에 최종 이미지로 교체할 때 찾기 위해
+
+            const imgSrc = `data:image/png;base64,${data.image_base64}`;
+
+            card.innerHTML = `
+                <img src="${imgSrc}" alt="" draggable="false">
+                <button type="button" class="save-gallery-btn" title="갤러리에 저장" disabled>☆</button>
+                <div class="info">
+                    <div class="info-row">
+                        <button type="button" class="clear-card-btn" title="미리보기 지우기">🧹</button>
+                        <div class="filename hires-label" title="HiresFix 처리 중...">HiresFix 처리 중...</div>
+                    </div>
+                    <div class="seed">${data.seed ? 'Seed: ' + data.seed : ''}</div>
+                </div>
+            `;
+
+            // 미리보기 지우기 버튼
+            const clearBtn = card.querySelector('.clear-card-btn');
+            clearBtn.onclick = (e) => {
+                e.stopPropagation();
+                card.remove();
+            };
+
+            // 이미지 클릭 시 라이트박스
+            const img = card.querySelector('img');
+            img.addEventListener('click', () => {
+                lightboxImg.src = imgSrc;
+                lightboxCurrentSlot = targetSlot;
+                lightboxCurrentCard = card;
+                lightbox.classList.add('active');
+            });
+
+            // 이미지 데이터 저장 (미리보기용)
+            card._imageData = {
+                image_base64: data.image_base64,
+                seed: data.seed,
+                width: data.width,
+                height: data.height,
+                isHiresPreview: true
+            };
+
+            // 카드를 맨 앞에 추가
+            imagesContainer.insertBefore(card, imagesContainer.firstChild);
+            console.log(`[addHiresPreviewToSlot] Preview card inserted for slot ${slotIndex}`);
         }
 
         function clearSlotImages() {
@@ -9843,6 +9937,12 @@
                     }
                     break;
 
+                case 'hires_preview':
+                    // HiresFix 1st pass 미리보기
+                    console.log(`[WS] HiresFix preview: job_id=${data.job_id}, slot_idx=${data.slot_idx}`);
+                    addHiresPreviewToSlot(data.slot_idx, data);
+                    break;
+
                 case 'job_cancelled':
                     console.log(`[WS] Job cancelled: ${data.job_id}, immediate: ${data.immediate}`);
                     updateProgressFromServer(data.progress);
@@ -9851,6 +9951,14 @@
                         totalImages = 0;
                         currentIndex = 0;
                         updateProgress();
+                    }
+                    // HiresFix 미리보기 카드 제거 (취소된 작업의 미완성 미리보기)
+                    if (data.job_id) {
+                        const hiresPreviewCards = document.querySelectorAll(`.slot-image-card.hires-preview[data-job-id="${data.job_id}"]`);
+                        hiresPreviewCards.forEach(card => {
+                            console.log(`[WS] Removing hires preview card for cancelled job: ${data.job_id}`);
+                            card.remove();
+                        });
                     }
                     // 실제로 취소된 이미지가 있을 때만 토스트 표시
                     if (data.cancelled_images > 0) {
@@ -13446,7 +13554,15 @@
                     document.getElementById('enableLut').checked = settings.enableLut;
                     document.getElementById('lutSettings').style.display = settings.enableLut ? 'block' : 'none';
                 }
-                if (settings.lutFile) window._pendingLutFile = settings.lutFile;
+                if (settings.lutFile) {
+                    // select 옵션이 이미 로드되어 있으면 직접 설정, 아니면 pending으로
+                    const lutSelect = document.getElementById('lutFile');
+                    if (lutSelect.options.length > 1) {
+                        lutSelect.value = settings.lutFile;
+                    } else {
+                        window._pendingLutFile = settings.lutFile;
+                    }
+                }
                 if (settings.lutIntensity !== undefined) {
                     const lutIntensityEl = document.getElementById('lutIntensity');
                     lutIntensityEl.value = settings.lutIntensity;
@@ -13480,13 +13596,20 @@
                     updateSliderFill(upscaleDenoiseEl);
                 }
 
-                // LUT settings
+                // LUT settings (Local)
                 if (settings.enableLut !== undefined) {
                     document.getElementById('enableLut').checked = settings.enableLut;
                     document.getElementById('lutSettings').style.display = settings.enableLut ? 'block' : 'none';
                 }
-                // LUT 파일은 loadResources 후에 적용 (select 옵션이 로드된 후)
-                if (settings.lutFile) window._pendingLutFile = settings.lutFile;
+                if (settings.lutFile) {
+                    // select 옵션이 이미 로드되어 있으면 직접 설정, 아니면 pending으로
+                    const lutSelect = document.getElementById('lutFile');
+                    if (lutSelect.options.length > 1) {
+                        lutSelect.value = settings.lutFile;
+                    } else {
+                        window._pendingLutFile = settings.lutFile;
+                    }
+                }
                 if (settings.lutIntensity !== undefined) {
                     const lutIntensityEl = document.getElementById('lutIntensity');
                     lutIntensityEl.value = settings.lutIntensity;

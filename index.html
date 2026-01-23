@@ -7184,6 +7184,9 @@
                         // 슬롯 이름 가져오기
                         const slotName = targetSlot.querySelector('.slot-name').value.trim();
 
+                        // 현재 선택된 폴더 사용 (생성 시점이 아닌 저장 시점 기준)
+                        const currentFolder = typeof getOutputFolder === 'function' ? getOutputFolder() : '';
+
                         const response = await fetch(`${API_BASE}/api/save-preview`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -7191,8 +7194,8 @@
                                 image_base64: card._imageData.image_base64,
                                 slot_index: card._imageData.slotIndex,
                                 slot_name: slotName,
-                                save_format: card._imageData.save_format,
-                                output_folder: card._imageData.output_folder
+                                save_format: document.getElementById('saveFormat').value,
+                                output_folder: currentFolder
                             })
                         });
 

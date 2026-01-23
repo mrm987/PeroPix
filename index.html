@@ -510,18 +510,24 @@
 
         /* 번역 모드 */
         .translate-mode-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--space-sm) var(--space-md);
             background: var(--bg-lighter);
             border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
             color: var(--text-dim);
-            padding: 2px 6px;
-            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: 500;
             cursor: pointer;
-            font-size: 0.75rem;
-            margin-right: 4px;
+            transition: var(--transition-fast);
+            white-space: nowrap;
         }
         .translate-mode-btn:hover {
-            background: var(--bg-light);
-            border-color: var(--text-dim);
+            background: var(--bg);
+            border-color: var(--accent);
+            color: var(--text);
         }
         .translate-mode-btn.active {
             background: var(--accent);
@@ -2040,8 +2046,10 @@
         /* PIP Floating Button */
         .pip-float {
             position: absolute;
-            bottom: 20px;
-            right: 20px;
+            bottom: 12px;
+            /* 슬라이더 바 우측에 배치: 중앙 + 슬라이더 너비/2 + 간격 */
+            left: calc(50% + 100px);
+            right: auto;
             z-index: 1000;
             cursor: move;
             user-select: none;
@@ -2531,7 +2539,36 @@
         body.resizing-slot * {
             cursor: ew-resize !important;
         }
-        
+
+        /* 슬롯 사이즈 조절 플로팅 바 */
+        .slot-size-bar {
+            position: absolute;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 90;
+            background: var(--bg-lighter);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 2px 16px;
+            box-shadow: var(--shadow-md);
+            display: flex;
+            align-items: center;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+
+        .slot-size-bar:hover {
+            opacity: 1;
+        }
+
+        .slot-size-bar input[type="range"] {
+            width: 180px;
+            height: 4px;
+            margin: 0;
+            padding: 0;
+        }
+
         /* input, textarea는 선택 가능 */
         .slot input, .slot textarea {
             user-select: text;
@@ -5183,7 +5220,6 @@
                             <label for="basePrompt" class="prompt-label">Base Prompt</label>
                         </div>
                         <div style="display: flex; align-items: center; gap: 4px;">
-                            <button type="button" class="translate-mode-btn" onclick="toggleTranslateMode()" title="번역 모드 (태그에 호버하면 번역 표시)">🌐</button>
                             <div class="prompt-preset-dropdown" data-category="base">
                                 <button type="button" class="prompt-preset-btn" title="프롬프트 프리셋">🔖 ▼</button>
                                 <div class="prompt-preset-menu">
@@ -5673,6 +5709,11 @@
                             <label for="stripMetadata">메타데이터 제거</label>
                         </div>
                         <small style="color: var(--text-dim);">체크 시 이미지에서 생성 정보가 제거됩니다</small>
+                        <div class="checkbox-row" style="margin-top: 12px;">
+                            <input type="checkbox" id="autoSaveToggle" checked>
+                            <label for="autoSaveToggle">설정 자동 저장</label>
+                        </div>
+                        <small style="color: var(--text-dim);">끄면 수동으로 저장해야 합니다</small>
                     </div>
                 </div>
             </div>
@@ -5759,8 +5800,9 @@
                     </button>
                     <button type="button" class="header-btn" id="saveImageSetBtn" title="현재 슬롯 이미지들을 폴더에 저장">
                         <span>💾</span>
-                        <span>세트 저장</span>
+                        <span>일괄 저장</span>
                     </button>
+                    <button type="button" class="translate-mode-btn" onclick="toggleTranslateMode()" title="번역 모드 (태그에 호버하면 번역 표시)">🌐</button>
                 </div>
                 <div class="toolbar-right">
                     <span class="toolbar-label">Save to:</span>
@@ -5786,6 +5828,10 @@
             <div class="slots-container-wrapper" id="slotsWrapper">
                 <div class="slots-container" id="slotsContainer">
                     <!-- 슬롯들이 가로로 배치됨 -->
+                </div>
+                <!-- 슬롯 사이즈 조절 플로팅 바 -->
+                <div class="slot-size-bar" id="slotSizeBar">
+                    <input type="range" id="slotSizeSlider" min="150" max="1200" value="280" title="슬롯 너비 조절">
                 </div>
                 <!-- PIP Floating Button -->
                 <div class="pip-float collapsed" id="pipFloat">
@@ -6608,6 +6654,7 @@
         let totalImages = 0;
         let resetTimer = null;
         let naiTokenSet = false;  // NAI 토큰 설정 여부
+        let autoSaveEnabled = true;  // 자동 저장 활성화 여부
 
         // WebSocket 연결 관리
         let ws = null;
@@ -6648,10 +6695,20 @@
         const MIN_SLOT_WIDTH = 150;
         const MAX_SLOT_WIDTH = 1200;
 
+        // setSlotWidth 함수에서 슬라이더 값 동기화
+        function updateSlotSizeSlider() {
+            const slider = document.getElementById('slotSizeSlider');
+            if (slider) {
+                slider.value = currentSlotWidth;
+                updateSliderFill(slider);
+            }
+        }
+
         function setSlotWidth(width) {
             currentSlotWidth = Math.max(MIN_SLOT_WIDTH, Math.min(MAX_SLOT_WIDTH, width));
             document.documentElement.style.setProperty('--slot-width', currentSlotWidth + 'px');
             updateSlotSizePresetButtons();
+            updateSlotSizeSlider();
             autoSaveSettings();
         }
 
@@ -6710,46 +6767,22 @@
             }
         })();
 
-        function setupSlotResize(slot) {
-            const handle = slot.querySelector('.slot-resize-handle');
-            if (!handle) return;
+        // 슬롯 사이즈 슬라이더 설정
+        (function setupSlotSizeSlider() {
+            const slider = document.getElementById('slotSizeSlider');
+            if (!slider) return;
 
-            handle.addEventListener('mousedown', (e) => {
-                e.preventDefault();
-                const startX = e.clientX;
-                const startWidth = currentSlotWidth;
+            // 슬라이더 래핑 (fill 효과용)
+            wrapSlider(slider);
 
-                document.body.classList.add('resizing-slot');
-                handle.classList.add('active');
+            // 초기값 설정
+            slider.value = currentSlotWidth;
+            updateSliderFill(slider);
 
-                // 리사이즈 중인 슬롯을 중앙에 유지
-                function scrollSlotToCenter() {
-                    const container = slotsContainer;
-                    const slotRect = slot.getBoundingClientRect();
-                    const containerRect = container.getBoundingClientRect();
-                    const slotCenter = slotRect.left + slotRect.width / 2;
-                    const containerCenter = containerRect.left + containerRect.width / 2;
-                    const scrollOffset = slotCenter - containerCenter;
-                    container.scrollLeft += scrollOffset;
-                }
-
-                function onMouseMove(e) {
-                    const deltaX = e.clientX - startX;
-                    setSlotWidth(startWidth + deltaX);
-                    scrollSlotToCenter();
-                }
-
-                function onMouseUp() {
-                    document.body.classList.remove('resizing-slot');
-                    handle.classList.remove('active');
-                    document.removeEventListener('mousemove', onMouseMove);
-                    document.removeEventListener('mouseup', onMouseUp);
-                }
-
-                document.addEventListener('mousemove', onMouseMove);
-                document.addEventListener('mouseup', onMouseUp);
+            slider.addEventListener('input', (e) => {
+                setSlotWidth(parseInt(e.target.value, 10));
             });
-        }
+        })();
 
         // 사이드바 너비 관리
         let currentSidebarWidth = 540;
@@ -6812,7 +6845,6 @@
             slot.className = 'slot';
             slot.dataset.slotIndex = slotId;
             slot.innerHTML = `
-                <div class="slot-resize-handle"></div>
                 <div class="slot-prompt">
                     <div class="slot-prompt-header">
                         <span class="slot-number">001</span>
@@ -6828,9 +6860,6 @@
                 </div>
             `;
 
-            // 리사이즈 핸들 설정
-            setupSlotResize(slot);
-            
             slot.querySelector('.slot-delete').onclick = () => {
                 if (slotsContainer.querySelectorAll('.slot').length > 1) {
                     slot.remove();
@@ -8132,8 +8161,7 @@
                 e.target.tagName === 'TEXTAREA' ||
                 e.target.tagName === 'BUTTON' ||
                 e.target.classList.contains('slot-drag') ||
-                e.target.classList.contains('slot-delete') ||
-                e.target.classList.contains('slot-resize-handle')) {
+                e.target.classList.contains('slot-delete')) {
                 return;
             }
             
@@ -12441,6 +12469,66 @@
                 highlightPrompt(textarea, overlay);
             });
             resizeObserver.observe(textarea);
+
+            // Ctrl+클릭으로 줄바꿈 기준 블록 선택 기능
+            // mouseup에서 처리하여 브라우저가 자연스럽게 커서를 설정한 후 블록 선택
+            let ctrlClickPending = false;
+            let savedScrollTop = 0;
+
+            textarea.addEventListener('mousedown', (e) => {
+                if (e.ctrlKey && e.button === 0) {
+                    ctrlClickPending = true;
+                    savedScrollTop = textarea.scrollTop;
+                }
+            });
+
+            textarea.addEventListener('mouseup', (e) => {
+                if (ctrlClickPending) {
+                    ctrlClickPending = false;
+                    // 스크롤 위치 복원
+                    textarea.scrollTop = savedScrollTop;
+                    // 약간의 지연 후 블록 선택 (커서 위치가 확정된 후)
+                    requestAnimationFrame(() => {
+                        selectLineBlock(textarea);
+                        textarea.scrollTop = savedScrollTop;
+                    });
+                }
+            });
+
+            // ESC 키로 블록 선택 해제
+            textarea.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && textarea.selectionStart !== textarea.selectionEnd) {
+                    // 선택 해제 - 커서를 선택 끝으로 이동
+                    textarea.setSelectionRange(textarea.selectionEnd, textarea.selectionEnd);
+                }
+            });
+        }
+
+        /**
+         * Ctrl+클릭 시 현재 커서 위치의 줄바꿈 기준 블록을 선택
+         * NAI 웹과 동일하게 줄바꿈으로 구분된 블록 전체를 선택
+         */
+        function selectLineBlock(textarea) {
+            const text = textarea.value;
+            const cursorPos = textarea.selectionStart;
+
+            // 현재 커서 위치에서 줄바꿈(\n) 기준 블록 찾기
+            // 이전 줄바꿈 또는 텍스트 시작 찾기
+            let blockStart = cursorPos;
+            while (blockStart > 0 && text[blockStart - 1] !== '\n') {
+                blockStart--;
+            }
+
+            // 다음 줄바꿈 또는 텍스트 끝 찾기
+            let blockEnd = cursorPos;
+            while (blockEnd < text.length && text[blockEnd] !== '\n') {
+                blockEnd++;
+            }
+
+            // 선택된 블록이 비어있지 않으면 선택
+            if (blockStart !== blockEnd) {
+                textarea.setSelectionRange(blockStart, blockEnd);
+            }
         }
 
         // ============================================================
@@ -13391,6 +13479,8 @@
                 utilityRenamePrefix: utilityState.renamePrefix || '',
                 utilityRenameStart: utilityState.renameStart || 1,
                 utilityRenamePadding: utilityState.renamePadding || 0,
+                // 자동 저장 옵션
+                autoSaveEnabled: autoSaveEnabled,
             };
 
             localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
@@ -13514,6 +13604,12 @@
                     }
                     if (settings.utilityRenamePadding !== undefined) {
                         window._pendingUtilityRenamePadding = settings.utilityRenamePadding;
+                    }
+                    // 자동 저장 설정
+                    if (settings.autoSaveEnabled !== undefined) {
+                        autoSaveEnabled = settings.autoSaveEnabled;
+                        const autoSaveToggle = document.getElementById('autoSaveToggle');
+                        if (autoSaveToggle) autoSaveToggle.checked = autoSaveEnabled;
                     }
 
                     // 현재 provider 설정 적용 (NAI로 시작)
@@ -13871,11 +13967,15 @@
         // 설정 변경 시 자동 저장 (debounce)
         let saveTimeout = null;
         function autoSaveSettings() {
-            if (saveTimeout) clearTimeout(saveTimeout);
-            saveTimeout = setTimeout(saveAppSettings, 500);
-            // 프리셋 변경 감지
+            // 프리셋 변경 감지는 항상 실행
             checkSlotPresetModified();
             checkCharPresetModified();
+
+            // 자동저장이 비활성화면 실제 저장은 하지 않음
+            if (!autoSaveEnabled) return;
+
+            if (saveTimeout) clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(saveAppSettings, 500);
         }
         
         // 주요 입력 요소에 자동 저장 연결
@@ -13937,6 +14037,21 @@
                             highlightPrompt(textarea, overlay);
                         }
                     });
+                });
+            }
+
+            // Auto save toggle
+            const autoSaveToggle = document.getElementById('autoSaveToggle');
+            if (autoSaveToggle) {
+                autoSaveToggle.addEventListener('change', () => {
+                    autoSaveEnabled = autoSaveToggle.checked;
+                    // 자동저장 설정 자체는 항상 저장 (다음 시작 시 복원을 위해)
+                    saveAppSettings();
+                    if (autoSaveEnabled) {
+                        showToast('자동 저장이 활성화되었습니다', 'success');
+                    } else {
+                        showToast('자동 저장이 비활성화되었습니다 (수동 저장 필요)', 'warning');
+                    }
                 });
             }
         }
@@ -19627,10 +19742,8 @@
             }
 
             if (detectedCount === 0) {
-                showToast('검열 대상이 감지되지 않았습니다', 'info');
-                censorState.processingMode = false;
-                censorState.processingResults = {};
-                return;
+                showToast('검열 대상이 감지되지 않았습니다. 수동으로 박스를 추가할 수 있습니다.', 'info');
+                // 감지된 부위가 없어도 검열중 탭으로 진입 가능 (수동 박스 추가용)
             }
 
             showToast(`스캔 완료: ${detectedCount}/${scannedCount} 이미지에서 감지`, 'success');

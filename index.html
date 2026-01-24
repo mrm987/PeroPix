@@ -437,16 +437,29 @@
             display: flex;
         }
 
+        /* 새 방식: textarea가 앞에, overlay가 뒤에 (z-index 역전)
+           textarea 텍스트는 보이고, 배경만 투명해서 뒤의 하이라이트가 비침 */
         .prompt-highlight-overlay {
             position: absolute;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            padding: var(--space-md) var(--space-md);
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+            border-radius: var(--radius-sm);
+            background: var(--bg);
+        }
+
+        /* 하이라이트를 표시하는 내부 div - textarea와 동일한 스크롤 영역 */
+        .prompt-highlight-backdrop {
+            position: absolute;
+            top: 0;
+            left: 0;
+            padding: var(--space-md);
             margin: 0;
             border: 1px solid transparent;
-            border-radius: var(--radius-sm);
             font-size: 0.875rem;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             line-height: 1.5;
@@ -456,21 +469,12 @@
             box-sizing: border-box;
             overflow-wrap: break-word;
             word-break: break-word;
-            overflow-y: auto;
-            overflow-x: hidden;
-            pointer-events: none;
-            z-index: 1;
-            color: var(--text);
-            background: var(--bg);
-        }
-
-        .prompt-highlight-overlay::-webkit-scrollbar {
-            display: none;
+            color: transparent;
         }
 
         .prompt-highlight-container textarea {
             position: relative;
-            z-index: 2;
+            z-index: 1;
             width: 100%;
             background: transparent !important;
             color: var(--text) !important;
@@ -487,8 +491,6 @@
             word-wrap: break-word;
             overflow-wrap: break-word;
             word-break: break-word;
-            -webkit-text-fill-color: transparent;
-            text-fill-color: transparent;
             box-sizing: border-box;
             overflow-y: auto;
             overflow-x: hidden;
@@ -496,8 +498,6 @@
 
         .prompt-highlight-container textarea::selection {
             background: rgba(74, 122, 184, 0.3);
-            -webkit-text-fill-color: var(--text);
-            text-fill-color: var(--text);
         }
 
         /* Character prompt의 overlay는 bg-light 사용 */
@@ -505,7 +505,7 @@
             background: var(--bg-light);
         }
 
-        .prompt-highlight-overlay span {
+        .prompt-highlight-backdrop span {
             border-radius: 3px;
         }
 
@@ -536,18 +536,18 @@
             color: white;
         }
 
-        .prompt-highlight-overlay.translate-mode {
+        .prompt-highlight-container.translate-mode .prompt-highlight-overlay {
             pointer-events: auto;
             z-index: 3;
         }
         .prompt-highlight-container.translate-mode textarea {
             pointer-events: none;
         }
-        .prompt-highlight-overlay.translate-mode span.tag-segment {
+        .prompt-highlight-container.translate-mode .prompt-highlight-backdrop span.tag-segment {
             cursor: help;
             transition: background-color 0.15s;
         }
-        .prompt-highlight-overlay.translate-mode span.tag-segment:hover {
+        .prompt-highlight-container.translate-mode .prompt-highlight-backdrop span.tag-segment:hover {
             outline: 1px solid var(--accent);
             outline-offset: 1px;
         }
@@ -2718,17 +2718,20 @@
         }
 
         .slot-prompt .prompt-highlight-overlay {
+            background: var(--bg-light);
+        }
+
+        .slot-prompt .prompt-highlight-backdrop {
             padding: 10px;
             font-size: 0.85rem;
             border: none;
-            background: var(--bg-light);
         }
 
         /* 슬롯 프롬프트 번역 모드 */
         .slot-prompt .prompt-highlight-container.translate-mode textarea {
             pointer-events: none;
         }
-        .slot-prompt .prompt-highlight-overlay.translate-mode {
+        .slot-prompt .prompt-highlight-container.translate-mode .prompt-highlight-overlay {
             pointer-events: auto;
             z-index: 3;
         }
@@ -12490,11 +12493,12 @@
          * (프로그래매틱하게 value를 변경한 후 호출)
          */
         function updatePromptHighlights() {
-            document.querySelectorAll('.prompt-highlight-overlay').forEach(overlay => {
-                const container = overlay.parentElement;
+            document.querySelectorAll('.prompt-highlight-backdrop').forEach(backdrop => {
+                const overlay = backdrop.parentElement;
+                const container = overlay?.parentElement;
                 const textarea = container?.querySelector('textarea');
                 if (textarea) {
-                    highlightPrompt(textarea, overlay);
+                    highlightPrompt(textarea, backdrop);
                 }
             });
         }
@@ -12502,18 +12506,14 @@
         /**
          * 프롬프트 텍스트를 하이라이팅하여 overlay에 렌더링
          * @param {HTMLTextAreaElement} textarea - 프롬프트 textarea
-         * @param {HTMLElement} overlay - overlay div
+         * @param {HTMLElement} backdrop - backdrop div (하이라이트 내용을 담는 요소)
          */
-        function highlightPrompt(textarea, overlay) {
+        function highlightPrompt(textarea, backdrop) {
             const text = textarea.value;
             if (!text) {
-                overlay.innerHTML = '';
-                overlay.classList.remove('translate-mode');
+                backdrop.innerHTML = '';
                 return;
             }
-
-            // 번역 모드 클래스 토글
-            overlay.classList.toggle('translate-mode', translateModeEnabled);
 
             // 하이라이트가 꺼져있으면 일반 텍스트만 표시
             if (!promptHighlightEnabled) {
@@ -12527,9 +12527,7 @@
                 if (text.endsWith('\n')) {
                     escapedText += '\u00A0';
                 }
-                overlay.innerHTML = escapedText;
-                overlay.scrollTop = textarea.scrollTop;
-                overlay.scrollLeft = textarea.scrollLeft;
+                backdrop.innerHTML = escapedText;
                 return;
             }
 
@@ -12606,20 +12604,16 @@
                 html += '\u00A0'; // non-breaking space
             }
 
-            overlay.innerHTML = html;
+            backdrop.innerHTML = html;
 
             // 번역 모드일 때 이벤트 바인딩
             if (translateModeEnabled) {
-                overlay.querySelectorAll('.tag-segment').forEach(span => {
+                backdrop.querySelectorAll('.tag-segment').forEach(span => {
                     span.addEventListener('mouseenter', handleTagHover);
                     span.addEventListener('mouseleave', hideTranslateTooltip);
                     span.addEventListener('click', handleTagClick);
                 });
             }
-
-            // overlay 스크롤을 textarea와 동기화
-            overlay.scrollTop = textarea.scrollTop;
-            overlay.scrollLeft = textarea.scrollLeft;
         }
 
         /**
@@ -12785,6 +12779,7 @@
 
         /**
          * textarea에 프롬프트 하이라이팅 적용
+         * 새 방식: backdrop을 textarea 뒤에 두고, CSS transform으로 스크롤 동기화
          * @param {HTMLTextAreaElement} textarea - 대상 textarea
          */
         function setupPromptHighlighting(textarea) {
@@ -12805,69 +12800,71 @@
             // Wrapper 생성
             const wrapper = document.createElement('div');
             wrapper.className = 'prompt-highlight-container';
-            // 번역 모드가 이미 켜져 있으면 클래스 추가
             if (translateModeEnabled) {
                 wrapper.classList.add('translate-mode');
             }
 
-            // Overlay 생성
+            // Overlay (클리핑 컨테이너) 생성
             const overlay = document.createElement('div');
             overlay.className = 'prompt-highlight-overlay';
+
+            // Backdrop (실제 하이라이트 내용) 생성
+            const backdrop = document.createElement('div');
+            backdrop.className = 'prompt-highlight-backdrop';
+            overlay.appendChild(backdrop);
 
             // textarea를 wrapper로 감싸기
             textarea.parentNode.insertBefore(wrapper, textarea);
             wrapper.appendChild(overlay);
             wrapper.appendChild(textarea);
 
-            console.log('[PromptHighlight] Created wrapper and overlay for', textarea.id);
+            console.log('[PromptHighlight] Created wrapper with overlay and backdrop for', textarea.id);
 
-            // textarea의 계산된 스타일을 overlay에 복사 (폰트 관련)
+            // backdrop 크기와 스타일을 textarea와 일치시킴
             function syncStyles() {
                 const computed = window.getComputedStyle(textarea);
-                overlay.style.padding = computed.padding;
-                overlay.style.fontSize = computed.fontSize;
-                overlay.style.fontFamily = computed.fontFamily;
-                overlay.style.lineHeight = computed.lineHeight;
-                overlay.style.letterSpacing = computed.letterSpacing;
-                overlay.style.wordSpacing = computed.wordSpacing;
+                backdrop.style.padding = computed.padding;
+                backdrop.style.fontSize = computed.fontSize;
+                backdrop.style.fontFamily = computed.fontFamily;
+                backdrop.style.lineHeight = computed.lineHeight;
+                backdrop.style.letterSpacing = computed.letterSpacing;
+                backdrop.style.wordSpacing = computed.wordSpacing;
+                backdrop.style.borderWidth = computed.borderWidth;
+                backdrop.style.borderStyle = computed.borderStyle;
 
-                // 스크롤바 영역 보정: textarea에 스크롤바가 있으면 overlay의 padding-right 증가
-                const hasScrollbar = textarea.scrollHeight > textarea.clientHeight;
-                if (hasScrollbar) {
-                    const paddingRight = parseFloat(computed.paddingRight) || 0;
-                    // 스크롤바 너비: border 제외한 전체 너비 - 실제 컨텐츠 영역 너비
-                    const scrollbarWidth = textarea.offsetWidth - textarea.clientWidth -
-                        (parseFloat(computed.borderLeftWidth) || 0) - (parseFloat(computed.borderRightWidth) || 0);
-                    overlay.style.paddingRight = (paddingRight + scrollbarWidth) + 'px';
-                } else {
-                    overlay.style.paddingRight = computed.paddingRight;
-                }
+                // backdrop 너비를 textarea의 clientWidth와 정확히 일치 (스크롤바 영역 제외)
+                const borderLeft = parseFloat(computed.borderLeftWidth) || 0;
+                const borderRight = parseFloat(computed.borderRightWidth) || 0;
+                backdrop.style.width = (textarea.clientWidth + borderLeft + borderRight) + 'px';
             }
 
-            // 초기 하이라이팅
+            // 스크롤 동기화 - CSS transform 사용 (스크롤 이벤트와 무관하게 정확히 동기화)
+            function syncScroll() {
+                backdrop.style.transform = `translate(${-textarea.scrollLeft}px, ${-textarea.scrollTop}px)`;
+            }
+
+            // 초기화
             syncStyles();
-            highlightPrompt(textarea, overlay);
+            highlightPrompt(textarea, backdrop);
+            syncScroll();
 
             // 이벤트 리스너
             textarea.addEventListener('input', () => {
                 syncStyles();
-                highlightPrompt(textarea, overlay);
+                highlightPrompt(textarea, backdrop);
             });
 
-            textarea.addEventListener('scroll', () => {
-                overlay.scrollTop = textarea.scrollTop;
-                overlay.scrollLeft = textarea.scrollLeft;
-            });
+            textarea.addEventListener('scroll', syncScroll);
 
             // 창 크기 변경 시 재렌더링
             const resizeObserver = new ResizeObserver(() => {
                 syncStyles();
-                highlightPrompt(textarea, overlay);
+                highlightPrompt(textarea, backdrop);
+                syncScroll();
             });
             resizeObserver.observe(textarea);
 
             // Ctrl+클릭으로 줄바꿈 기준 블록 선택 기능
-            // mouseup에서 처리하여 브라우저가 자연스럽게 커서를 설정한 후 블록 선택
             let ctrlClickPending = false;
             let savedScrollTop = 0;
 
@@ -12881,9 +12878,7 @@
             textarea.addEventListener('mouseup', (e) => {
                 if (ctrlClickPending) {
                     ctrlClickPending = false;
-                    // 스크롤 위치 복원
                     textarea.scrollTop = savedScrollTop;
-                    // 약간의 지연 후 블록 선택 (커서 위치가 확정된 후)
                     requestAnimationFrame(() => {
                         selectLineBlock(textarea);
                         textarea.scrollTop = savedScrollTop;
@@ -12894,7 +12889,6 @@
             // ESC 키로 블록 선택 해제
             textarea.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape' && textarea.selectionStart !== textarea.selectionEnd) {
-                    // 선택 해제 - 커서를 선택 끝으로 이동
                     textarea.setSelectionRange(textarea.selectionEnd, textarea.selectionEnd);
                 }
             });
@@ -14442,11 +14436,12 @@
                     autoSaveSettings();
 
                     // 모든 프롬프트 필드 다시 렌더링
-                    document.querySelectorAll('.prompt-highlight-overlay').forEach(overlay => {
-                        const container = overlay.parentElement;
-                        const textarea = container.querySelector('textarea');
+                    document.querySelectorAll('.prompt-highlight-backdrop').forEach(backdrop => {
+                        const overlay = backdrop.parentElement;
+                        const container = overlay?.parentElement;
+                        const textarea = container?.querySelector('textarea');
                         if (textarea) {
-                            highlightPrompt(textarea, overlay);
+                            highlightPrompt(textarea, backdrop);
                         }
                     });
                 });

@@ -2415,17 +2415,27 @@ async def process_job(job):
 
             # strip_metadata 처리
             if strip_metadata:
-                # 메타데이터 제거: 깨끗한 이미지로 저장
-                # PIL의 info 딕셔너리를 제거하기 위해 새 이미지로 복사
-                clean_image = Image.new(save_image.mode, save_image.size)
-                clean_image.putdata(list(save_image.getdata()))
+                # 메타데이터 완전 제거:
+                # 1. PNG chunks/EXIF 제거
+                # 2. Alpha 채널 LSB 스테가노그래피 데이터 제거 (NAI가 사용하는 방식)
+                import numpy as np
+                img_array = np.array(save_image)
+
+                # Alpha 채널이 있으면 (RGBA) LSB를 255로 정규화하여 스테가노그래피 제거
+                if img_array.ndim == 3 and img_array.shape[2] == 4:
+                    # Alpha 채널을 255로 설정하여 LSB 데이터 완전 제거
+                    img_array[:, :, 3] = 255
+
+                clean_image = Image.fromarray(img_array)
 
                 if save_format == 'jpg':
-                    clean_image.save(img_buffer, format=pil_format, quality=jpg_quality)
+                    clean_image.save(img_buffer, format=pil_format, quality=jpg_quality, exif=b'')
                 elif save_format == 'webp':
-                    clean_image.save(img_buffer, format=pil_format, quality=jpg_quality)
+                    clean_image.save(img_buffer, format=pil_format, quality=jpg_quality, exif=b'')
                 else:
-                    clean_image.save(img_buffer, format=pil_format)
+                    # PNG: pnginfo를 빈 객체로 명시
+                    from PIL.PngImagePlugin import PngInfo
+                    clean_image.save(img_buffer, format=pil_format, pnginfo=PngInfo())
 
                 image_bytes = img_buffer.getvalue()
             else:
@@ -3077,14 +3087,26 @@ async def convert_image(request: dict):
 
         # 메타데이터 처리
         if strip_metadata:
-            # 메타데이터 제거: 깨끗한 이미지로 복사
-            clean_image = Image.new(image.mode, image.size)
-            clean_image.putdata(list(image.getdata()))
+            # 메타데이터 완전 제거:
+            # 1. PNG chunks/EXIF 제거
+            # 2. Alpha 채널 LSB 스테가노그래피 데이터 제거 (NAI가 사용하는 방식)
+            import numpy as np
+            img_array = np.array(image)
 
-            if format_type in ('jpg', 'webp'):
-                clean_image.save(save_path, format=pil_format, quality=quality)
+            # Alpha 채널이 있으면 (RGBA) LSB를 255로 정규화하여 스테가노그래피 제거
+            if img_array.ndim == 3 and img_array.shape[2] == 4:
+                img_array[:, :, 3] = 255
+
+            clean_image = Image.fromarray(img_array)
+
+            if format_type == 'jpg':
+                clean_image.save(save_path, format=pil_format, quality=quality, exif=b'')
+            elif format_type == 'webp':
+                clean_image.save(save_path, format=pil_format, quality=quality, exif=b'')
             else:
-                clean_image.save(save_path, format=pil_format)
+                # PNG: pnginfo를 빈 객체로 명시
+                from PIL.PngImagePlugin import PngInfo
+                clean_image.save(save_path, format=pil_format, pnginfo=PngInfo())
         else:
             # 메타데이터 유지
             original_metadata = read_metadata_from_image(image_data)

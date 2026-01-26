@@ -543,6 +543,9 @@
         .prompt-highlight-container.translate-mode textarea {
             pointer-events: none;
         }
+        .prompt-highlight-container.translate-mode .prompt-highlight-backdrop {
+            color: var(--text);
+        }
         .prompt-highlight-container.translate-mode .prompt-highlight-backdrop span.tag-segment {
             cursor: help;
             transition: background-color 0.15s;
@@ -7362,8 +7365,8 @@
             loadSettingsBtn.onclick = async (e) => {
                 e.stopPropagation();
                 const metadata = card._imageData.metadata;
-                // 이미지 base64 가져오기
-                let imageBase64 = card._imageData.image;
+                // 이미지 base64 가져오기 (image, image_base64, image_path 순으로 시도)
+                let imageBase64 = card._imageData.image || card._imageData.image_base64;
                 if (!imageBase64 && card._imageData.image_path) {
                     try {
                         const response = await fetch(`${API_BASE}/api/outputs/${card._imageData.image_path}`);
@@ -7388,8 +7391,8 @@
             const inpaintBtn = card.querySelector('.inpaint-btn');
             inpaintBtn.onclick = async (e) => {
                 e.stopPropagation();
-                // 이미지 base64 가져오기
-                let imageBase64 = card._imageData.image;
+                // 이미지 base64 가져오기 (image, image_base64, image_path 순으로 시도)
+                let imageBase64 = card._imageData.image || card._imageData.image_base64;
                 if (!imageBase64 && card._imageData.image_path) {
                     // 파일 경로에서 이미지 로드 (outputs API 사용)
                     try {
@@ -7420,8 +7423,8 @@
             }
             enhanceBtn.onclick = async (e) => {
                 e.stopPropagation();
-                // 이미지 base64 가져오기
-                let imageBase64 = card._imageData.image;
+                // 이미지 base64 가져오기 (image, image_base64, image_path 순으로 시도)
+                let imageBase64 = card._imageData.image || card._imageData.image_base64;
                 if (!imageBase64 && card._imageData.image_path) {
                     try {
                         const response = await fetch(`${API_BASE}/api/outputs/${card._imageData.image_path}`);
@@ -7437,7 +7440,7 @@
                     }
                 }
                 if (imageBase64) {
-                    openEnhanceModal('data:image/png;base64,' + imageBase64, card._imageData.metadata);
+                    openEnhanceModal('data:image/png;base64,' + imageBase64, card._imageData.metadata, card._imageData.slotIndex);
                 } else {
                     showToast('이미지 데이터가 없습니다', 'error');
                 }
@@ -7513,6 +7516,7 @@
                         sampler: metadata.sampler || document.getElementById('sampler').value,
                         scheduler: metadata.noise_schedule || 'normal',
                         model: metadata.peropix?.local_model || document.getElementById('localModel').value,
+                        loras: metadata.peropix?.local_loras || null,
                         // HiresFix 옵션 (현재 UI 세팅 사용)
                         enable_upscale: true,
                         upscale_model: upscaleModel,
@@ -7531,7 +7535,9 @@
                         output_folder: typeof getOutputFolder === 'function' ? getOutputFolder() : '',
                         // HiresFix 전용 플래그: 1st pass 건너뛰고 base_image에 바로 HiresFix 적용
                         hiresfix_only: true,
-                        source_card_id: card.dataset.cardId || Date.now().toString()
+                        source_card_id: card.dataset.cardId || Date.now().toString(),
+                        // 슬롯 정보 (결과를 동일 슬롯에 표시)
+                        slot_indices: [card._imageData.slotIndex]
                     };
 
                     // 카드에 ID 저장 (나중에 상태 업데이트용)
@@ -14804,7 +14810,30 @@
                     const result = await response.json();
                     if (result.success) {
                         showToast('이미지 이동됨', 'success');
-                        loadGallery(currentGalleryFolder);
+                        // 현재 폴더에서 이동한 아이템만 DOM에서 제거 (전체 재로드 안 함)
+                        const movedItem = galleryGrid.querySelector(`.gallery-item[data-filename="${CSS.escape(filename)}"]`);
+                        if (!movedItem) {
+                            // data-filename이 없으면 _filename으로 찾기
+                            const items = galleryGrid.querySelectorAll('.gallery-item');
+                            items.forEach(item => {
+                                if (item._filename === filename) {
+                                    item.remove();
+                                }
+                            });
+                        } else {
+                            movedItem.remove();
+                        }
+                        // 갤러리가 비었으면 빈 상태 표시
+                        if (galleryGrid.querySelectorAll('.gallery-item').length === 0) {
+                            galleryEmpty.innerHTML = `
+                                <div class="icon">🖼️</div>
+                                <p>${currentGalleryFolder ? `'${currentGalleryFolder}' 폴더가` : '갤러리가'} 비어있습니다</p>
+                                <small>이미지에서 ⭐ 버튼을 눌러 갤러리에 저장하세요</small>
+                            `;
+                            galleryEmpty.style.display = 'flex';
+                            galleryGrid.style.display = 'none';
+                        }
+                        // 폴더 목록만 갱신 (이미지 수 업데이트)
                         loadGalleryFolders();
                     } else {
                         showToast('이동 실패: ' + result.error, 'error');
@@ -16481,7 +16510,8 @@
             width: 0,
             height: 0,
             scale: 1,       // 1 또는 1.5
-            magnitude: 3    // 1-5
+            magnitude: 3,   // 1-5
+            slotIndex: 0    // 결과를 표시할 슬롯 인덱스
         };
 
         // Magnitude별 strength/noise 매핑
@@ -16493,7 +16523,7 @@
             5: { strength: 0.7, noise: 0.1 }
         };
 
-        function openEnhanceModal(imageBase64, metadata = null) {
+        function openEnhanceModal(imageBase64, metadata = null, slotIndex = 0) {
             if (currentProvider !== 'nai') {
                 showToast('Enhance는 NAI 전용 기능입니다', 'error');
                 return;
@@ -16507,6 +16537,7 @@
                 enhanceState.height = img.height;
                 enhanceState.scale = 1;
                 enhanceState.magnitude = 3;
+                enhanceState.slotIndex = slotIndex;
 
                 // 모달 UI 업데이트
                 document.getElementById('enhanceModalImg').src = img.src;
@@ -16687,7 +16718,9 @@
                 base_noise: preset.noise,
                 // 저장 옵션 추가
                 save_format: document.getElementById('saveFormat').value || 'png',
-                jpg_quality: parseInt(document.getElementById('jpgQuality')?.value) || 95
+                jpg_quality: parseInt(document.getElementById('jpgQuality')?.value) || 95,
+                // 슬롯 정보 (결과를 동일 슬롯에 표시)
+                slot_indices: [enhanceState.slotIndex]
             };
 
             closeEnhanceModal();

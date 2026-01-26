@@ -1588,16 +1588,30 @@ def call_local_engine(req: GenerateRequest, cancel_check=None, preview_callback=
             embedding_directory=str(EMBEDDINGS_DIR)
         )
 
-    # LoRA 적용 (항상 먼저 제거 후 다시 적용)
-    _local_engine_generator.remove_loras()
+    # LoRA 적용 (변경된 경우에만 제거 후 다시 적용)
+    # 요청된 LoRA 설정을 리스트로 정규화 (순서 포함)
+    requested_loras = []  # [(lora_key, lora_scale, lora_path), ...]
     if req.loras:
         for lora_config in req.loras:
             lora_name = lora_config.get("name", "")
             lora_scale = lora_config.get("scale", 1.0)
             lora_path = LORA_DIR / lora_name
             if lora_path.exists():
-                logger.info(f"[LocalEngine] Applying LoRA: {lora_name} (scale={lora_scale})")
-                _local_engine_generator.apply_lora(str(lora_path), lora_scale)
+                # 파일 이름(확장자 제외)을 키로 사용 (loaded_loras와 동일한 형식)
+                lora_key = Path(lora_name).stem
+                requested_loras.append((lora_key, lora_scale, lora_path))
+
+    # 현재 로드된 LoRA와 비교 (순서 포함)
+    current_loras = _local_engine_generator.loaded_loras
+    current_lora_list = [(name, info['scale']) for name, info in current_loras.items()]
+    requested_lora_list = [(key, scale) for key, scale, _ in requested_loras]
+
+    # LoRA 설정이 변경된 경우에만 다시 로드 (순서도 비교)
+    if requested_lora_list != current_lora_list:
+        _local_engine_generator.remove_loras()
+        for lora_key, lora_scale, lora_path in requested_loras:
+            logger.info(f"[LocalEngine] Applying LoRA: {lora_path.name} (scale={lora_scale})")
+            _local_engine_generator.apply_lora(str(lora_path), lora_scale)
 
     seed = req.seed if req.seed >= 0 else np.random.randint(0, 2**31 - 1)
 
@@ -2357,6 +2371,7 @@ async def process_job(job):
                 "variety_plus": req.variety_plus,
                 "furry_mode": req.furry_mode,
                 "local_model": req.model if req.provider == 'local' else "",
+                "local_loras": req.loras if req.provider == 'local' and req.loras else None,
                 "vibe_transfer": vibe_info if vibe_info else None,
                 "base_prompt": req.base_prompt,
                 "slot_prompt": extra_prompt if extra_prompt else None
@@ -3124,7 +3139,8 @@ async def get_gallery_folders():
     folders = []
     try:
         for item in sorted(GALLERY_DIR.iterdir()):
-            if item.is_dir():
+            # 숨김 폴더 제외 (.thumbs 등)
+            if item.is_dir() and not item.name.startswith('.'):
                 # 폴더 내 이미지 수 카운트 (PNG/JPG/WebP)
                 image_count = 0
                 for ext in ['*.png', '*.jpg', '*.jpeg', '*.webp']:
@@ -3181,10 +3197,14 @@ async def delete_gallery_folder(folder_name: str):
         return {"success": False, "error": str(e)}
 
 
+# 메모리 썸네일 캐시 (파일경로 -> {mtime, data})
+_gallery_thumb_cache = {}
+
 @app.get("/api/gallery")
 async def get_gallery(folder: str = ""):
     """갤러리 이미지 목록 조회 (폴더별) - PNG/JPG/WebP 지원"""
-    images = []
+    import concurrent.futures
+    global _gallery_thumb_cache
 
     try:
         gallery_path = get_gallery_folder_path(folder)
@@ -3202,38 +3222,71 @@ async def get_gallery(folder: str = ""):
     # 수정 시간순 정렬 (최신순)
     all_files = sorted(all_files, key=lambda x: x.stat().st_mtime, reverse=True)
 
-    for filepath in all_files:
+    def process_image(filepath):
+        """단일 이미지 처리 (메모리 캐시 사용)"""
+        global _gallery_thumb_cache
         try:
-            # 파일을 바이트로 읽어서 메타데이터 추출
+            file_mtime = filepath.stat().st_mtime
+            cache_key = str(filepath)
+
+            # 메모리 캐시 확인
+            if cache_key in _gallery_thumb_cache:
+                cached = _gallery_thumb_cache[cache_key]
+                if cached.get('mtime') == file_mtime:
+                    return {
+                        "filename": filepath.name,
+                        "thumbnail": cached.get("thumbnail", ""),
+                        "seed": cached.get("seed"),
+                        "prompt": cached.get("prompt", ""),
+                        "has_metadata": cached.get("has_metadata", False)
+                    }
+
+            # 캐시 없음/만료 - 새로 생성
             with open(filepath, 'rb') as f:
                 image_bytes = f.read()
 
-            # 통합 메타데이터 읽기 (PNG Comment, 레거시 peropix, EXIF 순서로 시도)
+            # 메타데이터 추출
             comment_meta = read_metadata_from_image(image_bytes)
-
-            # seed와 prompt 추출
             seed = comment_meta.get("seed") if comment_meta else None
             prompt = (comment_meta.get("prompt", "") or "")[:100] if comment_meta else ""
             has_metadata = bool(comment_meta)
 
-            # 썸네일 생성 (고해상도 디스플레이용 2x)
+            # 썸네일 생성 (512px - 고해상도 디스플레이 대응)
             image = Image.open(io.BytesIO(image_bytes))
             thumb = image.copy()
-            thumb.thumbnail((520, 520), Image.LANCZOS)
+            thumb.thumbnail((512, 512), Image.LANCZOS)
             buffer = io.BytesIO()
-            thumb.save(buffer, format="PNG")
+            # JPEG로 저장 (PNG보다 훨씬 작음)
+            if thumb.mode in ('RGBA', 'P'):
+                thumb = thumb.convert('RGB')
+            thumb.save(buffer, format="JPEG", quality=95)
             thumb_base64 = base64.b64encode(buffer.getvalue()).decode()
 
-            images.append({
+            # 메모리 캐시 저장
+            _gallery_thumb_cache[cache_key] = {
+                "mtime": file_mtime,
+                "thumbnail": thumb_base64,
+                "seed": seed,
+                "prompt": prompt,
+                "has_metadata": has_metadata
+            }
+
+            return {
                 "filename": filepath.name,
                 "thumbnail": thumb_base64,
                 "seed": seed,
                 "prompt": prompt,
                 "has_metadata": has_metadata
-            })
+            }
         except Exception as e:
             print(f"[Gallery] Error loading {filepath}: {e}")
-            continue
+            return None
+
+    # 병렬 처리 (최대 8 스레드)
+    images = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        results = executor.map(process_image, all_files)
+        images = [r for r in results if r is not None]
 
     return {"images": images, "folder": folder}
 

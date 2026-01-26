@@ -910,6 +910,7 @@ class MultiGenerateRequest(BaseModel):
     jpg_quality: int = 95
     strip_metadata: bool = False
     auto_save: bool = True  # False면 파일 저장 안하고 미리보기만
+    exclude_slot_number: bool = False  # True면 파일명에서 슬롯 번호 제외
 
 
 class ConfigUpdate(BaseModel):
@@ -1637,8 +1638,12 @@ def call_local_engine(req: GenerateRequest, cancel_check=None, preview_callback=
         image = base_image
         used_seed = seed
         # CLIP 인코딩만 수행 (2nd pass에서 사용)
+        # 일반 generate()와 동일하게 clone()하여 원본 즉시 해제
         cond, cond_pooled, uncond, uncond_pooled = _local_engine_generator.encode_prompt(req.prompt, req.negative_prompt)
-        cond_cache = (cond, cond_pooled, uncond, uncond_pooled)
+        cond_cache = (cond.clone(), cond_pooled.clone(), uncond.clone(), uncond_pooled.clone())
+        # 원본 텐서 즉시 해제
+        del cond, cond_pooled, uncond, uncond_pooled
+        torch.cuda.empty_cache()
     else:
         # 일반 모드: 1st pass 실행
         logger.info(f"[LocalEngine] Generating: {req.width}x{req.height}, steps={req.steps}, cfg={req.cfg}, sampler={req.sampler}, seed={seed}")
@@ -1680,6 +1685,9 @@ def call_local_engine(req: GenerateRequest, cancel_check=None, preview_callback=
         if preview_callback and not req.hiresfix_only:
             preview_callback(image, used_seed)
         logger.info(f"[LocalEngine Upscale] Starting 2-pass upscale with {req.upscale_model}")
+
+        # 업스케일 모델 로드 전 VRAM 정리 (연속 실행 시 이전 작업 잔여물 해제)
+        torch.cuda.empty_cache()
 
         # 1. 업스케일 모델로 확대 (타일링 처리)
         upscale_model = upscale_cache.load_model(req.upscale_model)
@@ -1754,11 +1762,22 @@ def call_local_engine(req: GenerateRequest, cancel_check=None, preview_callback=
             callback=progress_callback_2nd
         )
         pbar_2nd.close()
+
+        # 2nd pass 후 중간 이미지 해제
+        del resized_image
+        del upscaled_image
+
         logger.info(f"[LocalEngine Upscale] 2nd pass done, final size={image.size[0]}x{image.size[1]}")
         did_2nd_pass = True
 
-    # conditioning 캐시 해제
+    # conditioning 캐시 해제 (텐서 개별 해제)
+    if cond_cache is not None:
+        for tensor in cond_cache:
+            del tensor
     del cond_cache
+
+    # VRAM 정리
+    torch.cuda.empty_cache()
 
     # LUT 적용 (마지막 단계)
     # lut_hires_only가 True면 2pass/HiresFix 결과에만 적용
@@ -2165,13 +2184,22 @@ async def process_job(job):
         if prompt_name:
             file_tag = sanitize_filename(prompt_name, max_length=100)
 
-        if file_tag:
-            category = f"{slot_index+1:03d}_{file_tag}"
+        # 슬롯 번호 제외 옵션 처리
+        if req.exclude_slot_number:
+            # 슬롯 번호 제외: 이름만 또는 카운트만
+            category = file_tag if file_tag else ""
         else:
-            category = f"{slot_index+1:03d}"
+            # 기존 방식: 슬롯번호_이름 또는 슬롯번호
+            if file_tag:
+                category = f"{slot_index+1:03d}_{file_tag}"
+            else:
+                category = f"{slot_index+1:03d}"
 
         file_num = get_next_image_number(category, save_dir, ext)
-        filename = f"{category}_{file_num:07d}.{ext}"
+        if category:
+            filename = f"{category}_{file_num:07d}.{ext}"
+        else:
+            filename = f"{file_num:07d}.{ext}"
         pre_allocated_filenames.append(filename)
 
     # 시드 설정
@@ -4240,6 +4268,7 @@ class SavePreviewRequest(BaseModel):
     slot_name: str = ""
     save_format: str = "png"
     output_folder: str = ""
+    exclude_slot_number: bool = False  # True면 파일명에서 슬롯 번호 제외
 
 @app.post("/api/save-preview")
 async def save_preview_image(req: SavePreviewRequest):
@@ -4263,13 +4292,22 @@ async def save_preview_image(req: SavePreviewRequest):
         if req.slot_name:
             file_tag = sanitize_filename(req.slot_name, max_length=100)
 
-        if file_tag:
-            category = f"{req.slot_index+1:03d}_{file_tag}"
+        # 슬롯 번호 제외 옵션 처리
+        if req.exclude_slot_number:
+            # 슬롯 번호 제외: 이름만 또는 카운트만
+            category = file_tag if file_tag else ""
         else:
-            category = f"{req.slot_index+1:03d}"
+            # 기존 방식: 슬롯번호_이름 또는 슬롯번호
+            if file_tag:
+                category = f"{req.slot_index+1:03d}_{file_tag}"
+            else:
+                category = f"{req.slot_index+1:03d}"
 
         file_num = get_next_image_number(category, save_dir, ext)
-        filename = f"{category}_{file_num:07d}.{ext}"
+        if category:
+            filename = f"{category}_{file_num:07d}.{ext}"
+        else:
+            filename = f"{file_num:07d}.{ext}"
 
         # base64 디코딩 및 저장
         image_bytes = base64.b64decode(req.image_base64)

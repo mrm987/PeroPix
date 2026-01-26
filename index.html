@@ -5792,6 +5792,10 @@
                             <input type="checkbox" id="autoSaveToggle" checked>
                             <label for="autoSaveToggle">자동 저장</label>
                         </div>
+                        <div class="checkbox-row">
+                            <input type="checkbox" id="excludeSlotNumber">
+                            <label for="excludeSlotNumber">슬롯 번호 제외</label>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -7262,7 +7266,8 @@
                                 slot_index: card._imageData.slotIndex,
                                 slot_name: slotName,
                                 save_format: document.getElementById('saveFormat').value,
-                                output_folder: currentFolder
+                                output_folder: currentFolder,
+                                exclude_slot_number: document.getElementById('excludeSlotNumber').checked
                             })
                         });
 
@@ -9878,6 +9883,7 @@
             request.jpg_quality = parseInt(document.getElementById('jpgQuality').value);
             request.strip_metadata = document.getElementById('stripMetadata').checked;
             request.auto_save = document.getElementById('autoSaveToggle').checked;
+            request.exclude_slot_number = document.getElementById('excludeSlotNumber').checked;
 
             // Base Image (img2img / inpaint)
             if (baseImageData.enabled && baseImageData.image) {
@@ -11242,6 +11248,7 @@
                 furry_mode: furryMode,
                 provider: ppx.provider || 'nai',
                 model: ppx.local_model || '',
+                local_loras: ppx.local_loras || null,
                 vibe_transfer: ppx.vibe_transfer || null,
                 // NAI 바이브 데이터 (순수 NAI 이미지용)
                 nai_vibes: {
@@ -11440,6 +11447,15 @@
             if (metadata.model) {
                 document.getElementById('localModel').value = metadata.model;
                 highlight('localModel');
+            }
+            // Local LoRA 설정
+            if (metadata.local_loras && metadata.local_loras.length > 0) {
+                loraSlots = metadata.local_loras.map(lora => ({
+                    name: lora.name || '',
+                    scale: lora.scale !== undefined ? lora.scale : 1.0
+                }));
+                renderLoraSlots();
+                highlight('loraList');
             }
 
             // Provider 설정
@@ -13516,7 +13532,8 @@
                 saveFormat: document.getElementById('saveFormat').value,
                 jpgQuality: document.getElementById('jpgQuality').value,
                 stripMetadata: document.getElementById('stripMetadata').checked,
-                
+                excludeSlotNumber: document.getElementById('excludeSlotNumber').checked,
+
                 // Output
                 outputFolder: getOutputFolder(),
                 repeatCount: document.getElementById('repeatCount').value,
@@ -13656,10 +13673,12 @@
                 document.getElementById('saveFormat').value = 'png';
                 document.getElementById('jpgQuality').value = 95;
                 document.getElementById('stripMetadata').checked = false;
+                document.getElementById('excludeSlotNumber').checked = false;
             } else {
                 if (settings.saveFormat) document.getElementById('saveFormat').value = settings.saveFormat;
                 if (settings.jpgQuality) document.getElementById('jpgQuality').value = settings.jpgQuality;
                 if (settings.stripMetadata !== undefined) document.getElementById('stripMetadata').checked = settings.stripMetadata;
+                if (settings.excludeSlotNumber !== undefined) document.getElementById('excludeSlotNumber').checked = settings.excludeSlotNumber;
             }
 
             // Output
@@ -14070,7 +14089,8 @@
                     if (currentSettings.saveFormat) document.getElementById('saveFormat').value = currentSettings.saveFormat;
                     if (currentSettings.jpgQuality) document.getElementById('jpgQuality').value = currentSettings.jpgQuality;
                     if (currentSettings.stripMetadata !== undefined) document.getElementById('stripMetadata').checked = currentSettings.stripMetadata;
-                    
+                    if (currentSettings.excludeSlotNumber !== undefined) document.getElementById('excludeSlotNumber').checked = currentSettings.excludeSlotNumber;
+
                     // Output
                     if (currentSettings.outputFolder !== undefined) setOutputFolder(currentSettings.outputFolder);
                     if (currentSettings.repeatCount) document.getElementById('repeatCount').value = currentSettings.repeatCount;
@@ -14190,6 +14210,7 @@
                     saveFormat: settings.saveFormat || 'png',
                     jpgQuality: settings.jpgQuality || 95,
                     stripMetadata: settings.stripMetadata || false,
+                    excludeSlotNumber: settings.excludeSlotNumber || false,
                     outputFolder: settings.outputFolder || '',
                     repeatCount: settings.repeatCount || 1,
                     slots: settings.slots || [],
@@ -14227,6 +14248,7 @@
                     saveFormat: 'png',
                     jpgQuality: 95,
                     stripMetadata: false,
+                    excludeSlotNumber: false,
                     outputFolder: '',
                     repeatCount: 1,
                     slots: [],
@@ -14280,6 +14302,7 @@
                 document.getElementById('saveFormat').value = naiSettings.saveFormat;
                 document.getElementById('jpgQuality').value = naiSettings.jpgQuality;
                 document.getElementById('stripMetadata').checked = naiSettings.stripMetadata;
+                document.getElementById('excludeSlotNumber').checked = naiSettings.excludeSlotNumber || false;
                 if (naiSettings.outputFolder) setOutputFolder(naiSettings.outputFolder);
                 document.getElementById('repeatCount').value = naiSettings.repeatCount;
                 
@@ -14399,7 +14422,7 @@
                 'downscaleRatio', 'sizeAlignment', 'upscaleSteps', 'upscaleCfg',
                 'upscaleDenoise', 'repeatCount', 'sizePreset',
                 'cfgRescale', 'varietyPlus', 'lockSeed',
-                'saveFormat', 'jpgQuality', 'stripMetadata'
+                'saveFormat', 'jpgQuality', 'stripMetadata', 'excludeSlotNumber'
             ];
             
             inputs.forEach(id => {

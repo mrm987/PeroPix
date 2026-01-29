@@ -4713,6 +4713,622 @@
             color: var(--text);
         }
 
+        /* File Manager Styles */
+        .file-manager-container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            background: var(--bg);
+        }
+        .file-manager-sidebar {
+            width: 220px;
+            flex-shrink: 0;
+            background: var(--bg-light);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+        }
+        .file-manager-sidebar-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+        }
+        .sidebar-title {
+            font-size: 0.9rem;
+        }
+        .folder-tree {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+        .folder-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: background 0.15s;
+            font-size: 0.85rem;
+            position: relative;
+        }
+        .folder-item:hover {
+            background: var(--bg-lighter);
+        }
+        .folder-item.active {
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--accent);
+        }
+        .folder-item .folder-icon {
+            flex-shrink: 0;
+        }
+        .folder-item .folder-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .folder-item .folder-count {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            background: var(--bg);
+            padding: 2px 6px;
+            border-radius: 10px;
+        }
+        .folder-item .folder-actions-menu {
+            position: absolute;
+            right: 8px;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        .folder-item:hover .folder-actions-menu {
+            opacity: 1;
+        }
+        .folder-actions-menu button {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 2px 4px;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+        .folder-actions-menu button:hover {
+            color: var(--text);
+        }
+        .folder-actions {
+            padding: 12px;
+            border-top: 1px solid var(--border);
+        }
+        .file-manager-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            padding: 12px;
+        }
+        .file-manager-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .fm-toolbar-left,
+        .fm-toolbar-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .fm-toolbar-left .btn,
+        .fm-toolbar-right .btn {
+            height: 28px;
+            padding: 0 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+        }
+        .fm-selected-count {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            margin-left: 8px;
+            white-space: nowrap;
+        }
+        .file-manager-grid {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, 120px);
+            grid-auto-rows: 120px;
+            gap: 12px;
+            overflow-y: auto;
+            padding: 8px;
+            align-content: start;
+            justify-content: start;
+        }
+        .fm-file-item {
+            position: relative;
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+            border: 2px solid transparent;
+            background: var(--bg-light);
+            width: 120px;
+            height: 120px;
+            box-sizing: border-box;
+        }
+        .fm-file-item:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+        .fm-file-item.selected {
+            border: 3px solid var(--accent);
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3), var(--shadow-md);
+        }
+        .fm-file-item.selected::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(99, 102, 241, 0.35);
+            pointer-events: none;
+            border-radius: var(--radius-md);
+        }
+        .fm-file-item .fm-checkbox {
+            position: absolute;
+            top: 6px;
+            left: 6px;
+            width: 22px;
+            height: 22px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.15s;
+            z-index: 1;
+            font-size: 14px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+        .fm-file-item:hover .fm-checkbox,
+        .fm-file-item.selected .fm-checkbox {
+            opacity: 1;
+        }
+        .fm-file-item.selected .fm-checkbox {
+            background: var(--accent);
+            border-color: white;
+            color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        .fm-file-thumb {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .fm-file-name {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 4px 6px;
+            background: linear-gradient(transparent, rgba(0,0,0,0.7));
+            color: white;
+            font-size: 0.7rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        /* 그리드 뷰 폴더 아이템 */
+        .fm-folder-item {
+            position: relative;
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+            border: 2px solid transparent;
+            background: var(--bg-light);
+            width: 120px;
+            height: 120px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        .fm-folder-item:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+            background: var(--bg-dark);
+        }
+        .fm-folder-item.drag-over {
+            background: rgba(99, 102, 241, 0.2);
+            border-color: var(--accent);
+        }
+        .fm-folder-item .fm-folder-icon {
+            font-size: 2.5rem;
+            flex-shrink: 0;
+        }
+        .fm-folder-item .fm-folder-name {
+            background: none;
+            color: var(--text);
+            text-align: center;
+            padding: 0;
+            font-size: 0.75rem;
+            line-height: 1.2;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .fm-folder-item .fm-folder-count {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            flex-shrink: 0;
+        }
+        /* 리스트 뷰 폴더 아이템 */
+        .fm-list-folder {
+            cursor: pointer;
+        }
+        .fm-list-folder:hover {
+            background: var(--bg-dark);
+        }
+        .fm-list-folder.drag-over {
+            background: rgba(99, 102, 241, 0.2);
+        }
+        .fm-list-folder-icon {
+            font-size: 1.2rem;
+            margin-right: 8px;
+        }
+        .file-manager-empty,
+        .file-manager-loading {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-dim);
+            gap: 8px;
+        }
+        .fm-empty-icon {
+            font-size: 3rem;
+        }
+        .fm-loading-spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .fm-load-more {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            padding: 16px 0;
+            color: var(--text-dim);
+            font-size: 0.85rem;
+        }
+        .fm-load-more .fm-loading-spinner {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* File Manager PIP Preview - 마우스 따라다님, 좌상단 고정 */
+        .fm-pip-preview {
+            position: fixed;
+            z-index: 9999;
+            background: var(--bg);
+            border: 2px solid var(--border);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            padding: 4px;
+            pointer-events: none;
+            display: none;
+        }
+        .fm-pip-preview img {
+            display: block;
+            border-radius: var(--radius-md);
+            max-width: 400px;
+            max-height: 400px;
+            object-fit: contain;
+        }
+
+        /* File Manager Modals */
+        .fm-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+        .fm-modal {
+            background: var(--bg);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            min-width: 320px;
+            max-width: 90%;
+            box-shadow: var(--shadow-lg);
+        }
+        .fm-modal-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+        .fm-modal-body {
+            margin-bottom: 16px;
+        }
+        .fm-modal-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            background: var(--bg-light);
+            color: var(--text);
+            font-size: 0.9rem;
+        }
+        .fm-modal-select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            background: var(--bg-light);
+            color: var(--text);
+            font-size: 0.9rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .fm-modal-select option {
+            padding: 8px;
+        }
+        .fm-modal-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+        .fm-modal-message {
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        .fm-delete-list {
+            max-height: 150px;
+            overflow-y: auto;
+            background: var(--bg-light);
+            border-radius: var(--radius-md);
+            padding: 8px;
+            margin-top: 8px;
+            font-size: 0.85rem;
+        }
+        .fm-delete-list-item {
+            padding: 4px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .fm-delete-list-item:last-child {
+            border-bottom: none;
+        }
+
+        /* File Manager - View Mode Buttons */
+        .fm-view-modes {
+            display: flex;
+            gap: 2px;
+            margin-right: 8px;
+        }
+        .fm-view-modes .btn {
+            padding: 4px 8px;
+        }
+        .fm-view-modes .btn.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        /* File Manager - Folder Tree (nested) */
+        .folder-tree-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 8px;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: background 0.15s;
+            font-size: 0.85rem;
+            position: relative;
+            user-select: none;
+        }
+        .folder-tree-item:hover {
+            background: var(--bg-lighter);
+        }
+        .folder-tree-item.active {
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--accent);
+        }
+        .folder-tree-item.drag-over {
+            background: rgba(99, 102, 241, 0.25);
+            outline: 2px dashed var(--accent);
+        }
+        .folder-tree-item.dragging {
+            opacity: 0.5;
+        }
+        .folder-tree-item[draggable="true"] {
+            cursor: grab;
+        }
+        .folder-tree-item[draggable="true"]:active {
+            cursor: grabbing;
+        }
+        .folder-tree-item .folder-toggle {
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            flex-shrink: 0;
+        }
+        .folder-tree-item .folder-toggle.has-children {
+            cursor: pointer;
+        }
+        .folder-tree-item .folder-toggle.has-children:hover {
+            color: var(--text);
+        }
+        .folder-tree-item .folder-icon {
+            flex-shrink: 0;
+        }
+        .folder-tree-item .folder-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .folder-tree-item .folder-count {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            background: var(--bg);
+            padding: 1px 5px;
+            border-radius: 8px;
+            flex-shrink: 0;
+        }
+        .folder-tree-item .folder-menu-btn {
+            opacity: 0;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 2px 4px;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            flex-shrink: 0;
+        }
+        .folder-tree-item:hover .folder-menu-btn {
+            opacity: 1;
+        }
+        .folder-tree-item .folder-menu-btn:hover {
+            color: var(--text);
+        }
+        .folder-tree-children {
+            margin-left: 12px;
+            border-left: 1px solid var(--border);
+            padding-left: 4px;
+        }
+
+        /* File Manager - List View */
+        .file-manager-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+        .fm-list-header {
+            display: flex;
+            padding: 8px 12px;
+            background: var(--bg-light);
+            border-bottom: 1px solid var(--border);
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-dim);
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        .fm-list-header .fm-col-check { width: 32px; flex-shrink: 0; }
+        .fm-list-header .fm-col-name { flex: 1; }
+        .fm-list-header .fm-col-size { width: 80px; text-align: right; }
+        .fm-list-header .fm-col-date { width: 120px; text-align: right; }
+        .fm-list-row {
+            display: flex;
+            align-items: center;
+            padding: 4px 12px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .fm-list-row:hover {
+            background: var(--bg-lighter);
+        }
+        .fm-list-row.selected {
+            background: rgba(99, 102, 241, 0.25);
+            border-left: 3px solid var(--accent);
+        }
+        .fm-list-row.dragging {
+            opacity: 0.5;
+        }
+        .fm-list-row .fm-col-check {
+            width: 32px;
+            flex-shrink: 0;
+        }
+        .fm-list-row .fm-col-check input {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--accent);
+        }
+        .fm-list-row .fm-col-name {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            overflow: hidden;
+        }
+        .fm-list-row .fm-col-name .fm-list-thumb {
+            width: 24px;
+            height: 24px;
+            object-fit: cover;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+        .fm-list-row .fm-col-name span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .fm-list-row .fm-col-size {
+            width: 80px;
+            text-align: right;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+        .fm-list-row .fm-col-date {
+            width: 120px;
+            text-align: right;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+
+        /* File Manager - Drag States */
+        .fm-file-item.dragging {
+            opacity: 0.5;
+        }
+        .fm-file-item[draggable="true"] {
+            cursor: grab;
+        }
+        .fm-file-item[draggable="true"]:active {
+            cursor: grabbing;
+        }
+        .fm-file-item.drag-highlight {
+            outline: 2px solid var(--accent);
+            outline-offset: -2px;
+            background: rgba(99, 102, 241, 0.15);
+        }
+        .fm-list-row.drag-highlight {
+            outline: 2px solid var(--accent);
+            outline-offset: -2px;
+            background: rgba(99, 102, 241, 0.2);
+        }
+
         /* Gallery */
         .gallery-container {
             flex: 1;
@@ -6155,6 +6771,7 @@
                     <div class="toolbar-left">
                         <button type="button" class="header-btn active" id="utilityTabConvert">🔄 이미지 변환</button>
                         <button type="button" class="header-btn" id="utilityTabExif">📋 EXIF 리더</button>
+                        <button type="button" class="header-btn" id="utilityTabFileManager">📁 파일 관리</button>
                     </div>
                 </div>
 
@@ -6284,6 +6901,74 @@
                             <div class="exif-columns">
                                 <div class="exif-column exif-prompts" id="exifPrompts"></div>
                                 <div class="exif-column exif-settings" id="exifSettings"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 파일 관리 탭 -->
+                <div class="utility-tab-content" id="utilityFileManagerContent" style="display: none;">
+                    <div class="file-manager-container">
+                        <!-- 좌측: 폴더 트리 -->
+                        <div class="file-manager-sidebar">
+                            <div class="file-manager-sidebar-header">
+                                <span class="sidebar-title">📂 폴더</span>
+                            </div>
+                            <div class="folder-tree" id="fileManagerFolderTree">
+                                <!-- 동적으로 채워짐 -->
+                            </div>
+                            <div class="folder-actions">
+                                <button type="button" class="btn btn-sm" id="fmCreateFolderBtn">+ 새 폴더</button>
+                            </div>
+                        </div>
+
+                        <!-- 우측: 파일 그리드 -->
+                        <div class="file-manager-main">
+                            <div class="file-manager-toolbar">
+                                <div class="fm-toolbar-left">
+                                    <div class="fm-view-modes">
+                                        <button type="button" class="btn btn-sm active" id="fmViewThumbnail" title="썸네일 보기">🔲</button>
+                                        <button type="button" class="btn btn-sm" id="fmViewList" title="리스트 보기">☰</button>
+                                        <button type="button" class="btn btn-sm" id="fmPipModeBtn" title="PIP 모드 (호버 시 확대)">⧉</button>
+                                        <button type="button" class="btn btn-sm" id="fmOpenFolderBtn" title="탐색기에서 열기">📂</button>
+                                    </div>
+                                    <button type="button" class="btn btn-sm" id="fmSelectAllBtn">전체 선택</button>
+                                    <button type="button" class="btn btn-sm" id="fmDeselectBtn">선택 해제</button>
+                                    <span class="fm-selected-count" id="fmSelectedCount">0개 선택됨</span>
+                                </div>
+                                <div class="fm-toolbar-right fm-actions" id="fmActions" style="display: none;">
+                                    <button type="button" class="btn btn-sm btn-danger" id="fmDeleteBtn">🗑️ 삭제</button>
+                                    <button type="button" class="btn btn-sm" id="fmRenameBtn" style="white-space: nowrap;">✏️ 이름변경</button>
+                                    <button type="button" class="btn btn-sm" id="fmConvertBtn">🔄 변환</button>
+                                </div>
+                            </div>
+
+                            <div class="file-manager-grid" id="fmFileGrid">
+                                <!-- 동적으로 채워짐 (썸네일 뷰) -->
+                            </div>
+
+                            <div class="file-manager-list" id="fmFileList" style="display: none;">
+                                <!-- 동적으로 채워짐 (리스트 뷰) -->
+                            </div>
+
+                            <div class="file-manager-empty" id="fmEmpty" style="display: none;">
+                                <div class="fm-empty-icon">📂</div>
+                                <p>폴더가 비어있습니다</p>
+                            </div>
+
+                            <div class="file-manager-loading" id="fmLoading" style="display: none;">
+                                <div class="fm-loading-spinner"></div>
+                                <p>로딩 중...</p>
+                            </div>
+
+                            <div class="fm-load-more" id="fmLoadMore" style="display: none;">
+                                <div class="fm-loading-spinner"></div>
+                                <span>로딩 중...</span>
+                            </div>
+
+                            <!-- PIP 미리보기 -->
+                            <div class="fm-pip-preview" id="fmPipPreview" style="display: none;">
+                                <img id="fmPipImage" src="" alt="미리보기">
                             </div>
                         </div>
                     </div>
@@ -13915,6 +14600,9 @@
                 utilityRenamePadding: utilityState.renamePadding || 0,
                 // 자동 저장 옵션
                 autoSaveEnabled: autoSaveEnabled,
+                // 파일 관리자 설정
+                fileManagerViewMode: utilityState.fileManager?.viewMode || 'thumbnail',
+                fileManagerPipMode: utilityState.fileManager?.pipMode || false,
             };
 
             localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
@@ -14044,6 +14732,14 @@
                         autoSaveEnabled = settings.autoSaveEnabled;
                         const autoSaveToggle = document.getElementById('autoSaveToggle');
                         if (autoSaveToggle) autoSaveToggle.checked = autoSaveEnabled;
+                    }
+
+                    // 파일 관리자 설정
+                    if (settings.fileManagerViewMode) {
+                        window._pendingFileManagerViewMode = settings.fileManagerViewMode;
+                    }
+                    if (settings.fileManagerPipMode !== undefined) {
+                        window._pendingFileManagerPipMode = settings.fileManagerPipMode;
                     }
 
                     // 현재 provider 설정 적용 (NAI로 시작)
@@ -16837,7 +17533,7 @@
 
         // 보조 도구 상태
         const utilityState = {
-            currentTab: 'convert',  // 'convert' | 'exif'
+            currentTab: 'convert',  // 'convert' | 'exif' | 'filemanager'
             convertFiles: [],       // 변환할 파일 목록 [{file: File, url: string}]
             isConverting: false,
             initialized: false,
@@ -16846,7 +17542,30 @@
             renameEnabled: false,
             renamePrefix: '',
             renameStart: 1,
-            renamePadding: 0
+            renamePadding: 0,
+            // 파일 관리자 상태
+            fileManager: {
+                initialized: false,
+                currentFolder: '',        // 현재 선택된 폴더 (빈 문자열 = 루트)
+                files: [],                // 현재 폴더의 파일 목록
+                subfolders: [],           // 현재 폴더의 하위 폴더 목록
+                folderTree: [],           // 중첩 폴더 트리 구조
+                rootCount: 0,             // 루트 폴더 이미지 수
+                selectedFiles: new Set(), // 선택된 파일 경로들
+                anchorIndex: -1,          // 기준점 인덱스 (Shift 선택 시작점, 탐색기 방식)
+                lastSelectedIndex: -1,    // 마지막 선택 인덱스 (Shift 선택용)
+                loading: false,
+                loadingMore: false,       // 추가 로딩 중
+                hasMore: true,            // 더 로드할 파일 있음
+                page: 1,
+                total: 0,
+                viewMode: 'thumbnail',    // 'thumbnail' | 'list'
+                expandedFolders: new Set(), // 펼쳐진 폴더 경로들
+                pipMode: false,           // PIP 모드 활성화
+                dragSelecting: false,     // 드래그 선택 중
+                dragStartIndex: undefined,  // 드래그 시작 인덱스
+                dragCurrentIndex: undefined // 현재 드래그 위치 인덱스
+            }
         };
 
         // 보조 도구 모드 초기화
@@ -16860,6 +17579,7 @@
             // 탭 전환 이벤트
             document.getElementById('utilityTabConvert').onclick = () => switchUtilityTab('convert');
             document.getElementById('utilityTabExif').onclick = () => switchUtilityTab('exif');
+            document.getElementById('utilityTabFileManager').onclick = () => switchUtilityTab('filemanager');
 
             // 저장된 탭 복원
             const savedTab = window._pendingUtilityTab || 'convert';
@@ -16916,9 +17636,16 @@
 
             document.getElementById('utilityTabConvert').classList.toggle('active', tab === 'convert');
             document.getElementById('utilityTabExif').classList.toggle('active', tab === 'exif');
+            document.getElementById('utilityTabFileManager').classList.toggle('active', tab === 'filemanager');
 
             document.getElementById('utilityConvertContent').style.display = tab === 'convert' ? 'flex' : 'none';
             document.getElementById('utilityExifContent').style.display = tab === 'exif' ? 'flex' : 'none';
+            document.getElementById('utilityFileManagerContent').style.display = tab === 'filemanager' ? 'flex' : 'none';
+
+            // 파일 관리 탭 초기화
+            if (tab === 'filemanager' && !utilityState.fileManager.initialized) {
+                initFileManagerTab();
+            }
         }
 
         // ============================================================
@@ -17810,6 +18537,1485 @@
                 showToast('클립보드에 복사됨', 'success');
             }).catch(() => {
                 showToast('복사 실패', 'error');
+            });
+        }
+
+        // ============================================================
+        // 파일 관리 탭
+        // ============================================================
+
+        function initFileManagerTab() {
+            const fm = utilityState.fileManager;
+            if (fm.initialized) return;
+            fm.initialized = true;
+
+            // 버튼 이벤트 바인딩
+            document.getElementById('fmSelectAllBtn').onclick = fmSelectAll;
+            document.getElementById('fmDeselectBtn').onclick = fmDeselectAll;
+            document.getElementById('fmDeleteBtn').onclick = fmDeleteSelected;
+            document.getElementById('fmRenameBtn').onclick = fmRenameSelected;
+            document.getElementById('fmConvertBtn').onclick = fmConvertSelected;
+            document.getElementById('fmCreateFolderBtn').onclick = fmCreateFolder;
+
+            // 뷰 모드 버튼
+            document.getElementById('fmViewThumbnail').onclick = () => fmSetViewMode('thumbnail');
+            document.getElementById('fmViewList').onclick = () => fmSetViewMode('list');
+
+            // PIP 모드 버튼
+            document.getElementById('fmPipModeBtn').onclick = fmTogglePipMode;
+
+            // 탐색기에서 열기 버튼
+            document.getElementById('fmOpenFolderBtn').onclick = fmOpenInExplorer;
+
+            // 스크롤 이벤트 (무한 스크롤)
+            const grid = document.getElementById('fmFileGrid');
+            const list = document.getElementById('fmFileList');
+            grid.onscroll = fmHandleScroll;
+            list.onscroll = fmHandleScroll;
+
+            // 드래그 선택 이벤트 (그리드 & 리스트)
+            grid.addEventListener('mousedown', fmStartDragSelect);
+            list.addEventListener('mousedown', fmStartDragSelect);
+            document.addEventListener('mousemove', fmDoDragSelect);
+            document.addEventListener('mouseup', fmEndDragSelect);
+
+            // 저장된 설정 복원
+            if (window._pendingFileManagerViewMode) {
+                fm.viewMode = window._pendingFileManagerViewMode;
+                delete window._pendingFileManagerViewMode;
+            }
+            if (window._pendingFileManagerPipMode) {
+                fm.pipMode = true;
+                const btn = document.getElementById('fmPipModeBtn');
+                btn.classList.add('active');
+                btn.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
+                btn.style.color = 'white';
+                btn.style.boxShadow = '0 0 8px rgba(245, 158, 11, 0.5)';
+                btn.style.borderColor = '#f59e0b';
+                delete window._pendingFileManagerPipMode;
+            }
+
+            // 초기 데이터 로드
+            fmLoadFolders();
+            fmLoadFiles();
+        }
+
+        // 폴더 트리 로드 (재귀적 구조)
+        async function fmLoadFolders() {
+            try {
+                const res = await fetch(`${API_BASE}/api/output-folders-tree`);
+                const data = await res.json();
+                if (data.success) {
+                    const fm = utilityState.fileManager;
+                    fm.folderTree = data.tree || [];
+                    fm.rootCount = data.root_count || 0;
+                    fmRenderFolderTree();
+                }
+            } catch (e) {
+                console.error('폴더 트리 로드 실패:', e);
+            }
+        }
+
+        // 폴더 트리 렌더링 (재귀적 트리 구조)
+        function fmRenderFolderTree() {
+            const fm = utilityState.fileManager;
+            const container = document.getElementById('fileManagerFolderTree');
+
+            // 루트(outputs) 폴더
+            let html = `
+                <div class="folder-tree-item ${fm.currentFolder === '' ? 'active' : ''}"
+                     data-folder="" data-depth="0"
+                     draggable="false"
+                     ondragover="fmFolderDragOver(event)"
+                     ondrop="fmFolderDrop(event, '')"
+                     ondragleave="fmFolderDragLeave(event)">
+                    <span class="folder-toggle"></span>
+                    <span class="folder-icon">📂</span>
+                    <span class="folder-name">outputs</span>
+                    <span class="folder-count">${fm.rootCount}</span>
+                </div>
+            `;
+
+            // 재귀적으로 폴더 트리 렌더링
+            html += fmRenderFolderChildren(fm.folderTree, 1);
+
+            container.innerHTML = html;
+
+            // 클릭 이벤트 바인딩
+            container.querySelectorAll('.folder-tree-item').forEach(item => {
+                // 폴더 선택 클릭
+                item.onclick = (e) => {
+                    if (e.target.closest('.folder-menu-btn')) return;
+                    if (e.target.closest('.folder-toggle')) {
+                        // 토글 클릭 - 펼치기/접기
+                        const folderPath = item.dataset.folder;
+                        fmToggleFolder(folderPath);
+                        return;
+                    }
+                    const folder = item.dataset.folder;
+                    fmSelectFolder(folder);
+                };
+            });
+        }
+
+        // 폴더 자식 렌더링 (재귀)
+        function fmRenderFolderChildren(folders, depth) {
+            const fm = utilityState.fileManager;
+            let html = '';
+
+            for (const folder of folders) {
+                const isActive = fm.currentFolder === folder.path;
+                const hasChildren = folder.children && folder.children.length > 0;
+                const isExpanded = fm.expandedFolders.has(folder.path);
+                const toggleClass = hasChildren ? (isExpanded ? 'has-children expanded' : 'has-children') : '';
+
+                html += `
+                    <div class="folder-tree-item ${isActive ? 'active' : ''}"
+                         data-folder="${folder.path}" data-depth="${depth}"
+                         style="padding-left: ${depth * 16 + 8}px"
+                         draggable="true"
+                         ondragstart="fmFolderTreeDragStart(event, '${folder.path}')"
+                         ondragend="fmFolderTreeDragEnd(event)"
+                         ondragover="fmFolderDragOver(event)"
+                         ondrop="fmFolderDrop(event, '${folder.path}')"
+                         ondragleave="fmFolderDragLeave(event)">
+                        <span class="folder-toggle ${toggleClass}">${hasChildren ? (isExpanded ? '▼' : '▶') : ''}</span>
+                        <span class="folder-icon">📁</span>
+                        <span class="folder-name">${folder.name}</span>
+                        <span class="folder-count">${folder.image_count}</span>
+                        <button class="folder-menu-btn" onclick="event.stopPropagation(); fmShowFolderMenu('${folder.path}')" title="메뉴">⋮</button>
+                    </div>
+                `;
+
+                // 자식 폴더 (펼쳐진 경우만)
+                if (hasChildren && isExpanded) {
+                    html += fmRenderFolderChildren(folder.children, depth + 1);
+                }
+            }
+
+            return html;
+        }
+
+        // 폴더 펼치기/접기 토글
+        function fmToggleFolder(folderPath) {
+            const fm = utilityState.fileManager;
+            if (fm.expandedFolders.has(folderPath)) {
+                fm.expandedFolders.delete(folderPath);
+            } else {
+                fm.expandedFolders.add(folderPath);
+            }
+            fmRenderFolderTree();
+        }
+
+        // 폴더 선택 옵션 생성 (트리 구조를 평탄화)
+        function fmGetFolderOptions(excludeFolder = null) {
+            const fm = utilityState.fileManager;
+            const options = [{ value: '', label: '📂 outputs (루트)' }];
+
+            function addFolders(folders, depth = 0) {
+                for (const folder of folders) {
+                    // 자기 자신이나 자신의 하위 폴더는 제외
+                    if (excludeFolder && (folder.path === excludeFolder || folder.path.startsWith(excludeFolder + '/'))) {
+                        continue;
+                    }
+                    const indent = '  '.repeat(depth);
+                    options.push({
+                        value: folder.path,
+                        label: `${indent}📁 ${folder.name}`
+                    });
+                    if (folder.children && folder.children.length > 0) {
+                        addFolders(folder.children, depth + 1);
+                    }
+                }
+            }
+
+            addFolders(fm.folderTree);
+            return options;
+        }
+
+        // 폴더 선택
+        function fmSelectFolder(folder) {
+            const fm = utilityState.fileManager;
+            fm.currentFolder = folder;
+            fm.selectedFiles.clear();
+            fm.anchorIndex = -1;
+            fm.lastSelectedIndex = -1;
+            fm.page = 1;
+            fm.files = [];
+            fm.hasMore = true;
+
+            // 선택된 폴더의 상위 폴더들을 모두 펼치기
+            if (folder) {
+                const parts = folder.split('/');
+                let path = '';
+                for (let i = 0; i < parts.length - 1; i++) {
+                    path = path ? path + '/' + parts[i] : parts[i];
+                    fm.expandedFolders.add(path);
+                }
+            }
+
+            fmRenderFolderTree();
+            fmLoadFiles();
+        }
+
+        // 파일 목록 로드 (초기 또는 추가 로드)
+        async function fmLoadFiles(append = false) {
+            const fm = utilityState.fileManager;
+
+            if (append) {
+                if (fm.loadingMore || !fm.hasMore) return;
+                fm.loadingMore = true;
+                fm.page++;
+            } else {
+                fm.loading = true;
+                fm.page = 1;
+                fm.files = [];
+                fm.hasMore = true;
+            }
+
+            // 로딩 표시만 업데이트 (전체 재렌더링 X)
+            if (append) {
+                fmUpdateLoadMore();
+            } else {
+                fmUpdateUI();
+            }
+
+            try {
+                const params = new URLSearchParams({
+                    folder: fm.currentFolder,
+                    page: fm.page,
+                    limit: 100  // 한 번에 100개씩 로드
+                });
+                const res = await fetch(`${API_BASE}/api/outputs-list?${params}`);
+                const data = await res.json();
+
+                if (data.success) {
+                    const newFiles = data.files || [];
+                    const prevLength = fm.files.length;
+
+                    if (append) {
+                        fm.files = [...fm.files, ...newFiles];
+                    } else {
+                        fm.files = newFiles;
+                    }
+                    fm.total = data.total || 0;
+                    fm.hasMore = fm.files.length < fm.total;
+
+                    // append 모드에서는 새 파일만 추가 렌더링
+                    if (append && newFiles.length > 0) {
+                        fmAppendFiles(newFiles, prevLength);
+                    }
+                }
+
+                // 현재 폴더의 하위 폴더 가져오기 (트리에서 찾기) - 초기 로드시만
+                if (!append) {
+                    fm.subfolders = fmGetSubfolders(fm.currentFolder);
+                }
+            } catch (e) {
+                console.error('파일 목록 로드 실패:', e);
+                if (!append) {
+                    fm.files = [];
+                    fm.subfolders = [];
+                }
+            }
+
+            fm.loading = false;
+            fm.loadingMore = false;
+
+            // 초기 로드시에만 전체 UI 업데이트
+            if (!append) {
+                fmUpdateUI();
+            } else {
+                fmUpdateLoadMore();
+            }
+        }
+
+        // 새 파일만 그리드/리스트에 추가 (append 전용)
+        function fmAppendFiles(newFiles, startIndex) {
+            const fm = utilityState.fileManager;
+            const grid = document.getElementById('fmFileGrid');
+            const list = document.getElementById('fmFileList');
+
+            if (fm.viewMode === 'thumbnail') {
+                // 썸네일 뷰에 추가
+                let html = '';
+                newFiles.forEach((file, i) => {
+                    const index = startIndex + i;
+                    const filePath = fm.currentFolder ? `${fm.currentFolder}/${file.filename}` : file.filename;
+                    const isSelected = fm.selectedFiles.has(filePath);
+                    html += `
+                        <div class="fm-file-item ${isSelected ? 'selected' : ''}"
+                             data-index="${index}" data-path="${filePath}"
+                             draggable="true">
+                            <div class="fm-checkbox">${isSelected ? '✓' : ''}</div>
+                            ${file.thumbnail ?
+                                `<img class="fm-file-thumb" src="data:image/jpeg;base64,${file.thumbnail}" alt="${file.filename}" draggable="false">` :
+                                `<div class="fm-file-thumb" style="display:flex;align-items:center;justify-content:center;font-size:2rem;">🖼️</div>`
+                            }
+                            <div class="fm-file-name">${file.filename}</div>
+                        </div>
+                    `;
+                });
+                grid.insertAdjacentHTML('beforeend', html);
+
+                // 새로 추가된 요소들에 이벤트 바인딩
+                const newItems = grid.querySelectorAll(`.fm-file-item[data-index="${startIndex}"]`);
+                grid.querySelectorAll('.fm-file-item').forEach(item => {
+                    const idx = parseInt(item.dataset.index);
+                    if (idx >= startIndex) {
+                        item.onclick = (e) => fmHandleFileClick(idx, e);
+                        item.ondragstart = (e) => fmFileDragStart(e, item.dataset.path);
+                        item.ondragend = (e) => fmFileDragEnd(e);
+                        // PIP 호버 이벤트
+                        item.onmouseenter = (e) => fmShowPipPreview(e, item.dataset.path);
+                        item.onmousemove = (e) => fmUpdatePipPosition(e);
+                        item.onmouseleave = () => fmHidePipPreview();
+                    }
+                });
+            } else {
+                // 리스트 뷰에 추가
+                let html = '';
+                newFiles.forEach((file, i) => {
+                    const index = startIndex + i;
+                    const filePath = fm.currentFolder ? `${fm.currentFolder}/${file.filename}` : file.filename;
+                    const isSelected = fm.selectedFiles.has(filePath);
+                    const sizeStr = fmFormatFileSize(file.size || 0);
+                    html += `
+                        <div class="fm-list-row ${isSelected ? 'selected' : ''}"
+                             data-index="${index}" data-path="${filePath}"
+                             draggable="true">
+                            <div class="fm-col-check">
+                                <input type="checkbox" ${isSelected ? 'checked' : ''}>
+                            </div>
+                            <div class="fm-col-name">
+                                ${file.thumbnail ?
+                                    `<img class="fm-list-thumb" src="data:image/jpeg;base64,${file.thumbnail}" alt="" draggable="false">` :
+                                    `<span class="fm-list-thumb" style="display:inline-flex;align-items:center;justify-content:center;">🖼️</span>`
+                                }
+                                <span>${file.filename}</span>
+                            </div>
+                            <div class="fm-col-size">${sizeStr}</div>
+                            <div class="fm-col-date">${fmFormatDate(file.modified)}</div>
+                        </div>
+                    `;
+                });
+                list.insertAdjacentHTML('beforeend', html);
+
+                // 새로 추가된 요소들에 이벤트 바인딩
+                list.querySelectorAll('.fm-list-row:not(.fm-list-folder)').forEach(item => {
+                    const idx = parseInt(item.dataset.index);
+                    if (idx >= startIndex) {
+                        item.onclick = (e) => {
+                            if (e.target.tagName === 'INPUT') {
+                                fmHandleFileClick(idx, e);
+                                return;
+                            }
+                            fmHandleFileClick(idx, e);
+                        };
+                        item.ondragstart = (e) => fmFileDragStart(e, item.dataset.path);
+                        item.ondragend = (e) => fmFileDragEnd(e);
+                        // PIP 호버 이벤트
+                        item.onmouseenter = (e) => fmShowPipPreview(e, item.dataset.path);
+                        item.onmousemove = (e) => fmUpdatePipPosition(e);
+                        item.onmouseleave = () => fmHidePipPreview();
+                    }
+                });
+            }
+        }
+
+        // 스크롤 이벤트 핸들러 (무한 스크롤) - 디바운스 적용
+        let fmScrollTimer = null;
+        function fmHandleScroll(e) {
+            if (fmScrollTimer) return; // 이미 대기 중이면 무시
+
+            fmScrollTimer = setTimeout(() => {
+                fmScrollTimer = null;
+
+                const fm = utilityState.fileManager;
+                if (fm.loading || fm.loadingMore || !fm.hasMore) return;
+
+                const el = e.target;
+                const scrollBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+
+                // 스크롤이 바닥에서 300px 이내면 추가 로드 (미리 로드)
+                if (scrollBottom < 300) {
+                    fmLoadFiles(true);
+                }
+            }, 100); // 100ms 디바운스
+        }
+
+        // 현재 폴더의 하위 폴더 목록 가져오기
+        function fmGetSubfolders(folderPath) {
+            const fm = utilityState.fileManager;
+
+            if (folderPath === '') {
+                // 루트인 경우 트리의 최상위 폴더들 반환
+                return fm.folderTree.map(f => ({
+                    name: f.name,
+                    path: f.path,
+                    image_count: f.image_count
+                }));
+            }
+
+            // 트리에서 해당 폴더 찾기
+            function findFolder(folders, targetPath) {
+                for (const folder of folders) {
+                    if (folder.path === targetPath) {
+                        return folder.children || [];
+                    }
+                    if (folder.children && folder.children.length > 0) {
+                        const found = findFolder(folder.children, targetPath);
+                        if (found) return found;
+                    }
+                }
+                return null;
+            }
+
+            const children = findFolder(fm.folderTree, folderPath);
+            return children ? children.map(f => ({
+                name: f.name,
+                path: f.path,
+                image_count: f.image_count
+            })) : [];
+        }
+
+        // UI 전체 업데이트
+        function fmUpdateUI() {
+            const fm = utilityState.fileManager;
+            if (fm.viewMode === 'thumbnail') {
+                fmRenderFileGrid();
+            } else {
+                fmRenderFileList();
+            }
+            fmUpdateToolbar();
+            fmUpdateLoadMore();
+            fmUpdateViewModeButtons();
+        }
+
+        // 로딩 더보기 표시 업데이트
+        function fmUpdateLoadMore() {
+            const fm = utilityState.fileManager;
+            const loadMore = document.getElementById('fmLoadMore');
+            loadMore.style.display = fm.loadingMore ? 'flex' : 'none';
+        }
+
+        // 뷰 모드 버튼 상태 업데이트
+        function fmUpdateViewModeButtons() {
+            const fm = utilityState.fileManager;
+            document.getElementById('fmViewThumbnail').classList.toggle('active', fm.viewMode === 'thumbnail');
+            document.getElementById('fmViewList').classList.toggle('active', fm.viewMode === 'list');
+        }
+
+        // 뷰 모드 변경
+        function fmSetViewMode(mode) {
+            utilityState.fileManager.viewMode = mode;
+            fmUpdateUI();
+            autoSaveSettings();
+        }
+
+        // 파일 그리드 렌더링 (썸네일 뷰)
+        function fmRenderFileGrid() {
+            const fm = utilityState.fileManager;
+            const grid = document.getElementById('fmFileGrid');
+            const list = document.getElementById('fmFileList');
+            const empty = document.getElementById('fmEmpty');
+            const loading = document.getElementById('fmLoading');
+
+            // 리스트 뷰 숨기기
+            list.style.display = 'none';
+
+            if (fm.loading) {
+                grid.style.display = 'none';
+                empty.style.display = 'none';
+                loading.style.display = 'flex';
+                return;
+            }
+
+            loading.style.display = 'none';
+
+            // 폴더 + 파일 모두 없으면 empty 표시
+            if (fm.subfolders.length === 0 && fm.files.length === 0) {
+                grid.style.display = 'none';
+                empty.style.display = 'flex';
+                return;
+            }
+
+            empty.style.display = 'none';
+            grid.style.display = 'grid';
+
+            let html = '';
+
+            // 하위 폴더 먼저 표시
+            fm.subfolders.forEach(folder => {
+                html += `
+                    <div class="fm-folder-item" data-folder-path="${folder.path}"
+                         ondragover="fmFolderDragOver(event)"
+                         ondrop="fmFolderDrop(event, '${folder.path}')"
+                         ondragleave="fmFolderDragLeave(event)">
+                        <div class="fm-folder-icon">📁</div>
+                        <div class="fm-folder-name">${folder.name}</div>
+                        <div class="fm-folder-count">${folder.image_count}개</div>
+                    </div>
+                `;
+            });
+
+            // 파일 표시
+            fm.files.forEach((file, index) => {
+                const filePath = fm.currentFolder ? `${fm.currentFolder}/${file.filename}` : file.filename;
+                const isSelected = fm.selectedFiles.has(filePath);
+                html += `
+                    <div class="fm-file-item ${isSelected ? 'selected' : ''}"
+                         data-index="${index}" data-path="${filePath}"
+                         draggable="true">
+                        <div class="fm-checkbox">${isSelected ? '✓' : ''}</div>
+                        ${file.thumbnail ?
+                            `<img class="fm-file-thumb" src="data:image/jpeg;base64,${file.thumbnail}" alt="${file.filename}" draggable="false">` :
+                            `<div class="fm-file-thumb" style="display:flex;align-items:center;justify-content:center;font-size:2rem;">🖼️</div>`
+                        }
+                        <div class="fm-file-name">${file.filename}</div>
+                    </div>
+                `;
+            });
+
+            grid.innerHTML = html;
+
+            // 폴더 클릭 이벤트 (더블클릭으로 진입)
+            grid.querySelectorAll('.fm-folder-item').forEach(item => {
+                item.ondblclick = () => {
+                    const folderPath = item.dataset.folderPath;
+                    fmSelectFolder(folderPath);
+                };
+            });
+
+            // 파일 클릭 및 드래그 이벤트 바인딩
+            grid.querySelectorAll('.fm-file-item').forEach(item => {
+                item.onclick = (e) => fmHandleFileClick(parseInt(item.dataset.index), e);
+                // 드래그 시작
+                item.ondragstart = (e) => fmFileDragStart(e, item.dataset.path);
+                item.ondragend = (e) => fmFileDragEnd(e);
+                // PIP 호버 이벤트
+                item.onmouseenter = (e) => fmShowPipPreview(e, item.dataset.path);
+                item.onmousemove = (e) => fmUpdatePipPosition(e);
+                item.onmouseleave = () => fmHidePipPreview();
+            });
+        }
+
+        // 파일 리스트 렌더링 (리스트 뷰)
+        function fmRenderFileList() {
+            const fm = utilityState.fileManager;
+            const grid = document.getElementById('fmFileGrid');
+            const list = document.getElementById('fmFileList');
+            const empty = document.getElementById('fmEmpty');
+            const loading = document.getElementById('fmLoading');
+
+            // 그리드 뷰 숨기기
+            grid.style.display = 'none';
+
+            if (fm.loading) {
+                list.style.display = 'none';
+                empty.style.display = 'none';
+                loading.style.display = 'flex';
+                return;
+            }
+
+            loading.style.display = 'none';
+
+            // 폴더 + 파일 모두 없으면 empty 표시
+            if (fm.subfolders.length === 0 && fm.files.length === 0) {
+                list.style.display = 'none';
+                empty.style.display = 'flex';
+                return;
+            }
+
+            empty.style.display = 'none';
+            list.style.display = 'block';
+
+            let html = `
+                <div class="fm-list-header">
+                    <div class="fm-col-check"></div>
+                    <div class="fm-col-name">이름</div>
+                    <div class="fm-col-size">크기</div>
+                    <div class="fm-col-date">수정일</div>
+                </div>
+            `;
+
+            // 하위 폴더 먼저 표시
+            fm.subfolders.forEach(folder => {
+                html += `
+                    <div class="fm-list-row fm-list-folder" data-folder-path="${folder.path}"
+                         ondragover="fmFolderDragOver(event)"
+                         ondrop="fmFolderDrop(event, '${folder.path}')"
+                         ondragleave="fmFolderDragLeave(event)">
+                        <div class="fm-col-check"></div>
+                        <div class="fm-col-name">
+                            <span class="fm-list-folder-icon">📁</span>
+                            <span>${folder.name}</span>
+                        </div>
+                        <div class="fm-col-size">${folder.image_count}개 항목</div>
+                        <div class="fm-col-date">-</div>
+                    </div>
+                `;
+            });
+
+            // 파일 표시
+            fm.files.forEach((file, index) => {
+                const filePath = fm.currentFolder ? `${fm.currentFolder}/${file.filename}` : file.filename;
+                const isSelected = fm.selectedFiles.has(filePath);
+                const sizeStr = fmFormatFileSize(file.size || 0);
+                html += `
+                    <div class="fm-list-row ${isSelected ? 'selected' : ''}"
+                         data-index="${index}" data-path="${filePath}"
+                         draggable="true">
+                        <div class="fm-col-check">
+                            <input type="checkbox" ${isSelected ? 'checked' : ''}>
+                        </div>
+                        <div class="fm-col-name">
+                            ${file.thumbnail ?
+                                `<img class="fm-list-thumb" src="data:image/jpeg;base64,${file.thumbnail}" alt="" draggable="false">` :
+                                `<span class="fm-list-thumb" style="display:inline-flex;align-items:center;justify-content:center;">🖼️</span>`
+                            }
+                            <span>${file.filename}</span>
+                        </div>
+                        <div class="fm-col-size">${sizeStr}</div>
+                        <div class="fm-col-date">${fmFormatDate(file.modified)}</div>
+                    </div>
+                `;
+            });
+
+            list.innerHTML = html;
+
+            // 폴더 클릭 이벤트 (더블클릭으로 진입)
+            list.querySelectorAll('.fm-list-folder').forEach(item => {
+                item.ondblclick = () => {
+                    const folderPath = item.dataset.folderPath;
+                    fmSelectFolder(folderPath);
+                };
+            });
+
+            // 파일 클릭 및 드래그 이벤트 바인딩
+            list.querySelectorAll('.fm-list-row:not(.fm-list-folder)').forEach(item => {
+                item.onclick = (e) => {
+                    if (e.target.tagName === 'INPUT') {
+                        // 체크박스 직접 클릭
+                        fmHandleFileClick(parseInt(item.dataset.index), e);
+                        return;
+                    }
+                    fmHandleFileClick(parseInt(item.dataset.index), e);
+                };
+                item.ondragstart = (e) => fmFileDragStart(e, item.dataset.path);
+                item.ondragend = (e) => fmFileDragEnd(e);
+                // PIP 호버 이벤트
+                item.onmouseenter = (e) => fmShowPipPreview(e, item.dataset.path);
+                item.onmousemove = (e) => fmUpdatePipPosition(e);
+                item.onmouseleave = () => fmHidePipPreview();
+            });
+        }
+
+        // 파일 크기 포맷
+        function fmFormatFileSize(bytes) {
+            if (bytes === 0) return '-';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        // 날짜 포맷 (timestamp -> YYYY-MM-DD HH:mm)
+        function fmFormatDate(timestamp) {
+            if (!timestamp) return '-';
+            const d = new Date(timestamp * 1000);
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            const hours = String(d.getHours()).padStart(2, '0');
+            const mins = String(d.getMinutes()).padStart(2, '0');
+            return `${year}-${month}-${day} ${hours}:${mins}`;
+        }
+
+        // 파일 드래그 시작
+        function fmFileDragStart(e, filePath) {
+            const fm = utilityState.fileManager;
+            // 선택된 파일이 없거나 드래그 중인 파일이 선택되지 않은 경우
+            if (!fm.selectedFiles.has(filePath)) {
+                fm.selectedFiles.clear();
+                fm.anchorIndex = -1;
+                fm.lastSelectedIndex = -1;
+                fm.selectedFiles.add(filePath);
+                fmUpdateUI();
+            }
+            // 선택된 파일들 전송
+            const files = Array.from(fm.selectedFiles);
+            e.dataTransfer.setData('application/x-fm-files', JSON.stringify(files));
+            e.dataTransfer.setData('text/plain', files.join('\n'));
+            e.dataTransfer.effectAllowed = 'move';
+
+            // 모든 선택된 아이템에 dragging 클래스 추가
+            const grid = document.getElementById('fmFileGrid');
+            const list = document.getElementById('fmFileList');
+            files.forEach(fp => {
+                const item = grid.querySelector(`.fm-file-item[data-path="${fp}"]`) ||
+                             list.querySelector(`.fm-list-row[data-path="${fp}"]`);
+                if (item) item.classList.add('dragging');
+            });
+
+            // 드래그 이미지 커스텀 (여러 개 선택 시 개수 표시)
+            if (files.length > 1) {
+                const dragImg = document.createElement('div');
+                dragImg.className = 'fm-drag-image';
+                dragImg.innerHTML = `<span>📁 ${files.length}개 파일</span>`;
+                dragImg.style.cssText = 'position:absolute;top:-1000px;left:-1000px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:13px;white-space:nowrap;';
+                document.body.appendChild(dragImg);
+                e.dataTransfer.setDragImage(dragImg, 0, 0);
+                // 드래그 끝나면 제거
+                setTimeout(() => dragImg.remove(), 0);
+            }
+        }
+
+        // 파일 드래그 종료
+        function fmFileDragEnd(e) {
+            // 모든 dragging 클래스 제거
+            document.querySelectorAll('.fm-file-item.dragging, .fm-list-row.dragging').forEach(item => {
+                item.classList.remove('dragging');
+            });
+        }
+
+        // 폴더에 드래그 오버
+        function fmFolderDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            e.currentTarget.classList.add('drag-over');
+        }
+
+        // 폴더 드래그 떠남
+        function fmFolderDragLeave(e) {
+            e.currentTarget.classList.remove('drag-over');
+        }
+
+        // 폴더 트리에서 폴더 드래그 시작
+        function fmFolderTreeDragStart(e, folderPath) {
+            e.dataTransfer.setData('application/x-fm-folder', folderPath);
+            e.dataTransfer.effectAllowed = 'move';
+            e.currentTarget.classList.add('dragging');
+        }
+
+        // 폴더 트리에서 폴더 드래그 종료
+        function fmFolderTreeDragEnd(e) {
+            e.currentTarget.classList.remove('dragging');
+            // 모든 drag-over 클래스 제거
+            document.querySelectorAll('.folder-tree-item.drag-over').forEach(item => {
+                item.classList.remove('drag-over');
+            });
+        }
+
+        // 폴더에 드롭 (파일 또는 폴더)
+        async function fmFolderDrop(e, targetFolder) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.currentTarget.classList.remove('drag-over');
+
+            const fm = utilityState.fileManager;
+
+            // 폴더 드롭 처리
+            const folderData = e.dataTransfer.getData('application/x-fm-folder');
+            if (folderData) {
+                const sourceFolder = folderData;
+
+                // 자기 자신에게 드롭 방지
+                if (sourceFolder === targetFolder) return;
+
+                // 자식 폴더로 드롭 방지 (순환 참조)
+                if (targetFolder.startsWith(sourceFolder + '/')) {
+                    showToast('하위 폴더로 이동할 수 없습니다', 'error');
+                    return;
+                }
+
+                // 이미 같은 부모에 있는 경우 방지
+                const sourceParent = sourceFolder.includes('/') ? sourceFolder.substring(0, sourceFolder.lastIndexOf('/')) : '';
+                if (sourceParent === targetFolder) {
+                    return;
+                }
+
+                try {
+                    const res = await fetch(`${API_BASE}/api/output-folders/move`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ folder: sourceFolder, to_folder: targetFolder })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        showToast('폴더 이동됨', 'success');
+                        // 현재 폴더가 이동된 폴더이거나 그 하위면 루트로 이동
+                        if (fm.currentFolder === sourceFolder || fm.currentFolder.startsWith(sourceFolder + '/')) {
+                            fm.currentFolder = '';
+                        }
+                        fmLoadFolders();
+                        fmLoadFiles();
+                    } else {
+                        showToast(data.error || '폴더 이동 실패', 'error');
+                    }
+                } catch (err) {
+                    console.error('폴더 이동 에러:', err);
+                    showToast('폴더 이동 실패', 'error');
+                }
+                return;
+            }
+
+            // 파일 드롭 처리
+            const filesData = e.dataTransfer.getData('application/x-fm-files');
+            if (!filesData) return;
+
+            const files = JSON.parse(filesData);
+            if (files.length === 0) return;
+
+            // 같은 폴더로 이동하는 경우 무시
+            const sourceFileFolder = fm.currentFolder;
+            if (sourceFileFolder === targetFolder) return;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/outputs/batch-move`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ files, to_folder: targetFolder })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`${data.moved}개 파일 이동됨`, 'success');
+                    fm.selectedFiles.clear();
+                    fm.anchorIndex = -1;
+                    fm.lastSelectedIndex = -1;
+                    fmLoadFiles();
+                    fmLoadFolders();
+                } else {
+                    showToast(data.error || '이동 실패', 'error');
+                }
+            } catch (err) {
+                showToast('이동 실패', 'error');
+            }
+        }
+
+        // 파일 클릭 핸들러 (탐색기 방식 선택)
+        function fmHandleFileClick(index, event) {
+            const fm = utilityState.fileManager;
+            const file = fm.files[index];
+            if (!file) return;
+
+            const filePath = fm.currentFolder ? `${fm.currentFolder}/${file.filename}` : file.filename;
+
+            if (event.shiftKey && fm.anchorIndex !== -1) {
+                // Shift+클릭: anchor 기준으로 범위 선택 (탐색기 방식)
+                // 이전 선택 해제 후 anchor~현재 범위 선택
+                fm.selectedFiles.clear();
+
+                const start = Math.min(fm.anchorIndex, index);
+                const end = Math.max(fm.anchorIndex, index);
+
+                for (let i = start; i <= end; i++) {
+                    const f = fm.files[i];
+                    const p = fm.currentFolder ? `${fm.currentFolder}/${f.filename}` : f.filename;
+                    fm.selectedFiles.add(p);
+                }
+                // anchor는 유지, lastSelectedIndex만 업데이트
+                fm.lastSelectedIndex = index;
+            } else {
+                // 일반 클릭: 토글 (추가/제거)
+                if (fm.selectedFiles.has(filePath)) {
+                    fm.selectedFiles.delete(filePath);
+                    // 선택 해제 시 anchor 유지 (다른 선택된 항목이 있으면)
+                    // 모든 선택이 해제되면 anchor도 리셋
+                    if (fm.selectedFiles.size === 0) {
+                        fm.anchorIndex = -1;
+                        fm.lastSelectedIndex = -1;
+                    }
+                } else {
+                    fm.selectedFiles.add(filePath);
+                    // 선택 시 anchor 설정 (기존 anchor 없을 때만)
+                    if (fm.anchorIndex === -1) {
+                        fm.anchorIndex = index;
+                    }
+                    fm.lastSelectedIndex = index;
+                }
+            }
+
+            fmUpdateUI();
+        }
+
+        // 전체 선택
+        function fmSelectAll() {
+            const fm = utilityState.fileManager;
+            fm.files.forEach(file => {
+                const filePath = fm.currentFolder ? `${fm.currentFolder}/${file.filename}` : file.filename;
+                fm.selectedFiles.add(filePath);
+            });
+            fmUpdateUI();
+        }
+
+        // 선택 해제
+        function fmDeselectAll() {
+            utilityState.fileManager.selectedFiles.clear();
+            utilityState.fileManager.anchorIndex = -1;
+            utilityState.fileManager.lastSelectedIndex = -1;
+            fmUpdateUI();
+        }
+
+        // 툴바 업데이트
+        function fmUpdateToolbar() {
+            const fm = utilityState.fileManager;
+            const count = fm.selectedFiles.size;
+            document.getElementById('fmSelectedCount').textContent = `${count}개 선택됨`;
+            document.getElementById('fmActions').style.display = count > 0 ? 'flex' : 'none';
+            // 이름변경은 1개만 선택됐을 때만 활성화
+            document.getElementById('fmRenameBtn').disabled = count !== 1;
+        }
+
+        // 새 폴더 생성 (현재 선택된 폴더 하위에)
+        async function fmCreateFolder() {
+            const fm = utilityState.fileManager;
+            const parentFolder = fm.currentFolder;
+            const parentLabel = parentFolder ? parentFolder : 'outputs';
+
+            const name = await fmPrompt('새 폴더', `"${parentLabel}" 하위에 생성할 폴더 이름`);
+            if (!name) return;
+
+            // 전체 경로 구성
+            const fullPath = parentFolder ? `${parentFolder}/${name}` : name;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/output-folders`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: fullPath })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('폴더 생성됨', 'success');
+                    // 부모 폴더 펼치기
+                    if (parentFolder) {
+                        fm.expandedFolders.add(parentFolder);
+                    }
+                    fmLoadFolders();
+                    // 현재 보고 있는 폴더에 생성된 경우 파일 리스트도 갱신
+                    fmLoadFiles();
+                } else {
+                    showToast(data.error || '폴더 생성 실패', 'error');
+                }
+            } catch (e) {
+                showToast('폴더 생성 실패', 'error');
+            }
+        }
+
+        // 폴더 메뉴 표시
+        async function fmShowFolderMenu(folderName) {
+            const action = await fmSelect('폴더 작업', [
+                { value: 'delete', label: '🗑️ 삭제' }
+            ]);
+
+            if (action === 'delete') {
+                await fmDeleteFolder(folderName);
+            }
+        }
+
+        // 폴더 삭제
+        async function fmDeleteFolder(folderName) {
+            const confirmed = await fmConfirm('폴더 삭제', `"${folderName}" 폴더를 삭제하시겠습니까?\n(빈 폴더만 삭제 가능)`);
+            if (!confirmed) return;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/output-folders/${encodeURIComponent(folderName)}`, {
+                    method: 'DELETE'
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('폴더 삭제됨', 'success');
+                    const fm = utilityState.fileManager;
+                    // 현재 폴더가 삭제된 폴더이거나 그 하위인 경우 루트로 이동
+                    if (fm.currentFolder === folderName || fm.currentFolder.startsWith(folderName + '/')) {
+                        fmSelectFolder('');
+                    }
+                    fmLoadFolders();
+                } else {
+                    showToast(data.error || '폴더 삭제 실패', 'error');
+                }
+            } catch (e) {
+                showToast('폴더 삭제 실패', 'error');
+            }
+        }
+
+        // 선택 파일 삭제
+        async function fmDeleteSelected() {
+            const fm = utilityState.fileManager;
+            const files = Array.from(fm.selectedFiles);
+            if (files.length === 0) return;
+
+            const confirmed = await fmConfirmDelete(files);
+            if (!confirmed) return;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/outputs/batch-delete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ files })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`${data.deleted}개 파일 삭제됨`, 'success');
+                    fm.selectedFiles.clear();
+                    fm.anchorIndex = -1;
+                    fm.lastSelectedIndex = -1;
+                    fmLoadFiles();
+                    fmLoadFolders();
+                } else {
+                    showToast(data.error || '삭제 실패', 'error');
+                }
+            } catch (e) {
+                showToast('삭제 실패', 'error');
+            }
+        }
+
+        // 선택 파일 이름 변경 (1개만)
+        async function fmRenameSelected() {
+            const fm = utilityState.fileManager;
+            if (fm.selectedFiles.size !== 1) return;
+
+            const filePath = Array.from(fm.selectedFiles)[0];
+            const oldName = filePath.split('/').pop();
+            const newName = await fmPrompt('이름 변경', '새 파일명을 입력하세요', oldName);
+            if (!newName || newName === oldName) return;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/outputs/${encodeURIComponent(filePath)}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ new_name: newName })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('이름 변경됨', 'success');
+                    fm.selectedFiles.clear();
+                    fm.anchorIndex = -1;
+                    fm.lastSelectedIndex = -1;
+                    fmLoadFiles();
+                } else {
+                    showToast(data.error || '이름 변경 실패', 'error');
+                }
+            } catch (e) {
+                showToast('이름 변경 실패', 'error');
+            }
+        }
+
+        // 선택 파일 이동
+        async function fmMoveSelected() {
+            const fm = utilityState.fileManager;
+            const files = Array.from(fm.selectedFiles);
+            if (files.length === 0) return;
+
+            const options = fmGetFolderOptions();
+            const toFolder = await fmSelect(`${files.length}개 파일 이동할 위치`, options);
+            if (toFolder === null) return;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/outputs/batch-move`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ files, to_folder: toFolder })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`${data.moved}개 파일 이동됨`, 'success');
+                    fm.selectedFiles.clear();
+                    fm.anchorIndex = -1;
+                    fm.lastSelectedIndex = -1;
+                    fmLoadFiles();
+                    fmLoadFolders();
+                } else {
+                    showToast(data.error || '이동 실패', 'error');
+                }
+            } catch (e) {
+                showToast('이동 실패', 'error');
+            }
+        }
+
+        // 선택 파일 변환 탭으로 전달
+        async function fmConvertSelected() {
+            const fm = utilityState.fileManager;
+            const filePaths = Array.from(fm.selectedFiles);
+            if (filePaths.length === 0) return;
+
+            // 파일 데이터 로드하여 변환 탭에 전달
+            const files = [];
+            for (const filePath of filePaths) {
+                try {
+                    const res = await fetch(`${API_BASE}/api/outputs/${encodeURIComponent(filePath)}`);
+                    if (res.ok) {
+                        const blob = await res.blob();
+                        const filename = filePath.split('/').pop();
+                        files.push(new File([blob], filename, { type: blob.type }));
+                    }
+                } catch (e) {
+                    console.error('파일 로드 실패:', filePath, e);
+                }
+            }
+
+            if (files.length > 0) {
+                // 변환 탭으로 전환 후 파일 추가
+                switchUtilityTab('convert');
+                addConvertFiles(files);
+                showToast(`${files.length}개 파일이 변환 탭에 추가됨`, 'success');
+            } else {
+                showToast('파일 로드 실패', 'error');
+            }
+        }
+
+        // ---- PIP 모드 ----
+
+        // PIP 모드 토글
+        function fmTogglePipMode() {
+            const fm = utilityState.fileManager;
+            fm.pipMode = !fm.pipMode;
+
+            const btn = document.getElementById('fmPipModeBtn');
+            btn.classList.toggle('active', fm.pipMode);
+            if (fm.pipMode) {
+                btn.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
+                btn.style.color = 'white';
+                btn.style.boxShadow = '0 0 8px rgba(245, 158, 11, 0.5)';
+                btn.style.borderColor = '#f59e0b';
+            } else {
+                btn.style.background = '';
+                btn.style.color = '';
+                btn.style.boxShadow = '';
+                btn.style.borderColor = '';
+            }
+
+            if (!fm.pipMode) {
+                // PIP 모드 끄면 프리뷰 숨기기
+                const preview = document.getElementById('fmPipPreview');
+                preview.style.display = 'none';
+            }
+
+            autoSaveSettings();
+        }
+
+        // PIP 프리뷰 표시 (마우스 따라다님, 좌상단 고정)
+        function fmShowPipPreview(e, imagePath) {
+            const fm = utilityState.fileManager;
+            if (!fm.pipMode) return;
+
+            const preview = document.getElementById('fmPipPreview');
+            const img = document.getElementById('fmPipImage');
+
+            // 이미지 로드
+            img.src = `${API_BASE}/api/outputs/${encodeURIComponent(imagePath)}`;
+            preview.style.display = 'block';
+
+            // 초기 위치 설정
+            fmUpdatePipPosition(e);
+        }
+
+        // PIP 프리뷰 위치 업데이트 (좌상단이 마우스 옆에 고정)
+        function fmUpdatePipPosition(e) {
+            const preview = document.getElementById('fmPipPreview');
+            if (preview.style.display === 'none') return;
+
+            const padding = 15;
+            let left = e.clientX + padding;
+            let top = e.clientY + padding;
+
+            // 화면 밖으로 나가지 않도록 최소한의 조정 (좌상단 기준)
+            if (left < 0) left = padding;
+            if (top < 0) top = padding;
+
+            preview.style.left = left + 'px';
+            preview.style.top = top + 'px';
+        }
+
+        // PIP 프리뷰 숨기기
+        function fmHidePipPreview() {
+            const preview = document.getElementById('fmPipPreview');
+            preview.style.display = 'none';
+        }
+
+        // ---- 탐색기에서 열기 ----
+
+        async function fmOpenInExplorer() {
+            const fm = utilityState.fileManager;
+            try {
+                await openFolder('outputs', fm.currentFolder);
+            } catch (e) {
+                console.error('폴더 열기 실패:', e);
+                showToast('폴더 열기 실패', 'error');
+            }
+        }
+
+        // ---- 드래그 선택 (클릭+드래그로 범위 선택, Shift+클릭과 유사) ----
+
+        // 드래그 선택 시작 (미선택 이미지 클릭 시)
+        function fmStartDragSelect(e) {
+            const fm = utilityState.fileManager;
+
+            // Shift 키가 눌려있으면 드래그 선택 시작하지 않음 (Shift+클릭 처리는 onclick에서)
+            if (e.shiftKey) return;
+
+            // 파일 아이템 위에서만 동작 (썸네일 또는 리스트)
+            const fileItem = e.target.closest('.fm-file-item') || e.target.closest('.fm-list-row:not(.fm-list-folder)');
+            const folderItem = e.target.closest('.fm-subfolder-item') || e.target.closest('.fm-list-folder');
+            if (folderItem) return;
+            if (!fileItem) return;
+
+            // 이미 선택된 아이템 위에서는 기존 드래그(이동) 동작 유지
+            if (fm.selectedFiles.has(fileItem.dataset.path)) return;
+
+            // 왼쪽 마우스 버튼만
+            if (e.button !== 0) return;
+
+            // 드래그 선택 시작
+            const startIndex = parseInt(fileItem.dataset.index);
+            fm.dragSelecting = true;
+            fm.dragStartIndex = startIndex;
+            fm.dragCurrentIndex = startIndex;
+
+            // 시작 아이템 하이라이트
+            fmHighlightRange(startIndex, startIndex);
+
+            e.preventDefault();
+        }
+
+        // 드래그 선택 진행 (마우스 이동 시)
+        function fmDoDragSelect(e) {
+            const fm = utilityState.fileManager;
+            if (!fm.dragSelecting) return;
+
+            // 썸네일 또는 리스트 아이템 찾기
+            const fileItem = e.target.closest('.fm-file-item') || e.target.closest('.fm-list-row:not(.fm-list-folder)');
+
+            if (fileItem && fileItem.dataset.index !== undefined) {
+                const currentIndex = parseInt(fileItem.dataset.index);
+                if (currentIndex !== fm.dragCurrentIndex) {
+                    fm.dragCurrentIndex = currentIndex;
+                    // 시작~현재 범위 하이라이트
+                    fmHighlightRange(fm.dragStartIndex, currentIndex);
+                }
+            }
+        }
+
+        // 드래그 선택 종료
+        function fmEndDragSelect(e) {
+            const fm = utilityState.fileManager;
+            if (!fm.dragSelecting) return;
+
+            // 범위 선택 적용
+            if (fm.dragStartIndex !== undefined && fm.dragCurrentIndex !== undefined) {
+                fmSelectRange(fm.dragStartIndex, fm.dragCurrentIndex);
+            }
+
+            // 정리
+            fm.dragSelecting = false;
+            fm.dragStartIndex = undefined;
+            fm.dragCurrentIndex = undefined;
+
+            // 드래그 하이라이트 제거 (그리드 & 리스트)
+            document.querySelectorAll('.fm-file-item.drag-highlight, .fm-list-row.drag-highlight').forEach(item => {
+                item.classList.remove('drag-highlight');
+            });
+        }
+
+        // 범위 하이라이트 (시작~끝 인덱스)
+        function fmHighlightRange(startIndex, endIndex) {
+            const fm = utilityState.fileManager;
+            const minIdx = Math.min(startIndex, endIndex);
+            const maxIdx = Math.max(startIndex, endIndex);
+
+            // 현재 뷰모드에 따라 아이템 선택
+            const container = fm.viewMode === 'thumbnail'
+                ? document.getElementById('fmFileGrid')
+                : document.getElementById('fmFileList');
+            const selector = fm.viewMode === 'thumbnail' ? '.fm-file-item' : '.fm-list-row:not(.fm-list-folder)';
+            const items = container.querySelectorAll(selector);
+
+            items.forEach(item => {
+                const idx = parseInt(item.dataset.index);
+                const inRange = idx >= minIdx && idx <= maxIdx;
+                item.classList.toggle('drag-highlight', inRange);
+            });
+        }
+
+        // 범위 선택 적용 (시작~끝 인덱스의 파일들 선택)
+        function fmSelectRange(startIndex, endIndex) {
+            const fm = utilityState.fileManager;
+            const minIdx = Math.min(startIndex, endIndex);
+            const maxIdx = Math.max(startIndex, endIndex);
+
+            for (let i = minIdx; i <= maxIdx; i++) {
+                const file = fm.files[i];
+                if (file) {
+                    const filePath = fm.currentFolder ? `${fm.currentFolder}/${file.filename}` : file.filename;
+                    fm.selectedFiles.add(filePath);
+                }
+            }
+
+            // 기존 anchor가 없을 때만 설정 (Shift+클릭 연계 유지)
+            if (fm.anchorIndex === -1) {
+                fm.anchorIndex = startIndex;
+            }
+            fm.lastSelectedIndex = endIndex;
+
+            fmUpdateUI();
+        }
+
+        // ---- 모달 헬퍼 함수들 ----
+
+        // 프롬프트 모달 (입력)
+        function fmPrompt(title, message, defaultValue = '') {
+            return new Promise(resolve => {
+                const overlay = document.createElement('div');
+                overlay.className = 'fm-modal-overlay';
+                overlay.innerHTML = `
+                    <div class="fm-modal">
+                        <div class="fm-modal-title">${title}</div>
+                        <div class="fm-modal-body">
+                            <p class="fm-modal-message">${message}</p>
+                            <input type="text" class="fm-modal-input" value="${defaultValue}">
+                        </div>
+                        <div class="fm-modal-buttons">
+                            <button class="btn btn-sm" id="fmModalCancel">취소</button>
+                            <button class="btn btn-sm btn-primary" id="fmModalConfirm">확인</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(overlay);
+
+                const input = overlay.querySelector('.fm-modal-input');
+                input.focus();
+                input.select();
+
+                const close = (value) => {
+                    document.body.removeChild(overlay);
+                    resolve(value);
+                };
+
+                overlay.querySelector('#fmModalCancel').onclick = () => close(null);
+                overlay.querySelector('#fmModalConfirm').onclick = () => close(input.value.trim());
+                input.onkeydown = (e) => {
+                    if (e.key === 'Enter') close(input.value.trim());
+                    if (e.key === 'Escape') close(null);
+                };
+                overlay.onclick = (e) => {
+                    if (e.target === overlay) close(null);
+                };
+            });
+        }
+
+        // 확인 모달
+        function fmConfirm(title, message) {
+            return new Promise(resolve => {
+                const overlay = document.createElement('div');
+                overlay.className = 'fm-modal-overlay';
+                overlay.innerHTML = `
+                    <div class="fm-modal">
+                        <div class="fm-modal-title">${title}</div>
+                        <div class="fm-modal-body">
+                            <p class="fm-modal-message">${message.replace(/\n/g, '<br>')}</p>
+                        </div>
+                        <div class="fm-modal-buttons">
+                            <button class="btn btn-sm" id="fmModalCancel">취소</button>
+                            <button class="btn btn-sm btn-danger" id="fmModalConfirm">확인</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(overlay);
+
+                const close = (value) => {
+                    document.body.removeChild(overlay);
+                    resolve(value);
+                };
+
+                overlay.querySelector('#fmModalCancel').onclick = () => close(false);
+                overlay.querySelector('#fmModalConfirm').onclick = () => close(true);
+                overlay.onclick = (e) => {
+                    if (e.target === overlay) close(false);
+                };
+            });
+        }
+
+        // 삭제 확인 모달 (파일 목록 표시)
+        function fmConfirmDelete(files) {
+            return new Promise(resolve => {
+                const overlay = document.createElement('div');
+                overlay.className = 'fm-modal-overlay';
+
+                let listHtml = '';
+                const displayFiles = files.slice(0, 10);
+                for (const f of displayFiles) {
+                    listHtml += `<div class="fm-delete-list-item">${f.split('/').pop()}</div>`;
+                }
+                if (files.length > 10) {
+                    listHtml += `<div class="fm-delete-list-item">... 외 ${files.length - 10}개</div>`;
+                }
+
+                overlay.innerHTML = `
+                    <div class="fm-modal">
+                        <div class="fm-modal-title">🗑️ 파일 삭제</div>
+                        <div class="fm-modal-body">
+                            <p class="fm-modal-message">다음 ${files.length}개 파일을 삭제하시겠습니까?</p>
+                            <div class="fm-delete-list">${listHtml}</div>
+                        </div>
+                        <div class="fm-modal-buttons">
+                            <button class="btn btn-sm" id="fmModalCancel">취소</button>
+                            <button class="btn btn-sm btn-danger" id="fmModalConfirm">삭제</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(overlay);
+
+                const close = (value) => {
+                    document.body.removeChild(overlay);
+                    resolve(value);
+                };
+
+                overlay.querySelector('#fmModalCancel').onclick = () => close(false);
+                overlay.querySelector('#fmModalConfirm').onclick = () => close(true);
+                overlay.onclick = (e) => {
+                    if (e.target === overlay) close(false);
+                };
+            });
+        }
+
+        // 선택 모달 (드롭다운)
+        function fmSelect(title, options) {
+            return new Promise(resolve => {
+                const overlay = document.createElement('div');
+                overlay.className = 'fm-modal-overlay';
+
+                let optionsHtml = '';
+                for (const opt of options) {
+                    optionsHtml += `<option value="${opt.value}">${opt.label}</option>`;
+                }
+
+                overlay.innerHTML = `
+                    <div class="fm-modal">
+                        <div class="fm-modal-title">${title}</div>
+                        <div class="fm-modal-body">
+                            <select class="fm-modal-select">${optionsHtml}</select>
+                        </div>
+                        <div class="fm-modal-buttons">
+                            <button class="btn btn-sm" id="fmModalCancel">취소</button>
+                            <button class="btn btn-sm btn-primary" id="fmModalConfirm">확인</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(overlay);
+
+                const select = overlay.querySelector('.fm-modal-select');
+
+                const close = (value) => {
+                    document.body.removeChild(overlay);
+                    resolve(value);
+                };
+
+                overlay.querySelector('#fmModalCancel').onclick = () => close(null);
+                overlay.querySelector('#fmModalConfirm').onclick = () => close(select.value);
+                overlay.onclick = (e) => {
+                    if (e.target === overlay) close(null);
+                };
             });
         }
 

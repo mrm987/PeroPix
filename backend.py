@@ -4241,16 +4241,25 @@ async def list_output_folders():
 
 @app.post("/api/output-folders")
 async def create_output_folder(req: dict):
-    """output 폴더 내에 새 하위 폴더 생성"""
+    """output 폴더 내에 새 하위 폴더 생성 (중첩 폴더 지원)"""
     folder_name = req.get("name", "").strip()
     if not folder_name:
         return {"success": False, "error": "폴더명이 필요합니다"}
 
-    # 안전한 폴더명 확인
-    if "/" in folder_name or "\\" in folder_name or ".." in folder_name:
+    # 안전한 폴더명 확인 (슬래시는 중첩 폴더용으로 허용)
+    if "\\" in folder_name or ".." in folder_name or folder_name.startswith("/"):
         return {"success": False, "error": "잘못된 폴더명입니다"}
 
     folder_path = OUTPUT_DIR / folder_name
+
+    # 경로 검증
+    try:
+        folder_path = folder_path.resolve()
+        if not str(folder_path).startswith(str(OUTPUT_DIR.resolve())):
+            return {"success": False, "error": "잘못된 경로입니다"}
+    except Exception:
+        return {"success": False, "error": "잘못된 경로입니다"}
+
     if folder_path.exists():
         return {"success": False, "error": "이미 존재하는 폴더입니다"}
 
@@ -4259,6 +4268,566 @@ async def create_output_folder(req: dict):
         return {"success": True, "name": folder_name}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+@app.delete("/api/output-folders/{folder_path:path}")
+async def delete_output_folder(folder_path: str):
+    """output 폴더 내 하위 폴더 삭제 (빈 폴더만)"""
+    # 경로 검증
+    if ".." in folder_path or folder_path.startswith("/") or folder_path.startswith("\\"):
+        return {"success": False, "error": "잘못된 폴더명입니다"}
+
+    target_path = OUTPUT_DIR / folder_path
+    try:
+        target_path = target_path.resolve()
+        if not str(target_path).startswith(str(OUTPUT_DIR.resolve())):
+            return {"success": False, "error": "잘못된 경로입니다"}
+    except Exception:
+        return {"success": False, "error": "잘못된 경로입니다"}
+
+    if not target_path.exists():
+        return {"success": False, "error": "폴더를 찾을 수 없습니다"}
+
+    if not target_path.is_dir():
+        return {"success": False, "error": "폴더가 아닙니다"}
+
+    # outputs 루트 폴더 자체는 삭제 불가
+    if target_path.resolve() == OUTPUT_DIR.resolve():
+        return {"success": False, "error": "루트 폴더는 삭제할 수 없습니다"}
+
+    # 비어있는지 확인
+    if any(target_path.iterdir()):
+        return {"success": False, "error": "폴더가 비어있지 않습니다"}
+
+    try:
+        target_path.rmdir()
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/output-folders/{folder_path:path}/move")
+async def move_output_folder(folder_path: str, req: dict):
+    """output 폴더를 다른 폴더로 이동"""
+    import shutil
+    to_folder = req.get("to_folder", "")
+
+    # 경로 검증
+    if ".." in folder_path or folder_path.startswith("/") or folder_path.startswith("\\"):
+        return {"success": False, "error": "잘못된 경로입니다"}
+    if to_folder and (".." in to_folder or to_folder.startswith("/") or to_folder.startswith("\\")):
+        return {"success": False, "error": "잘못된 대상 경로입니다"}
+
+    src_path = OUTPUT_DIR / folder_path
+    try:
+        src_path = src_path.resolve()
+        if not str(src_path).startswith(str(OUTPUT_DIR.resolve())):
+            return {"success": False, "error": "잘못된 경로입니다"}
+    except Exception:
+        return {"success": False, "error": "잘못된 경로입니다"}
+
+    if not src_path.exists() or not src_path.is_dir():
+        return {"success": False, "error": "폴더를 찾을 수 없습니다"}
+
+    # outputs 루트 폴더 자체는 이동 불가
+    if src_path.resolve() == OUTPUT_DIR.resolve():
+        return {"success": False, "error": "루트 폴더는 이동할 수 없습니다"}
+
+    # 대상 폴더 결정
+    if to_folder:
+        dst_parent = OUTPUT_DIR / to_folder
+    else:
+        dst_parent = OUTPUT_DIR
+
+    try:
+        dst_parent = dst_parent.resolve()
+        if not str(dst_parent).startswith(str(OUTPUT_DIR.resolve())):
+            return {"success": False, "error": "잘못된 대상 경로입니다"}
+    except Exception:
+        return {"success": False, "error": "잘못된 대상 경로입니다"}
+
+    # 대상 폴더가 없으면 생성
+    dst_parent.mkdir(parents=True, exist_ok=True)
+
+    # 자기 자신 안으로 이동 방지
+    if str(dst_parent.resolve()).startswith(str(src_path.resolve())):
+        return {"success": False, "error": "자기 자신의 하위 폴더로 이동할 수 없습니다"}
+
+    folder_name = src_path.name
+    dst_path = dst_parent / folder_name
+
+    # 이름 충돌 처리
+    if dst_path.exists():
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        new_name = f"{folder_name}_{timestamp}"
+        dst_path = dst_parent / new_name
+    else:
+        new_name = folder_name
+
+    try:
+        shutil.move(str(src_path), str(dst_path))
+        return {"success": True, "new_name": new_name}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/output-folders/move")
+async def move_output_folder_new(req: dict):
+    """output 폴더를 다른 폴더로 이동 (새 API)"""
+    import shutil
+    folder_path = req.get("folder", "")
+    to_folder = req.get("to_folder", "")
+
+    # 경로 검증
+    if not folder_path:
+        return {"success": False, "error": "폴더 경로가 필요합니다"}
+    if ".." in folder_path or folder_path.startswith("/") or folder_path.startswith("\\"):
+        return {"success": False, "error": "잘못된 경로입니다"}
+    if to_folder and (".." in to_folder or to_folder.startswith("/") or to_folder.startswith("\\")):
+        return {"success": False, "error": "잘못된 대상 경로입니다"}
+
+    src_path = OUTPUT_DIR / folder_path
+    try:
+        src_path = src_path.resolve()
+        if not str(src_path).startswith(str(OUTPUT_DIR.resolve())):
+            return {"success": False, "error": "잘못된 경로입니다"}
+    except Exception:
+        return {"success": False, "error": "잘못된 경로입니다"}
+
+    if not src_path.exists() or not src_path.is_dir():
+        return {"success": False, "error": "폴더를 찾을 수 없습니다"}
+
+    # outputs 루트 폴더 자체는 이동 불가
+    if src_path.resolve() == OUTPUT_DIR.resolve():
+        return {"success": False, "error": "루트 폴더는 이동할 수 없습니다"}
+
+    # 대상 폴더 결정
+    if to_folder:
+        dst_parent = OUTPUT_DIR / to_folder
+    else:
+        dst_parent = OUTPUT_DIR
+
+    try:
+        dst_parent = dst_parent.resolve()
+        if not str(dst_parent).startswith(str(OUTPUT_DIR.resolve())):
+            return {"success": False, "error": "잘못된 대상 경로입니다"}
+    except Exception:
+        return {"success": False, "error": "잘못된 대상 경로입니다"}
+
+    # 대상 폴더가 없으면 생성
+    dst_parent.mkdir(parents=True, exist_ok=True)
+
+    # 자기 자신 안으로 이동 방지
+    if str(dst_parent.resolve()).startswith(str(src_path.resolve())):
+        return {"success": False, "error": "자기 자신의 하위 폴더로 이동할 수 없습니다"}
+
+    folder_name = src_path.name
+    dst_path = dst_parent / folder_name
+
+    # 이름 충돌 처리
+    if dst_path.exists():
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        new_name = f"{folder_name}_{timestamp}"
+        dst_path = dst_parent / new_name
+    else:
+        new_name = folder_name
+
+    try:
+        shutil.move(str(src_path), str(dst_path))
+        return {"success": True, "new_name": new_name}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# === Output File Management API ===
+
+# 메모리 썸네일 캐시 (파일경로 -> {mtime, thumbnail, filename, size})
+_output_thumb_cache = {}
+
+def get_output_folder_path(folder: str = "") -> Path:
+    """output 폴더 경로 반환 (보안 검증 포함)"""
+    if not folder:
+        return OUTPUT_DIR
+    # 경로 조작 방지
+    if ".." in folder or folder.startswith("/") or folder.startswith("\\"):
+        raise ValueError("잘못된 폴더명입니다")
+    result = OUTPUT_DIR / folder
+    # resolve로 실제 경로 확인
+    try:
+        result = result.resolve()
+        if not str(result).startswith(str(OUTPUT_DIR.resolve())):
+            raise ValueError("잘못된 경로입니다")
+    except Exception:
+        raise ValueError("잘못된 경로입니다")
+    return result
+
+
+def process_output_image(filepath: Path):
+    """단일 출력 이미지 처리 (메모리 캐시 사용)"""
+    global _output_thumb_cache
+    try:
+        file_mtime = filepath.stat().st_mtime
+        file_size = filepath.stat().st_size
+        cache_key = str(filepath)
+
+        # 메모리 캐시 확인
+        if cache_key in _output_thumb_cache:
+            cached = _output_thumb_cache[cache_key]
+            if cached.get('mtime') == file_mtime:
+                return {
+                    "filename": filepath.name,
+                    "thumbnail": cached.get("thumbnail", ""),
+                    "size": cached.get("size", file_size),
+                    "modified": file_mtime
+                }
+
+        # 캐시 없음/만료 - 새로 생성
+        with open(filepath, 'rb') as f:
+            image_bytes = f.read()
+
+        # 썸네일 생성 (150px)
+        image = Image.open(io.BytesIO(image_bytes))
+        thumb = image.copy()
+        thumb.thumbnail((150, 150), Image.LANCZOS)
+        buffer = io.BytesIO()
+        # JPEG로 저장
+        if thumb.mode in ('RGBA', 'P'):
+            thumb = thumb.convert('RGB')
+        thumb.save(buffer, format="JPEG", quality=80)
+        thumb_base64 = base64.b64encode(buffer.getvalue()).decode()
+
+        # 메모리 캐시 저장
+        _output_thumb_cache[cache_key] = {
+            "mtime": file_mtime,
+            "thumbnail": thumb_base64,
+            "size": file_size
+        }
+
+        return {
+            "filename": filepath.name,
+            "thumbnail": thumb_base64,
+            "size": file_size,
+            "modified": file_mtime
+        }
+    except Exception as e:
+        print(f"[OutputList] Error loading {filepath}: {e}")
+        # 썸네일 실패해도 파일 정보는 반환
+        try:
+            stat = filepath.stat()
+            return {
+                "filename": filepath.name,
+                "thumbnail": "",
+                "size": stat.st_size,
+                "modified": stat.st_mtime
+            }
+        except Exception:
+            return None
+
+
+@app.get("/api/outputs-list")
+async def list_outputs_detailed(folder: str = "", page: int = 1, limit: int = 50):
+    """출력 이미지 목록 (페이지네이션, 썸네일 포함) - 캐싱 + 병렬 처리"""
+    import math
+    import concurrent.futures
+
+    try:
+        target_dir = get_output_folder_path(folder)
+    except ValueError as e:
+        return {"success": False, "error": str(e)}
+
+    if not target_dir.exists():
+        return {"success": True, "files": [], "folder": folder, "total": 0, "page": 1, "pages": 1}
+
+    # 이미지 파일만 필터링
+    image_extensions = ['.png', '.jpg', '.jpeg', '.webp']
+    all_files = []
+    for f in target_dir.iterdir():
+        if f.is_file() and f.suffix.lower() in image_extensions:
+            all_files.append(f)
+
+    # 수정 시간 기준 내림차순 정렬
+    all_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+
+    # 페이지네이션
+    total = len(all_files)
+    pages = max(1, math.ceil(total / limit))
+    start = (page - 1) * limit
+    end = start + limit
+    page_files = all_files[start:end]
+
+    # 병렬 처리 (최대 8 스레드)
+    files = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        results = executor.map(process_output_image, page_files)
+        files = [r for r in results if r is not None]
+
+    return {
+        "success": True,
+        "files": files,
+        "folder": folder,
+        "total": total,
+        "page": page,
+        "pages": pages
+    }
+
+
+@app.get("/api/output-folders-tree")
+async def list_output_folders_tree():
+    """재귀적으로 모든 하위 폴더 트리 반환"""
+    image_extensions = ['.png', '.jpg', '.jpeg', '.webp']
+
+    def count_images(path: Path) -> int:
+        """폴더 내 이미지 파일 수 카운트 (하위 폴더 제외)"""
+        count = 0
+        try:
+            for f in path.iterdir():
+                if f.is_file() and f.suffix.lower() in image_extensions:
+                    count += 1
+        except Exception:
+            pass
+        return count
+
+    def scan_dir(path: Path, prefix: str = "") -> list:
+        """재귀적으로 폴더 스캔"""
+        folders = []
+        try:
+            for item in sorted(path.iterdir()):
+                if item.is_dir() and not item.name.startswith('.'):
+                    rel_path = f"{prefix}/{item.name}" if prefix else item.name
+                    folders.append({
+                        "name": item.name,
+                        "path": rel_path,
+                        "image_count": count_images(item),
+                        "children": scan_dir(item, rel_path)
+                    })
+        except Exception:
+            pass
+        return folders
+
+    # 루트 이미지 수
+    root_count = count_images(OUTPUT_DIR)
+
+    return {
+        "success": True,
+        "root_count": root_count,
+        "tree": scan_dir(OUTPUT_DIR)
+    }
+
+
+@app.patch("/api/outputs/{filepath:path}")
+async def rename_output_file(filepath: str, request: Request):
+    """출력 이미지 파일 이름 변경"""
+    data = await request.json()
+    new_name = data.get("new_name", "").strip()
+
+    if not new_name:
+        return {"success": False, "error": "새 파일명이 필요합니다"}
+
+    # 안전한 파일명인지 확인
+    if "/" in new_name or "\\" in new_name or ".." in new_name:
+        return {"success": False, "error": "잘못된 파일명입니다"}
+
+    # 확장자 처리
+    image_extensions = ['.png', '.jpg', '.jpeg', '.webp']
+    has_valid_ext = any(new_name.lower().endswith(ext) for ext in image_extensions)
+    if not has_valid_ext:
+        # 원본 파일의 확장자 사용
+        old_ext = Path(filepath).suffix
+        new_name += old_ext if old_ext else ".png"
+
+    # 경로 검증
+    file_path = OUTPUT_DIR / filepath
+    try:
+        file_path = file_path.resolve()
+        if not str(file_path).startswith(str(OUTPUT_DIR.resolve())):
+            return {"success": False, "error": "잘못된 경로입니다"}
+    except Exception:
+        return {"success": False, "error": "잘못된 경로입니다"}
+
+    if not file_path.exists() or not file_path.is_file():
+        return {"success": False, "error": "파일을 찾을 수 없습니다"}
+
+    # 새 경로 (같은 폴더 내)
+    new_path = file_path.parent / new_name
+
+    if new_path.exists() and file_path != new_path:
+        return {"success": False, "error": "같은 이름의 파일이 이미 존재합니다"}
+
+    try:
+        file_path.rename(new_path)
+        return {"success": True, "new_filename": new_name}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/outputs/{filepath:path}/move")
+async def move_output_file(filepath: str, req: dict):
+    """출력 이미지를 다른 폴더로 이동"""
+    import shutil
+    to_folder = req.get("to_folder", "")
+
+    # 경로 검증
+    file_path = OUTPUT_DIR / filepath
+    try:
+        file_path = file_path.resolve()
+        if not str(file_path).startswith(str(OUTPUT_DIR.resolve())):
+            return {"success": False, "error": "잘못된 경로입니다"}
+    except Exception:
+        return {"success": False, "error": "잘못된 경로입니다"}
+
+    if not file_path.exists() or not file_path.is_file():
+        return {"success": False, "error": "파일을 찾을 수 없습니다"}
+
+    try:
+        to_path = get_output_folder_path(to_folder)
+    except ValueError as e:
+        return {"success": False, "error": str(e)}
+
+    # 대상 폴더가 없으면 생성
+    to_path.mkdir(parents=True, exist_ok=True)
+
+    filename = file_path.name
+    dst_file = to_path / filename
+
+    # 이름 충돌 처리
+    if dst_file.exists():
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        base_name = Path(filename).stem
+        ext = Path(filename).suffix
+        new_filename = f"{base_name}_{timestamp}{ext}"
+        dst_file = to_path / new_filename
+    else:
+        new_filename = filename
+
+    try:
+        shutil.move(str(file_path), str(dst_file))
+
+        # 재연결 동기화 목록에서도 업데이트
+        gen_queue.recent_images = [
+            img for img in gen_queue.recent_images
+            if img.get("image_path") != filepath
+        ]
+
+        return {"success": True, "new_filename": new_filename}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/outputs/batch-delete")
+async def batch_delete_outputs(req: dict):
+    """여러 출력 이미지 일괄 삭제"""
+    files = req.get("files", [])
+
+    if not files:
+        return {"success": False, "error": "삭제할 파일이 없습니다"}
+
+    deleted = []
+    failed = []
+
+    for filepath in files:
+        file_path = OUTPUT_DIR / filepath
+        try:
+            file_path = file_path.resolve()
+            if not str(file_path).startswith(str(OUTPUT_DIR.resolve())):
+                failed.append({"file": filepath, "error": "잘못된 경로"})
+                continue
+        except Exception:
+            failed.append({"file": filepath, "error": "잘못된 경로"})
+            continue
+
+        if not file_path.exists() or not file_path.is_file():
+            failed.append({"file": filepath, "error": "파일 없음"})
+            continue
+
+        try:
+            file_path.unlink()
+            deleted.append(filepath)
+
+            # 재연결 동기화 목록에서도 삭제
+            gen_queue.recent_images = [
+                img for img in gen_queue.recent_images
+                if img.get("image_path") != filepath
+            ]
+        except Exception as e:
+            failed.append({"file": filepath, "error": str(e)})
+
+    return {
+        "success": True,
+        "deleted": len(deleted),
+        "failed": len(failed),
+        "deleted_files": deleted,
+        "failed_files": failed
+    }
+
+
+@app.post("/api/outputs/batch-move")
+async def batch_move_outputs(req: dict):
+    """여러 출력 이미지 일괄 이동"""
+    import shutil
+    files = req.get("files", [])
+    to_folder = req.get("to_folder", "")
+
+    if not files:
+        return {"success": False, "error": "이동할 파일이 없습니다"}
+
+    try:
+        to_path = get_output_folder_path(to_folder)
+    except ValueError as e:
+        return {"success": False, "error": str(e)}
+
+    # 대상 폴더가 없으면 생성
+    to_path.mkdir(parents=True, exist_ok=True)
+
+    moved = []
+    failed = []
+
+    for filepath in files:
+        file_path = OUTPUT_DIR / filepath
+        try:
+            file_path = file_path.resolve()
+            if not str(file_path).startswith(str(OUTPUT_DIR.resolve())):
+                failed.append({"file": filepath, "error": "잘못된 경로"})
+                continue
+        except Exception:
+            failed.append({"file": filepath, "error": "잘못된 경로"})
+            continue
+
+        if not file_path.exists() or not file_path.is_file():
+            failed.append({"file": filepath, "error": "파일 없음"})
+            continue
+
+        filename = file_path.name
+        dst_file = to_path / filename
+
+        # 이름 충돌 처리
+        if dst_file.exists():
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            base_name = Path(filename).stem
+            ext = Path(filename).suffix
+            new_filename = f"{base_name}_{timestamp}{ext}"
+            dst_file = to_path / new_filename
+        else:
+            new_filename = filename
+
+        try:
+            shutil.move(str(file_path), str(dst_file))
+            moved.append({"original": filepath, "new_filename": new_filename})
+
+            # 재연결 동기화 목록에서도 제거
+            gen_queue.recent_images = [
+                img for img in gen_queue.recent_images
+                if img.get("image_path") != filepath
+            ]
+        except Exception as e:
+            failed.append({"file": filepath, "error": str(e)})
+
+    return {
+        "success": True,
+        "moved": len(moved),
+        "failed": len(failed),
+        "moved_files": moved,
+        "failed_files": failed
+    }
 
 
 # === Save Preview Image API ===

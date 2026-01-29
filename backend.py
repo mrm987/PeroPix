@@ -4545,8 +4545,8 @@ async def list_outputs_detailed(folder: str = "", page: int = 1, limit: int = 50
         if f.is_file() and f.suffix.lower() in image_extensions:
             all_files.append(f)
 
-    # 수정 시간 기준 내림차순 정렬
-    all_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+    # 파일명 기준 오름차순 정렬 (A→Z, 1→9)
+    all_files.sort(key=lambda x: x.name.lower())
 
     # 페이지네이션
     total = len(all_files)

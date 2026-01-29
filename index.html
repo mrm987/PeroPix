@@ -4813,14 +4813,25 @@
             padding-bottom: 8px;
             border-bottom: 1px solid var(--border);
             margin-bottom: 8px;
-            flex-wrap: wrap;
             gap: 6px;
         }
-        .fm-toolbar-left,
+        .fm-toolbar-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            min-width: 0;
+        }
         .fm-toolbar-right {
             display: flex;
             align-items: center;
             gap: 8px;
+        }
+        .fm-toolbar-divider {
+            width: 1px;
+            height: 20px;
+            background: var(--border);
+            flex-shrink: 0;
         }
         .fm-toolbar-left .btn,
         .fm-toolbar-right .btn {
@@ -4836,6 +4847,18 @@
             color: var(--text-dim);
             margin-left: 8px;
             white-space: nowrap;
+        }
+        .file-manager-content-wrapper {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            position: relative;
+        }
+        .file-manager-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
         .file-manager-grid {
             flex: 1;
@@ -5046,6 +5069,319 @@
             max-width: 400px;
             max-height: 400px;
             object-fit: contain;
+        }
+
+        /* File Manager Convert Panel */
+        .file-manager-main {
+            position: relative;
+        }
+        .fm-convert-toggle-wrapper {
+            position: relative;
+            flex-shrink: 0;
+            display: flex;
+            align-self: stretch;
+        }
+        .fm-convert-toggle {
+            align-self: center;
+            width: auto;
+            padding: 8px 6px;
+            background: var(--accent);
+            border: none;
+            border-radius: var(--radius-md) 0 0 var(--radius-md);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 500;
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            transition: background 0.15s;
+            box-shadow: var(--shadow-md);
+        }
+        .fm-convert-toggle:hover {
+            background: var(--accent-hover);
+        }
+        .fm-convert-toggle .toggle-text {
+            white-space: nowrap;
+        }
+        .fm-convert-panel {
+            flex-shrink: 0;
+            width: 0;
+            overflow: hidden;
+            background: var(--bg-light);
+            border-left: 2px solid var(--accent);
+            display: flex;
+            flex-direction: column;
+            transition: width 0.2s ease;
+            box-shadow: -4px 0 12px rgba(0, 0, 0, 0.15);
+        }
+        .file-manager-content-wrapper.panel-open .fm-convert-panel {
+            width: 280px;
+        }
+        .fm-convert-panel > * {
+            min-width: 280px;
+        }
+        .fm-convert-panel-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            flex-shrink: 0;
+            background: var(--bg);
+        }
+        .fm-convert-panel-close {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: var(--text-dim);
+            padding: 0;
+            line-height: 1;
+        }
+        .fm-convert-panel-close:hover {
+            color: var(--text);
+        }
+        .fm-convert-dropzone {
+            flex: 1;
+            margin: 8px;
+            padding: 16px;
+            border: 2px dashed var(--border);
+            border-radius: var(--radius-md);
+            text-align: center;
+            color: var(--text-dim);
+            transition: border-color 0.15s, background 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .fm-convert-dropzone.drag-over {
+            border-color: var(--accent);
+            background: rgba(99, 102, 241, 0.1);
+        }
+        .fm-convert-dropzone p {
+            margin: 0;
+            font-size: 0.85rem;
+        }
+        .fm-convert-file-list {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .fm-convert-file-header {
+            padding: 6px 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+            background: var(--bg);
+        }
+        .fm-convert-file-header .btn {
+            width: auto;
+            padding: 2px 8px;
+            font-size: 0.7rem;
+            font-weight: 500;
+        }
+        .fm-convert-file-items {
+            flex: 1;
+            overflow-y: auto;
+            padding: 4px 6px;
+        }
+        .fm-convert-file-item {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 6px;
+            background: var(--bg);
+            border-radius: var(--radius-sm);
+            margin-bottom: 4px;
+            cursor: grab;
+            border: 1px solid var(--border);
+        }
+        .fm-convert-file-item:active {
+            cursor: grabbing;
+        }
+        .fm-convert-file-item.dragging > * {
+            opacity: 0.5;
+        }
+        .fm-convert-file-item.drop-indicator::after {
+            content: '';
+            position: absolute;
+            bottom: -3px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--accent);
+            border-radius: 1px;
+            box-shadow: 0 0 6px var(--accent), 0 0 12px var(--accent);
+            z-index: 10;
+            opacity: 1 !important;
+        }
+        .fm-convert-file-item.drop-indicator-top::before {
+            content: '';
+            position: absolute;
+            top: -3px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--accent);
+            border-radius: 1px;
+            box-shadow: 0 0 6px var(--accent), 0 0 12px var(--accent);
+            z-index: 10;
+            opacity: 1 !important;
+        }
+        .fm-convert-file-item-thumb {
+            width: 24px;
+            height: 24px;
+            object-fit: cover;
+            border-radius: var(--radius-sm);
+            flex-shrink: 0;
+        }
+        .fm-convert-file-item-name {
+            flex: 1;
+            font-size: 0.75rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .fm-convert-file-item-remove {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-dim);
+            padding: 1px 3px;
+            font-size: 12px;
+            line-height: 1;
+            border-radius: var(--radius-sm);
+        }
+        .fm-convert-file-item-remove:hover {
+            background: var(--bg-hover);
+            color: var(--danger);
+        }
+        .fm-convert-settings {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background: var(--bg);
+            border-top: 1px solid var(--border);
+        }
+        .fm-convert-setting-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .fm-convert-setting-group > label {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+        }
+        .fm-convert-format-btns {
+            display: flex;
+            gap: 4px;
+        }
+        .fm-convert-format-btns .format-btn {
+            flex: 1;
+            padding: 6px 8px;
+            border: 1px solid var(--border);
+            background: var(--bg-light);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 0.85rem;
+            color: var(--text);
+            transition: all 0.15s;
+        }
+        .fm-convert-format-btns .format-btn:hover {
+            background: var(--bg-hover);
+        }
+        .fm-convert-format-btns .format-btn.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+        .fm-convert-quality-group input[type="range"] {
+            width: 100%;
+        }
+        .fm-convert-panel .checkbox-row {
+            margin-bottom: 0;
+        }
+        .fm-convert-rename-options {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 6px 8px;
+            background: var(--bg-light);
+            border-radius: var(--radius-sm);
+            margin-top: 4px;
+        }
+        .fm-convert-rename-options .rename-option-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .fm-convert-rename-options .rename-option-row label {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            width: 50px;
+            flex-shrink: 0;
+        }
+        .fm-convert-rename-options input[type="text"],
+        .fm-convert-rename-options input[type="number"] {
+            flex: 1;
+            padding: 4px 6px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            background: var(--bg);
+            font-size: 0.8rem;
+            color: var(--text);
+            max-width: 80px;
+        }
+        .fm-convert-panel .rename-preview {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            padding: 2px 0;
+        }
+        .fm-convert-actions {
+            padding: 12px;
+            border-top: 1px solid var(--border);
+            flex-shrink: 0;
+            background: var(--bg);
+        }
+        .fm-convert-actions .btn {
+            width: 100%;
+        }
+        .fm-convert-progress {
+            padding: 12px;
+            border-top: 1px solid var(--border);
+            flex-shrink: 0;
+            background: var(--bg);
+        }
+        .fm-convert-progress .progress-bar {
+            height: 6px;
+            background: var(--bg-light);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 6px;
+        }
+        .fm-convert-progress .progress-fill {
+            height: 100%;
+            background: var(--accent);
+            transition: width 0.2s;
+        }
+        .fm-convert-progress .progress-text {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            text-align: center;
+            display: block;
         }
 
         /* File Manager Modals */
@@ -6932,28 +7268,125 @@
                                         <button type="button" class="btn btn-sm" id="fmPipModeBtn" title="PIP 모드 (호버 시 확대)">⧉</button>
                                         <button type="button" class="btn btn-sm" id="fmOpenFolderBtn" title="탐색기에서 열기">📂</button>
                                     </div>
-                                    <button type="button" class="btn btn-sm" id="fmSelectAllBtn">전체 선택</button>
-                                    <button type="button" class="btn btn-sm" id="fmDeselectBtn">선택 해제</button>
                                     <span class="fm-selected-count" id="fmSelectedCount">0개 선택됨</span>
                                 </div>
-                                <div class="fm-toolbar-right fm-actions" id="fmActions" style="display: none;">
-                                    <button type="button" class="btn btn-sm btn-danger" id="fmDeleteBtn">🗑️ 삭제</button>
-                                    <button type="button" class="btn btn-sm" id="fmRenameBtn" style="white-space: nowrap;">✏️ 이름변경</button>
-                                    <button type="button" class="btn btn-sm" id="fmConvertBtn">🔄 변환</button>
+                                <div class="fm-toolbar-right fm-actions" id="fmActions">
+                                    <button type="button" class="btn btn-sm btn-danger fm-action-dynamic" id="fmDeleteBtn" style="display: none;">🗑️ 삭제</button>
+                                    <button type="button" class="btn btn-sm fm-action-dynamic" id="fmRenameBtn" style="display: none; white-space: nowrap;">✏️ 이름변경</button>
+                                    <button type="button" class="btn btn-sm fm-action-dynamic" id="fmConvertBtn" style="display: none; white-space: nowrap;">🔄 변환 추가</button>
+                                    <span class="fm-toolbar-divider"></span>
+                                    <button type="button" class="btn btn-sm" id="fmSelectAllBtn" style="white-space: nowrap;">전체 선택</button>
+                                    <button type="button" class="btn btn-sm" id="fmDeselectBtn" style="white-space: nowrap;">선택 해제</button>
                                 </div>
                             </div>
 
-                            <div class="file-manager-grid" id="fmFileGrid">
-                                <!-- 동적으로 채워짐 (썸네일 뷰) -->
-                            </div>
+                            <div class="file-manager-content-wrapper">
+                                <div class="file-manager-content">
+                                    <div class="file-manager-grid" id="fmFileGrid">
+                                        <!-- 동적으로 채워짐 (썸네일 뷰) -->
+                                    </div>
 
-                            <div class="file-manager-list" id="fmFileList" style="display: none;">
-                                <!-- 동적으로 채워짐 (리스트 뷰) -->
-                            </div>
+                                    <div class="file-manager-list" id="fmFileList" style="display: none;">
+                                        <!-- 동적으로 채워짐 (리스트 뷰) -->
+                                    </div>
 
-                            <div class="file-manager-empty" id="fmEmpty" style="display: none;">
-                                <div class="fm-empty-icon">📂</div>
-                                <p>폴더가 비어있습니다</p>
+                                    <div class="file-manager-empty" id="fmEmpty" style="display: none;">
+                                        <div class="fm-empty-icon">📂</div>
+                                        <p>폴더가 비어있습니다</p>
+                                    </div>
+                                </div>
+
+                                <!-- 변환 패널 토글 + 패널 wrapper -->
+                                <div class="fm-convert-toggle-wrapper">
+                                    <button type="button" class="fm-convert-toggle" id="fmConvertToggle" title="이미지 변환 패널">
+                                        <span class="toggle-text">🔄 변환</span>
+                                    </button>
+
+                                    <!-- 변환 사이드 패널 -->
+                                    <div class="fm-convert-panel" id="fmConvertPanel">
+                                    <div class="fm-convert-panel-header">
+                                        <span>🔄 이미지 변환</span>
+                                        <button type="button" class="fm-convert-panel-close" id="fmConvertPanelClose">&times;</button>
+                                    </div>
+
+                                    <!-- 드롭존 / 파일 목록 -->
+                                    <div class="fm-convert-dropzone" id="fmConvertDropzone">
+                                        <div class="dropzone-content">
+                                            <p>이미지를 여기에<br>드래그하세요</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="fm-convert-file-list" id="fmConvertFileList" style="display: none;">
+                                        <div class="fm-convert-file-header">
+                                            <span id="fmConvertFileCount">0개 파일</span>
+                                            <button type="button" class="btn btn-xs" id="fmConvertClearBtn">초기화</button>
+                                        </div>
+                                        <div class="fm-convert-file-items" id="fmConvertFileItems">
+                                            <!-- 동적으로 채워짐 -->
+                                        </div>
+                                    </div>
+
+                                    <!-- 설정 영역 -->
+                                    <div class="fm-convert-settings">
+                                        <div class="fm-convert-setting-group">
+                                            <label>출력 형식</label>
+                                            <div class="fm-convert-format-btns">
+                                                <button type="button" class="format-btn active" data-format="png">PNG</button>
+                                                <button type="button" class="format-btn" data-format="jpg">JPG</button>
+                                                <button type="button" class="format-btn" data-format="webp">WebP</button>
+                                            </div>
+                                        </div>
+
+                                        <div class="fm-convert-setting-group fm-convert-quality-group" id="fmConvertQualityGroup" style="display: none;">
+                                            <label>품질: <span id="fmConvertQualityValue">95</span>%</label>
+                                            <input type="range" id="fmConvertQuality" min="1" max="100" value="95">
+                                        </div>
+
+                                        <div class="checkbox-row">
+                                            <input type="checkbox" id="fmConvertRenameEnabled">
+                                            <label for="fmConvertRenameEnabled">파일명 일괄 변경</label>
+                                        </div>
+                                        <div class="fm-convert-rename-options" id="fmConvertRenameOptions" style="display: none;">
+                                            <div class="rename-option-row">
+                                                <label>접두어</label>
+                                                <input type="text" id="fmConvertRenamePrefix" placeholder="예: img">
+                                            </div>
+                                            <div class="rename-option-row">
+                                                <label>시작번호</label>
+                                                <input type="number" id="fmConvertRenameStart" value="1" min="0">
+                                            </div>
+                                            <div class="rename-option-row">
+                                                <label>자릿수</label>
+                                                <input type="number" id="fmConvertRenamePadding" value="1" min="1" max="6">
+                                            </div>
+                                            <div class="rename-preview" id="fmConvertRenamePreview">미리보기: -</div>
+                                        </div>
+
+                                        <div class="checkbox-row">
+                                            <input type="checkbox" id="fmConvertStripMetadata">
+                                            <label for="fmConvertStripMetadata">메타데이터 제거</label>
+                                        </div>
+
+                                        <div class="checkbox-row">
+                                            <input type="checkbox" id="fmConvertOpenFolder" checked>
+                                            <label for="fmConvertOpenFolder">완료 후 폴더 열기</label>
+                                        </div>
+                                    </div>
+
+                                    <!-- 변환 버튼 -->
+                                    <div class="fm-convert-actions">
+                                        <button type="button" class="btn btn-primary" id="fmConvertRunBtn" disabled>변환 시작</button>
+                                    </div>
+
+                                    <!-- 진행 표시 -->
+                                    <div class="fm-convert-progress" id="fmConvertProgress" style="display: none;">
+                                        <div class="progress-bar">
+                                            <div class="progress-fill" id="fmConvertProgressFill"></div>
+                                        </div>
+                                        <span class="progress-text" id="fmConvertProgressText">0 / 0</span>
+                                    </div>
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="file-manager-loading" id="fmLoading" style="display: none;">
@@ -17564,7 +17997,21 @@
                 pipMode: false,           // PIP 모드 활성화
                 dragSelecting: false,     // 드래그 선택 중
                 dragStartIndex: undefined,  // 드래그 시작 인덱스
-                dragCurrentIndex: undefined // 현재 드래그 위치 인덱스
+                dragCurrentIndex: undefined, // 현재 드래그 위치 인덱스
+                // 변환 패널 상태
+                convertPanel: {
+                    open: false,
+                    files: [],            // [{path, filename, url}]
+                    format: 'png',
+                    quality: 95,
+                    renameEnabled: false,
+                    renamePrefix: '',
+                    renameStart: 1,
+                    renamePadding: 1,
+                    stripMetadata: false,
+                    openFolder: true,
+                    isConverting: false
+                }
             }
         };
 
@@ -18579,6 +19026,21 @@
             document.addEventListener('mousemove', fmDoDragSelect);
             document.addEventListener('mouseup', fmEndDragSelect);
 
+            // 빈 공간 클릭 시 선택 해제 (그리드/리스트)
+            grid.addEventListener('click', fmHandleEmptyClick);
+            list.addEventListener('click', fmHandleEmptyClick);
+
+            // 폴더 트리 빈 공간 클릭 시 선택 해제
+            const folderTree = document.getElementById('fileManagerFolderTree');
+            if (folderTree) {
+                folderTree.addEventListener('click', (e) => {
+                    // 폴더 아이템이 아닌 빈 공간 클릭 시
+                    if (e.target === folderTree || e.target.classList.contains('folder-tree')) {
+                        fmDeselectAll();
+                    }
+                });
+            }
+
             // 저장된 설정 복원
             if (window._pendingFileManagerViewMode) {
                 fm.viewMode = window._pendingFileManagerViewMode;
@@ -18594,6 +19056,9 @@
                 btn.style.borderColor = '#f59e0b';
                 delete window._pendingFileManagerPipMode;
             }
+
+            // 변환 패널 초기화
+            fmInitConvertPanel();
 
             // 초기 데이터 로드
             fmLoadFolders();
@@ -19235,6 +19700,8 @@
         // 파일 드래그 시작
         function fmFileDragStart(e, filePath) {
             const fm = utilityState.fileManager;
+            // 드래그 시작 시 PIP 숨기기
+            fmHidePipPreview();
             // 선택된 파일이 없거나 드래그 중인 파일이 선택되지 않은 경우
             if (!fm.selectedFiles.has(filePath)) {
                 fm.selectedFiles.clear();
@@ -19457,12 +19924,25 @@
             fmUpdateUI();
         }
 
+        // 빈 공간 클릭 시 선택 해제
+        function fmHandleEmptyClick(e) {
+            // 파일 아이템이나 하위폴더가 아닌 빈 공간 클릭 시에만 선택 해제
+            const clickedItem = e.target.closest('.fm-file-item, .fm-list-item, .fm-subfolder-item');
+            if (!clickedItem) {
+                fmDeselectAll();
+            }
+        }
+
         // 툴바 업데이트
         function fmUpdateToolbar() {
             const fm = utilityState.fileManager;
             const count = fm.selectedFiles.size;
             document.getElementById('fmSelectedCount').textContent = `${count}개 선택됨`;
-            document.getElementById('fmActions').style.display = count > 0 ? 'flex' : 'none';
+            // 동적 버튼들 표시/숨김
+            const showDynamic = count > 0 ? '' : 'none';
+            document.querySelectorAll('.fm-action-dynamic').forEach(btn => {
+                btn.style.display = showDynamic;
+            });
             // 이름변경은 1개만 선택됐을 때만 활성화
             document.getElementById('fmRenameBtn').disabled = count !== 1;
         }
@@ -19634,34 +20114,477 @@
             }
         }
 
-        // 선택 파일 변환 탭으로 전달
+        // 선택 파일 변환 - 패널 열고 파일 추가
         async function fmConvertSelected() {
             const fm = utilityState.fileManager;
             const filePaths = Array.from(fm.selectedFiles);
-            if (filePaths.length === 0) return;
-
-            // 파일 데이터 로드하여 변환 탭에 전달
-            const files = [];
-            for (const filePath of filePaths) {
-                try {
-                    const res = await fetch(`${API_BASE}/api/outputs/${encodeURIComponent(filePath)}`);
-                    if (res.ok) {
-                        const blob = await res.blob();
-                        const filename = filePath.split('/').pop();
-                        files.push(new File([blob], filename, { type: blob.type }));
-                    }
-                } catch (e) {
-                    console.error('파일 로드 실패:', filePath, e);
-                }
+            if (filePaths.length === 0) {
+                // 선택된 파일 없으면 패널만 열기
+                fmToggleConvertPanel(true);
+                return;
             }
 
-            if (files.length > 0) {
-                // 변환 탭으로 전환 후 파일 추가
-                switchUtilityTab('convert');
-                addConvertFiles(files);
-                showToast(`${files.length}개 파일이 변환 탭에 추가됨`, 'success');
+            // 패널 열기
+            fmToggleConvertPanel(true);
+
+            // 선택된 파일들을 변환 패널에 추가
+            await fmConvertPanelAddFiles(filePaths);
+
+            // 패널 열림 애니메이션 후 선택된 이미지가 보이도록 스크롤
+            setTimeout(() => {
+                const selectedItems = document.querySelectorAll('.fm-file-item.selected');
+                if (selectedItems.length === 0) return;
+
+                const last = selectedItems[selectedItems.length - 1];
+                const container = document.getElementById('fmFileGrid');
+                if (!container) return;
+
+                const containerRect = container.getBoundingClientRect();
+                const lastRect = last.getBoundingClientRect();
+
+                // 마지막 이미지가 안 보이면 스크롤
+                const lastVisible = lastRect.top >= containerRect.top && lastRect.bottom <= containerRect.bottom;
+
+                if (!lastVisible) {
+                    last.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                }
+            }, 300);
+        }
+
+        // ============================================================
+        // 파일 관리 - 변환 패널
+        // ============================================================
+
+        // 변환 패널 초기화
+        function fmInitConvertPanel() {
+            const cp = utilityState.fileManager.convertPanel;
+
+            // 토글 버튼
+            document.getElementById('fmConvertToggle').onclick = () => fmToggleConvertPanel();
+
+            // 닫기 버튼
+            document.getElementById('fmConvertPanelClose').onclick = () => fmToggleConvertPanel(false);
+
+            // 초기화 버튼
+            document.getElementById('fmConvertClearBtn').onclick = fmConvertPanelClear;
+
+            // 형식 버튼
+            document.querySelectorAll('#fmConvertPanel .format-btn').forEach(btn => {
+                btn.onclick = () => {
+                    document.querySelectorAll('#fmConvertPanel .format-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    cp.format = btn.dataset.format;
+                    // 품질 슬라이더 표시/숨김
+                    document.getElementById('fmConvertQualityGroup').style.display =
+                        (cp.format === 'jpg' || cp.format === 'webp') ? 'flex' : 'none';
+                    fmConvertPanelUpdateRenamePreview();
+                };
+            });
+
+            // 품질 슬라이더
+            const qualitySlider = document.getElementById('fmConvertQuality');
+            qualitySlider.oninput = () => {
+                cp.quality = parseInt(qualitySlider.value);
+                document.getElementById('fmConvertQualityValue').textContent = cp.quality;
+            };
+
+            // 리네이밍 체크박스
+            const renameCheckbox = document.getElementById('fmConvertRenameEnabled');
+            renameCheckbox.onchange = () => {
+                cp.renameEnabled = renameCheckbox.checked;
+                document.getElementById('fmConvertRenameOptions').style.display = cp.renameEnabled ? 'block' : 'none';
+                fmConvertPanelUpdateRenamePreview();
+            };
+
+            // 리네이밍 옵션
+            document.getElementById('fmConvertRenamePrefix').oninput = (e) => {
+                cp.renamePrefix = e.target.value;
+                fmConvertPanelUpdateRenamePreview();
+            };
+            document.getElementById('fmConvertRenameStart').oninput = (e) => {
+                cp.renameStart = parseInt(e.target.value) || 1;
+                fmConvertPanelUpdateRenamePreview();
+            };
+            document.getElementById('fmConvertRenamePadding').oninput = (e) => {
+                cp.renamePadding = parseInt(e.target.value) || 1;
+                fmConvertPanelUpdateRenamePreview();
+            };
+
+            // 옵션 체크박스
+            document.getElementById('fmConvertStripMetadata').onchange = (e) => {
+                cp.stripMetadata = e.target.checked;
+            };
+            document.getElementById('fmConvertOpenFolder').onchange = (e) => {
+                cp.openFolder = e.target.checked;
+            };
+
+            // 변환 버튼
+            document.getElementById('fmConvertRunBtn').onclick = fmConvertPanelRun;
+
+            // 드롭존 드래그&드롭
+            const dropzone = document.getElementById('fmConvertDropzone');
+            const panel = document.getElementById('fmConvertPanel');
+
+            // 패널 전체에 드래그 이벤트
+            panel.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropzone.classList.add('drag-over');
+            });
+            panel.addEventListener('dragleave', (e) => {
+                if (!panel.contains(e.relatedTarget)) {
+                    dropzone.classList.remove('drag-over');
+                }
+            });
+            panel.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                dropzone.classList.remove('drag-over');
+
+                // 드래그된 파일 경로 처리
+                const dragData = e.dataTransfer.getData('application/x-fm-files');
+                if (dragData) {
+                    const filePaths = JSON.parse(dragData);
+                    await fmConvertPanelAddFiles(filePaths);
+                }
+            });
+        }
+
+        // 패널 토글
+        function fmToggleConvertPanel(forceOpen) {
+            const cp = utilityState.fileManager.convertPanel;
+            const toggle = document.getElementById('fmConvertToggle');
+            const wrapper = document.querySelector('.file-manager-content-wrapper');
+
+            if (forceOpen === true) {
+                cp.open = true;
+            } else if (forceOpen === false) {
+                cp.open = false;
             } else {
-                showToast('파일 로드 실패', 'error');
+                cp.open = !cp.open;
+            }
+
+            toggle.classList.toggle('active', cp.open);
+            wrapper.classList.toggle('panel-open', cp.open);
+        }
+
+        // 파일 추가
+        async function fmConvertPanelAddFiles(filePaths) {
+            const cp = utilityState.fileManager.convertPanel;
+
+            for (const filePath of filePaths) {
+                // 중복 체크
+                if (cp.files.find(f => f.path === filePath)) continue;
+
+                const filename = filePath.split('/').pop();
+                const url = `${API_BASE}/api/outputs/${encodeURIComponent(filePath)}`;
+                cp.files.push({ path: filePath, filename, url });
+            }
+
+            fmConvertPanelUpdateFileList();
+        }
+
+        // 파일 목록 업데이트
+        function fmConvertPanelUpdateFileList() {
+            const cp = utilityState.fileManager.convertPanel;
+            const dropzone = document.getElementById('fmConvertDropzone');
+            const fileList = document.getElementById('fmConvertFileList');
+            const fileItems = document.getElementById('fmConvertFileItems');
+            const runBtn = document.getElementById('fmConvertRunBtn');
+
+            const hasFiles = cp.files.length > 0;
+            dropzone.style.display = hasFiles ? 'none' : 'block';
+            fileList.style.display = hasFiles ? 'flex' : 'none';
+            runBtn.disabled = !hasFiles || cp.isConverting;
+
+            document.getElementById('fmConvertFileCount').textContent = `${cp.files.length}개 파일`;
+
+            if (hasFiles) {
+                fileItems.innerHTML = cp.files.map((file, idx) => `
+                    <div class="fm-convert-file-item" data-index="${idx}" data-path="${file.path}" draggable="true">
+                        <img class="fm-convert-file-item-thumb" src="${file.url}" alt="">
+                        <span class="fm-convert-file-item-name">${file.filename}</span>
+                        <button type="button" class="fm-convert-file-item-remove" onclick="fmConvertPanelRemoveFile(${idx})">&times;</button>
+                    </div>
+                `).join('');
+
+                // 파일 목록 내 드래그 순서 변경
+                fmConvertPanelSetupDragReorder();
+                // PIP 호버 이벤트 연결
+                fmConvertPanelSetupPipHover();
+            }
+
+            fmConvertPanelUpdateRenamePreview();
+        }
+
+        // 파일 제거
+        function fmConvertPanelRemoveFile(index) {
+            const cp = utilityState.fileManager.convertPanel;
+            cp.files.splice(index, 1);
+            fmConvertPanelUpdateFileList();
+        }
+
+        // 파일 목록 초기화
+        function fmConvertPanelClear() {
+            const cp = utilityState.fileManager.convertPanel;
+            cp.files = [];
+            fmConvertPanelUpdateFileList();
+        }
+
+        // 드래그 순서 변경 설정
+        function fmConvertPanelSetupDragReorder() {
+            const fileItems = document.getElementById('fmConvertFileItems');
+            let draggedItem = null;
+            let isDraggingReorder = false;
+
+            fileItems.querySelectorAll('.fm-convert-file-item').forEach(item => {
+                item.addEventListener('dragstart', (e) => {
+                    draggedItem = item;
+                    isDraggingReorder = true;
+                    item.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                    // 드래그 시작 시 PIP 숨기기
+                    fmHidePipPreview();
+                });
+
+                item.addEventListener('dragend', () => {
+                    // 모든 드롭 인디케이터 제거 (draggedItem null 되기 전에)
+                    fileItems.querySelectorAll('.fm-convert-file-item').forEach(el => {
+                        el.classList.remove('drop-indicator', 'drop-indicator-top', 'dragging');
+                    });
+                    draggedItem = null;
+                    isDraggingReorder = false;
+                });
+
+                item.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    if (!draggedItem) return;
+
+                    // 모든 인디케이터 제거
+                    fileItems.querySelectorAll('.fm-convert-file-item').forEach(el => {
+                        el.classList.remove('drop-indicator', 'drop-indicator-top');
+                    });
+
+                    const allItems = Array.from(fileItems.querySelectorAll('.fm-convert-file-item'));
+                    const hoverIndex = allItems.indexOf(item);
+                    const rect = item.getBoundingClientRect();
+                    const midY = rect.top + rect.height / 2;
+
+                    // 단순 규칙: 모든 슬롯은 below만 표시, 최상단만 top 표시
+                    if (e.clientY < midY) {
+                        // 이 아이템 앞에 삽입
+                        if (hoverIndex === 0) {
+                            item.classList.add('drop-indicator-top');
+                        } else {
+                            allItems[hoverIndex - 1].classList.add('drop-indicator');
+                        }
+                    } else {
+                        // 이 아이템 뒤에 삽입
+                        item.classList.add('drop-indicator');
+                    }
+                });
+
+                item.addEventListener('dragleave', () => {
+                    // dragleave는 개별 처리 안 함 (dragover에서 전체 관리)
+                });
+
+                item.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    if (!draggedItem || draggedItem === item) return;
+
+                    const rect = item.getBoundingClientRect();
+                    const midY = rect.top + rect.height / 2;
+
+                    if (e.clientY < midY) {
+                        item.parentNode.insertBefore(draggedItem, item);
+                    } else {
+                        item.parentNode.insertBefore(draggedItem, item.nextSibling);
+                    }
+
+                    fileItems.querySelectorAll('.fm-convert-file-item').forEach(el => {
+                        el.classList.remove('drop-indicator', 'drop-indicator-top');
+                    });
+                });
+            });
+
+            fileItems.addEventListener('dragend', () => {
+                // 모든 인디케이터 제거
+                fileItems.querySelectorAll('.fm-convert-file-item').forEach(el => {
+                    el.classList.remove('drop-indicator', 'drop-indicator-top', 'dragging');
+                });
+                // 순서 업데이트
+                const cp = utilityState.fileManager.convertPanel;
+                const newFiles = [];
+                fileItems.querySelectorAll('.fm-convert-file-item').forEach(item => {
+                    const idx = parseInt(item.dataset.index);
+                    newFiles.push(cp.files[idx]);
+                });
+                cp.files = newFiles;
+                fmConvertPanelUpdateFileList();
+            });
+
+            // PIP 호버에서 드래그 중인지 체크할 수 있도록 상태 저장
+            fileItems._isDraggingReorder = () => isDraggingReorder;
+        }
+
+        // 변환 패널 파일 목록 PIP 호버 설정
+        function fmConvertPanelSetupPipHover() {
+            const fm = utilityState.fileManager;
+            const fileItems = document.getElementById('fmConvertFileItems');
+
+            fileItems.querySelectorAll('.fm-convert-file-item').forEach(item => {
+                item.addEventListener('mouseenter', (e) => {
+                    if (!fm.pipMode) return;
+                    // 드래그 순서 조정 중이면 PIP 표시 안함
+                    if (fileItems._isDraggingReorder && fileItems._isDraggingReorder()) return;
+                    const path = item.dataset.path;
+                    if (path) {
+                        fmShowPipPreview(e, path);
+                    }
+                });
+
+                item.addEventListener('mousemove', (e) => {
+                    if (!fm.pipMode) return;
+                    // 드래그 순서 조정 중이면 PIP 표시 안함
+                    if (fileItems._isDraggingReorder && fileItems._isDraggingReorder()) return;
+                    fmUpdatePipPosition(e);
+                });
+
+                item.addEventListener('mouseleave', () => {
+                    fmHidePipPreview();
+                });
+            });
+        }
+
+        // 리네이밍 미리보기 업데이트
+        function fmConvertPanelUpdateRenamePreview() {
+            const cp = utilityState.fileManager.convertPanel;
+            const preview = document.getElementById('fmConvertRenamePreview');
+
+            if (!cp.renameEnabled) {
+                preview.textContent = '미리보기: -';
+                return;
+            }
+
+            const prefix = cp.renamePrefix;
+            const start = cp.renameStart;
+            const padding = cp.renamePadding;
+            const ext = cp.format;
+
+            const num = String(start).padStart(padding, '0');
+            // 접두어가 있으면 접두어_숫자, 없으면 숫자만
+            const filename = prefix ? `${prefix}_${num}.${ext}` : `${num}.${ext}`;
+            preview.textContent = `미리보기: ${filename}`;
+        }
+
+        // 변환 실행
+        async function fmConvertPanelRun() {
+            const cp = utilityState.fileManager.convertPanel;
+            if (cp.isConverting || cp.files.length === 0) return;
+
+            // 저장 폴더 선택
+            try {
+                const folderRes = await fetch(`${API_BASE}/api/select-folder`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ default_path: utilityState.lastSavePath || 'outputs' })
+                });
+                const folderData = await folderRes.json();
+                if (!folderData.path) {
+                    showToast('저장 폴더를 선택해주세요', 'warning');
+                    return;
+                }
+                const savePath = folderData.path;
+                utilityState.lastSavePath = savePath;
+
+                cp.isConverting = true;
+                const runBtn = document.getElementById('fmConvertRunBtn');
+                runBtn.disabled = true;
+                runBtn.textContent = '변환 중...';
+
+                const progressDiv = document.getElementById('fmConvertProgress');
+                const progressFill = document.getElementById('fmConvertProgressFill');
+                const progressText = document.getElementById('fmConvertProgressText');
+                progressDiv.style.display = 'block';
+
+                let successCount = 0;
+                const total = cp.files.length;
+
+                for (let i = 0; i < total; i++) {
+                    const file = cp.files[i];
+                    progressText.textContent = `${i + 1} / ${total}`;
+                    progressFill.style.width = `${((i + 1) / total) * 100}%`;
+
+                    try {
+                        // 이미지 로드
+                        const imgRes = await fetch(file.url);
+                        const blob = await imgRes.blob();
+                        const base64 = await new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                            reader.readAsDataURL(blob);
+                        });
+
+                        // 파일명 결정
+                        let customFilename = null;
+                        if (cp.renameEnabled) {
+                            const prefix = cp.renamePrefix;
+                            const num = String(cp.renameStart + i).padStart(cp.renamePadding, '0');
+                            // 접두어가 있으면 접두어_숫자, 없으면 숫자만
+                            customFilename = prefix ? `${prefix}_${num}.${cp.format}` : `${num}.${cp.format}`;
+                        }
+
+                        // 변환 API 호출
+                        const res = await fetch(`${API_BASE}/api/utility/convert`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                image: base64,
+                                filename: file.filename,
+                                format: cp.format,
+                                quality: cp.quality,
+                                strip_metadata: cp.stripMetadata,
+                                save_path: savePath,
+                                custom_filename: customFilename
+                            })
+                        });
+
+                        if (res.ok) {
+                            successCount++;
+                        }
+                    } catch (e) {
+                        console.error('변환 실패:', file.filename, e);
+                    }
+                }
+
+                // 완료
+                cp.isConverting = false;
+                runBtn.disabled = false;
+                runBtn.textContent = '변환 시작';
+                progressDiv.style.display = 'none';
+
+                if (successCount > 0) {
+                    showToast(`${successCount}개 파일 변환 완료`, 'success');
+
+                    // 완료 후 폴더 열기
+                    if (cp.openFolder) {
+                        fetch(`${API_BASE}/api/open-folder`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ path: savePath })
+                        });
+                    }
+
+                    // 파일 목록 초기화
+                    fmConvertPanelClear();
+                } else {
+                    showToast('변환 실패', 'error');
+                }
+            } catch (e) {
+                console.error('변환 오류:', e);
+                cp.isConverting = false;
+                document.getElementById('fmConvertRunBtn').disabled = false;
+                document.getElementById('fmConvertRunBtn').textContent = '변환 시작';
+                document.getElementById('fmConvertProgress').style.display = 'none';
+                showToast('변환 중 오류 발생', 'error');
             }
         }
 
@@ -19711,16 +20634,29 @@
             fmUpdatePipPosition(e);
         }
 
-        // PIP 프리뷰 위치 업데이트 (좌상단이 마우스 옆에 고정)
+        // PIP 프리뷰 위치 업데이트 (화면 밖 벗어나면 반대로 이동)
         function fmUpdatePipPosition(e) {
             const preview = document.getElementById('fmPipPreview');
             if (preview.style.display === 'none') return;
 
             const padding = 15;
+            const previewRect = preview.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+
             let left = e.clientX + padding;
             let top = e.clientY + padding;
 
-            // 화면 밖으로 나가지 않도록 최소한의 조정 (좌상단 기준)
+            // 오른쪽으로 벗어나면 왼쪽에 표시
+            if (left + previewRect.width > viewportWidth) {
+                left = e.clientX - padding - previewRect.width;
+            }
+            // 아래로 벗어나면 위쪽에 표시
+            if (top + previewRect.height > viewportHeight) {
+                top = e.clientY - padding - previewRect.height;
+            }
+
+            // 최소 경계값 (화면 밖으로 완전히 나가지 않도록)
             if (left < 0) left = padding;
             if (top < 0) top = padding;
 
@@ -20229,7 +21165,7 @@
                 return;
             }
             
-            // 파일명 기준 정렬
+            // 파일명 기준 오름차순 정렬 (A→Z, 1→9)
             files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
             
             const newImages = [];

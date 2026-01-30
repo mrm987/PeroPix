@@ -6752,7 +6752,7 @@
                             <input type="checkbox" id="notifySoundOnComplete">
                             <label for="notifySoundOnComplete" style="flex: 1;">🔔 큐 완료 알림</label>
                             <span style="font-size: 0.8rem; color: var(--text-dim);">vol</span>
-                            <input type="text" id="notifySoundVolume" value="30" style="width: 50px; padding: 4px 6px; margin: 0; text-align: center;" title="볼륨 (1-100)">
+                            <input type="text" id="notifySoundVolume" value="50" style="width: 50px; padding: 4px 6px; margin: 0; text-align: center;" title="볼륨 (1-100)">
                             <span style="font-size: 0.8rem; color: var(--text-dim);">%</span>
                         </div>
                     </div>
@@ -12162,34 +12162,11 @@
         }
 
         function playNotificationSound() {
-            // Web Audio API로 간단한 알림음 생성
             try {
-                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 const volume = (parseInt(document.getElementById('notifySoundVolume').value) || 30) / 100;
-
-                // 첫 번째 음 (높은 음)
-                const osc1 = audioCtx.createOscillator();
-                const gain1 = audioCtx.createGain();
-                osc1.connect(gain1);
-                gain1.connect(audioCtx.destination);
-                osc1.frequency.value = 880; // A5
-                osc1.type = 'sine';
-                gain1.gain.setValueAtTime(volume, audioCtx.currentTime);
-                gain1.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
-                osc1.start(audioCtx.currentTime);
-                osc1.stop(audioCtx.currentTime + 0.2);
-
-                // 두 번째 음 (더 높은 음)
-                const osc2 = audioCtx.createOscillator();
-                const gain2 = audioCtx.createGain();
-                osc2.connect(gain2);
-                gain2.connect(audioCtx.destination);
-                osc2.frequency.value = 1108.73; // C#6
-                osc2.type = 'sine';
-                gain2.gain.setValueAtTime(volume, audioCtx.currentTime + 0.15);
-                gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
-                osc2.start(audioCtx.currentTime + 0.15);
-                osc2.stop(audioCtx.currentTime + 0.4);
+                const audio = new Audio('assets/sound_noti.wav?v=' + Date.now());
+                audio.volume = volume;
+                audio.play();
             } catch (e) {
                 console.log('[Notify] Sound failed:', e);
             }
@@ -14897,7 +14874,7 @@
                 document.getElementById('stripMetadata').checked = false;
                 document.getElementById('excludeSlotNumber').checked = false;
                 document.getElementById('notifySoundOnComplete').checked = false;
-                document.getElementById('notifySoundVolume').value = 30;
+                document.getElementById('notifySoundVolume').value = 50;
             } else {
                 if (settings.saveFormat) document.getElementById('saveFormat').value = settings.saveFormat;
                 if (settings.jpgQuality) document.getElementById('jpgQuality').value = settings.jpgQuality;

@@ -7265,7 +7265,7 @@
                                     <div class="fm-view-modes">
                                         <button type="button" class="btn btn-sm active" id="fmViewThumbnail" title="썸네일 보기">🔲</button>
                                         <button type="button" class="btn btn-sm" id="fmViewList" title="리스트 보기">☰</button>
-                                        <button type="button" class="btn btn-sm" id="fmPipModeBtn" title="PIP 모드 (호버 시 확대)">⧉</button>
+                                        <button type="button" class="btn btn-sm active" id="fmPipModeBtn" title="PIP 모드 (호버 시 확대)">⧉</button>
                                         <button type="button" class="btn btn-sm" id="fmOpenFolderBtn" title="탐색기에서 열기">📂</button>
                                     </div>
                                     <span class="fm-selected-count" id="fmSelectedCount">0개 선택됨</span>
@@ -17994,7 +17994,7 @@
                 total: 0,
                 viewMode: 'thumbnail',    // 'thumbnail' | 'list'
                 expandedFolders: new Set(), // 펼쳐진 폴더 경로들
-                pipMode: false,           // PIP 모드 활성화
+                pipMode: true,            // PIP 모드 활성화
                 dragSelecting: false,     // 드래그 선택 중
                 dragStartIndex: undefined,  // 드래그 시작 인덱스
                 dragCurrentIndex: undefined, // 현재 드래그 위치 인덱스

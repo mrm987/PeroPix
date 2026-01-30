@@ -9293,28 +9293,79 @@
 
         // 세트 저장 버튼 - 현재 슬롯에 표시된 이미지들을 폴더로 저장
         document.getElementById('saveImageSetBtn').onclick = async () => {
-            // 모든 슬롯에서 표시된 이미지 경로 수집
-            const imagePaths = [];
-            slotsContainer.querySelectorAll('.slot').forEach(slot => {
+            // 모든 슬롯에서 표시된 이미지 수집 (파일 경로 또는 base64)
+            const images = [];
+            slotsContainer.querySelectorAll('.slot').forEach((slot, slotIdx) => {
                 const imagesContainer = slot.querySelector('.slot-images');
-                imagesContainer.querySelectorAll('.slot-image-card').forEach(card => {
-                    if (card._imageData && card._imageData.image_path) {
-                        imagePaths.push(card._imageData.image_path);
+                // 슬롯 이름 가져오기
+                const slotNameInput = slot.querySelector('.slot-name');
+                const slotName = slotNameInput ? slotNameInput.value.trim() : '';
+
+                imagesContainer.querySelectorAll('.slot-image-card').forEach((card, cardIdx) => {
+                    if (card._imageData) {
+                        const imageInfo = {
+                            slot_index: slotIdx,
+                            slot_name: slotName
+                        };
+
+                        if (card._imageData.image_path) {
+                            // 파일로 저장된 경우
+                            imageInfo.image_path = card._imageData.image_path;
+                        } else if (card._imageData.image || card._imageData.image_base64) {
+                            // base64만 있는 경우 (자동저장 꺼진 경우)
+                            imageInfo.image_base64 = card._imageData.image || card._imageData.image_base64;
+                        }
+
+                        if (imageInfo.image_path || imageInfo.image_base64) {
+                            images.push(imageInfo);
+                        }
                     }
                 });
             });
 
-            if (imagePaths.length === 0) {
+            if (images.length === 0) {
                 showToast('저장할 이미지가 없습니다', 'warning');
                 return;
             }
 
+            // 먼저 폴더 선택 다이얼로그 (이미지변환과 동일한 방식)
+            let targetFolder;
             try {
-                showToast('폴더를 선택하세요...', 'info');
+                const folderResponse = await fetch(`${API_BASE}/api/select-folder`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ default_path: 'outputs' })
+                });
+                const folderResult = await folderResponse.json();
+                if (!folderResult.success || !folderResult.path) {
+                    // 사용자가 취소함
+                    return;
+                }
+                targetFolder = folderResult.path;
+            } catch (err) {
+                showToast('폴더 선택 실패', 'error');
+                return;
+            }
+
+            // Save Options 설정 가져오기
+            const saveFormat = document.getElementById('saveFormat').value;
+            const jpgQuality = parseInt(document.getElementById('jpgQuality').value) || 95;
+            const stripMetadata = document.getElementById('stripMetadata').checked;
+            const excludeSlotNumber = document.getElementById('excludeSlotNumber').checked;
+
+            // 이미지 저장 요청
+            try {
                 const response = await fetch(`${API_BASE}/api/save-image-set`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image_paths: imagePaths })
+                    body: JSON.stringify({
+                        images: images,
+                        target_folder: targetFolder,
+                        format: saveFormat,
+                        quality: jpgQuality,
+                        strip_metadata: stripMetadata,
+                        exclude_slot_number: excludeSlotNumber
+                    })
                 });
                 const result = await response.json();
 

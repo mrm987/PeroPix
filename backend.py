@@ -6870,23 +6870,58 @@ async def batch_censor(request: dict):
 # Image Set Save (Slot Mode)
 # ============================================================
 
-def select_folder_dialog(title: str = "폴더 선택") -> Optional[str]:
-    """시스템 폴더 선택 다이얼로그 (Windows/macOS/Linux) - tkinter 사용"""
+def select_folder_dialog(title: str = "폴더 선택", initial_dir: str = None) -> Optional[str]:
+    """시스템 폴더 선택 다이얼로그 (Windows/macOS/Linux)"""
+    if initial_dir is None:
+        initial_dir = str(APP_DIR)
+
+    # Windows: PowerShell COM 인터페이스 사용
+    if sys.platform == 'win32':
+        try:
+            import subprocess
+            initial_dir_escaped = str(initial_dir).replace("'", "''")
+            title_escaped = title.replace("'", "''")
+            # 간단한 폴더 선택 다이얼로그 (Shell.Application)
+            ps_script = f'''
+Add-Type -AssemblyName System.Windows.Forms
+$dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+$dialog.Description = '{title_escaped}'
+$dialog.SelectedPath = '{initial_dir_escaped}'
+$dialog.ShowNewFolderButton = $true
+$form = New-Object System.Windows.Forms.Form
+$form.TopMost = $true
+$result = $dialog.ShowDialog($form)
+if ($result -eq [System.Windows.Forms.DialogResult]::OK) {{
+    Write-Output $dialog.SelectedPath
+}}
+'''
+            result = subprocess.run(
+                ['powershell', '-NoProfile', '-Command', ps_script],
+                capture_output=True,
+                text=True,
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+            folder_path = result.stdout.strip()
+            return folder_path if folder_path else None
+        except Exception as e:
+            print(f"[FolderDialog] PowerShell error: {e}")
+
+    # macOS/Linux 또는 Windows PowerShell 실패 시: tkinter 시도
     try:
         import tkinter as tk
         from tkinter import filedialog
-        
+
         root = tk.Tk()
         root.withdraw()
-        # Windows에서 다이얼로그가 뒤로 가는 문제 방지
         root.attributes('-topmost', True)
         root.update()
-        
+
         folder_path = filedialog.askdirectory(
             title=title,
+            initialdir=initial_dir,
             parent=root
         )
-        
+
         root.destroy()
         return folder_path if folder_path else None
     except Exception as e:
@@ -7069,60 +7104,138 @@ if ($result) {{
         return {"success": False, "error": str(e)}
 
 
+class SaveImageSetItem(BaseModel):
+    image_path: Optional[str] = None  # outputs 폴더 기준 상대 경로 (자동저장된 경우)
+    image_base64: Optional[str] = None  # base64 이미지 데이터 (자동저장 안된 경우)
+    filename: Optional[str] = None  # base64 저장 시 파일명 (하위 호환)
+    slot_index: Optional[int] = None  # 슬롯 인덱스
+    slot_name: Optional[str] = None  # 슬롯 이름
+
 class SaveImageSetRequest(BaseModel):
-    image_paths: List[str]  # outputs 폴더 기준 상대 경로 목록
+    image_paths: Optional[List[str]] = None  # 하위 호환용
+    images: Optional[List[SaveImageSetItem]] = None  # 새로운 형식
+    target_folder: Optional[str] = None  # 저장 폴더 경로 (프론트에서 미리 선택한 경우)
+    format: Optional[str] = None  # 저장 포맷 (png, jpg, webp)
+    quality: Optional[int] = 95  # JPG/WebP 품질
+    strip_metadata: Optional[bool] = False  # 메타데이터 제거 여부
+    exclude_slot_number: Optional[bool] = False  # 슬롯 번호 제외 여부
 
 
 @app.post("/api/save-image-set")
 async def save_image_set(req: SaveImageSetRequest):
-    """현재 슬롯에 표시된 이미지들을 선택한 폴더로 복사"""
-    if not req.image_paths:
+    """현재 슬롯에 표시된 이미지들을 선택한 폴더로 복사/저장"""
+    # 하위 호환: image_paths만 있으면 기존 방식
+    if req.image_paths and not req.images:
+        req.images = [SaveImageSetItem(image_path=p) for p in req.image_paths]
+
+    if not req.images:
         return {"success": False, "error": "저장할 이미지가 없습니다"}
-    
-    # 폴더 선택 다이얼로그
-    target_folder = select_folder_dialog("이미지 세트 저장 폴더 선택")
-    
+
+    # 프론트에서 이미 폴더를 선택한 경우
+    if req.target_folder:
+        target_folder = req.target_folder
+    else:
+        # 폴더 선택 다이얼로그 (하위 호환)
+        target_folder = select_folder_dialog("이미지 세트 저장 폴더 선택")
+
     if not target_folder:
         return {"success": False, "cancelled": True, "error": "폴더 선택이 취소되었습니다"}
-    
+
     target_path = Path(target_folder)
     if not target_path.exists():
         return {"success": False, "error": f"폴더가 존재하지 않습니다: {target_folder}"}
-    
+
     saved_count = 0
     errors = []
-    
-    for image_path in req.image_paths:
+
+    # 포맷 및 품질 설정
+    save_format = req.format or 'png'
+    save_quality = req.quality or 95
+    strip_metadata = req.strip_metadata or False
+    exclude_slot_number = req.exclude_slot_number or False
+
+    # 확장자
+    ext = save_format.lower()
+    if ext == 'jpeg':
+        ext = 'jpg'
+
+    for idx, item in enumerate(req.images):
         try:
-            # outputs 폴더 기준 상대 경로
-            source = OUTPUT_DIR / image_path
-            if not source.exists():
-                errors.append(f"파일 없음: {image_path}")
+            img = None
+
+            if item.image_path:
+                # 파일 경로가 있으면 로드
+                source = OUTPUT_DIR / item.image_path
+                if not source.exists():
+                    errors.append(f"파일 없음: {item.image_path}")
+                    continue
+                img = Image.open(source)
+
+            elif item.image_base64:
+                # base64 데이터가 있으면 로드
+                image_data = base64.b64decode(item.image_base64)
+                img = Image.open(io.BytesIO(image_data))
+
+            if img is None:
                 continue
-            
-            # 대상 경로
-            dest = target_path / source.name
-            
-            # 파일명 충돌 시 처리
-            if dest.exists():
-                stem = source.stem
-                suffix = source.suffix
-                counter = 1
-                while dest.exists():
-                    dest = target_path / f"{stem}_{counter}{suffix}"
-                    counter += 1
-            
-            # 파일 복사 (메타데이터 포함)
-            shutil.copy2(str(source), str(dest))
+
+            # 슬롯 파일명 규칙과 동일하게 생성
+            slot_index = item.slot_index if item.slot_index is not None else 0
+            slot_name = item.slot_name or ""
+
+            # 파일 태그 생성 (슬롯 이름)
+            file_tag = sanitize_filename(slot_name, max_length=100) if slot_name else ""
+
+            # 카테고리 생성 (슬롯 번호 제외 여부에 따라)
+            if exclude_slot_number:
+                category = file_tag if file_tag else ""
+            else:
+                if file_tag:
+                    category = f"{slot_index+1:03d}_{file_tag}"
+                else:
+                    category = f"{slot_index+1:03d}"
+
+            # 다음 순번 가져오기
+            file_num = get_next_image_number(category, target_path, ext)
+            if category:
+                new_filename = f"{category}_{file_num:07d}.{ext}"
+            else:
+                new_filename = f"{file_num:07d}.{ext}"
+
+            dest = target_path / new_filename
+
+            # 메타데이터 제거 여부
+            if strip_metadata:
+                # 새 이미지 생성 (메타데이터 없이)
+                if img.mode in ('RGBA', 'LA', 'P'):
+                    new_img = Image.new(img.mode, img.size)
+                else:
+                    new_img = Image.new('RGB', img.size)
+                new_img.paste(img)
+                img = new_img
+
+            # 포맷에 따라 저장
+            save_kwargs = {}
+            if save_format.lower() in ('jpg', 'jpeg'):
+                if img.mode in ('RGBA', 'LA', 'P'):
+                    img = img.convert('RGB')
+                save_kwargs['quality'] = save_quality
+                save_kwargs['optimize'] = True
+            elif save_format.lower() == 'webp':
+                save_kwargs['quality'] = save_quality
+            elif save_format.lower() == 'png':
+                save_kwargs['compress_level'] = 6
+
+            img.save(str(dest), **save_kwargs)
             saved_count += 1
-            
+
         except Exception as e:
-            errors.append(f"{image_path}: {str(e)}")
-    
+            errors.append(f"이미지 {idx+1}: {str(e)}")
+
     return {
         "success": saved_count > 0,
         "saved_count": saved_count,
-        "total_count": len(req.image_paths),
+        "total_count": len(req.images),
         "target_folder": target_folder,
         "errors": errors if errors else None
     }

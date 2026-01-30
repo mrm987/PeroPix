@@ -6748,6 +6748,13 @@
                             <input type="checkbox" id="excludeSlotNumber">
                             <label for="excludeSlotNumber">슬롯 번호 제외</label>
                         </div>
+                        <div class="checkbox-row" style="border-top: 1px solid var(--border); margin-top: 8px; padding-top: 8px;">
+                            <input type="checkbox" id="notifySoundOnComplete">
+                            <label for="notifySoundOnComplete" style="flex: 1;">🔔 큐 완료 알림</label>
+                            <span style="font-size: 0.8rem; color: var(--text-dim);">vol</span>
+                            <input type="text" id="notifySoundVolume" value="30" style="width: 50px; padding: 4px 6px; margin: 0; text-align: center;" title="볼륨 (1-100)">
+                            <span style="font-size: 0.8rem; color: var(--text-dim);">%</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -11258,6 +11265,9 @@
                         showToast('완료', 'success');
                         lastImageSeq = 0;  // 시퀀스 리셋
 
+                        // 완료 알림
+                        notifyQueueComplete();
+
                         if (resetTimer) clearTimeout(resetTimer);
                         resetTimer = setTimeout(() => {
                             if (totalImages === currentIndex || totalImages === 0) {
@@ -12135,6 +12145,77 @@
                 clearTimeout(toastTimeout);
                 toastTimeout = null;
             }
+        }
+
+        // 큐 완료 알림
+        const originalTitle = document.title;
+
+        function notifyQueueComplete() {
+            // 소리 알림
+            // 소리 알림 (옵션)
+            if (document.getElementById('notifySoundOnComplete').checked) {
+                playNotificationSound();
+            }
+
+            // 탭 타이틀 알림 (항상)
+            showTitleNotification();
+        }
+
+        function playNotificationSound() {
+            // Web Audio API로 간단한 알림음 생성
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const volume = (parseInt(document.getElementById('notifySoundVolume').value) || 30) / 100;
+
+                // 첫 번째 음 (높은 음)
+                const osc1 = audioCtx.createOscillator();
+                const gain1 = audioCtx.createGain();
+                osc1.connect(gain1);
+                gain1.connect(audioCtx.destination);
+                osc1.frequency.value = 880; // A5
+                osc1.type = 'sine';
+                gain1.gain.setValueAtTime(volume, audioCtx.currentTime);
+                gain1.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+                osc1.start(audioCtx.currentTime);
+                osc1.stop(audioCtx.currentTime + 0.2);
+
+                // 두 번째 음 (더 높은 음)
+                const osc2 = audioCtx.createOscillator();
+                const gain2 = audioCtx.createGain();
+                osc2.connect(gain2);
+                gain2.connect(audioCtx.destination);
+                osc2.frequency.value = 1108.73; // C#6
+                osc2.type = 'sine';
+                gain2.gain.setValueAtTime(volume, audioCtx.currentTime + 0.15);
+                gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+                osc2.start(audioCtx.currentTime + 0.15);
+                osc2.stop(audioCtx.currentTime + 0.4);
+            } catch (e) {
+                console.log('[Notify] Sound failed:', e);
+            }
+        }
+
+        function showTitleNotification() {
+            // 이미 포커스가 있으면 타이틀 변경 안함
+            if (document.hasFocus()) return;
+
+            document.title = 'PeroPix ✦';
+
+            // 탭에 포커스가 오면 원래대로
+            const resetTitle = () => {
+                document.title = originalTitle;
+                window.removeEventListener('focus', resetTitle);
+                document.removeEventListener('visibilitychange', onVisibilityChange);
+            };
+
+            const onVisibilityChange = () => {
+                if (document.visibilityState === 'visible') {
+                    resetTitle();
+                }
+            };
+
+            window.addEventListener('focus', resetTitle);
+            document.addEventListener('visibilitychange', onVisibilityChange);
         }
 
         // Generic Confirm Modal
@@ -14672,6 +14753,8 @@
                 jpgQuality: document.getElementById('jpgQuality').value,
                 stripMetadata: document.getElementById('stripMetadata').checked,
                 excludeSlotNumber: document.getElementById('excludeSlotNumber').checked,
+                notifySoundOnComplete: document.getElementById('notifySoundOnComplete').checked,
+                notifySoundVolume: document.getElementById('notifySoundVolume').value,
 
                 // Output
                 outputFolder: getOutputFolder(),
@@ -14813,11 +14896,15 @@
                 document.getElementById('jpgQuality').value = 95;
                 document.getElementById('stripMetadata').checked = false;
                 document.getElementById('excludeSlotNumber').checked = false;
+                document.getElementById('notifySoundOnComplete').checked = false;
+                document.getElementById('notifySoundVolume').value = 30;
             } else {
                 if (settings.saveFormat) document.getElementById('saveFormat').value = settings.saveFormat;
                 if (settings.jpgQuality) document.getElementById('jpgQuality').value = settings.jpgQuality;
                 if (settings.stripMetadata !== undefined) document.getElementById('stripMetadata').checked = settings.stripMetadata;
                 if (settings.excludeSlotNumber !== undefined) document.getElementById('excludeSlotNumber').checked = settings.excludeSlotNumber;
+                if (settings.notifySoundOnComplete !== undefined) document.getElementById('notifySoundOnComplete').checked = settings.notifySoundOnComplete;
+                if (settings.notifySoundVolume !== undefined) document.getElementById('notifySoundVolume').value = settings.notifySoundVolume;
             }
 
             // Output
@@ -15240,6 +15327,8 @@
                     if (currentSettings.jpgQuality) document.getElementById('jpgQuality').value = currentSettings.jpgQuality;
                     if (currentSettings.stripMetadata !== undefined) document.getElementById('stripMetadata').checked = currentSettings.stripMetadata;
                     if (currentSettings.excludeSlotNumber !== undefined) document.getElementById('excludeSlotNumber').checked = currentSettings.excludeSlotNumber;
+                    if (currentSettings.notifySoundOnComplete !== undefined) document.getElementById('notifySoundOnComplete').checked = currentSettings.notifySoundOnComplete;
+                    if (currentSettings.notifySoundVolume !== undefined) document.getElementById('notifySoundVolume').value = currentSettings.notifySoundVolume;
 
                     // Output
                     if (currentSettings.outputFolder !== undefined) setOutputFolder(currentSettings.outputFolder);
@@ -15572,7 +15661,8 @@
                 'downscaleRatio', 'sizeAlignment', 'upscaleSteps', 'upscaleCfg',
                 'upscaleDenoise', 'repeatCount', 'sizePreset',
                 'cfgRescale', 'varietyPlus', 'lockSeed',
-                'saveFormat', 'jpgQuality', 'stripMetadata', 'excludeSlotNumber'
+                'saveFormat', 'jpgQuality', 'stripMetadata', 'excludeSlotNumber',
+                'notifySoundOnComplete', 'notifySoundVolume'
             ];
             
             inputs.forEach(id => {

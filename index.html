@@ -6321,8 +6321,8 @@
                             <label>Model</label>
                             <select id="naiModel">
                                 <option value="nai-diffusion-4-5-full">V4.5 Full</option>
+                                <option value="nai-diffusion-4-5-curated">V4.5 Curated</option>
                                 <option value="nai-diffusion-4-curated-preview">V4 Curated</option>
-                                <option value="nai-diffusion-3">V3</option>
                             </select>
 
                             <div class="row">
@@ -17874,6 +17874,27 @@
                 // 슬롯 정보 (결과를 동일 슬롯에 표시)
                 slot_indices: [enhanceState.slotIndex]
             };
+
+            // Vibe Transfer 추가 (활성화되어 있고 바이브가 있으면)
+            if (document.getElementById('enableVibeTransfer').checked && vibeList.length > 0) {
+                enhanceParams.vibe_transfer = vibeList.map(v => ({
+                    image: v.image,
+                    info_extracted: v.info_extracted,
+                    strength: v.strength,
+                    name: v.name || 'vibe',
+                    encoded: v.encoded,
+                    encoded_model: v.encoded_model
+                }));
+            }
+
+            // Character Reference 추가 (V4.5 전용, 활성화되어 있고 데이터가 있으면)
+            if (document.getElementById('enableCharRef').checked && charRefData) {
+                enhanceParams.character_reference = {
+                    image: charRefData.processedImage || charRefData.image,
+                    fidelity: parseFloat(document.getElementById('charRefFidelity').value),
+                    style_aware: document.getElementById('charRefStyleAware').checked
+                };
+            }
 
             closeEnhanceModal();
 

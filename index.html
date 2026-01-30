@@ -12407,13 +12407,24 @@
                 negativePrompt.dispatchEvent(new Event('input', { bubbles: true }));
             }
 
-            // 캐릭터 프롬프트 적용 (없으면 기존 캐릭터 클리어)
+            // 캐릭터 프롬프트 적용 (기존 height 유지)
             const charactersList = document.getElementById('charactersList');
+            // 기존 캐릭터들의 height 저장
+            const existingHeights = Array.from(charactersList.querySelectorAll('.character-item textarea'))
+                .map(ta => ta.style.height || null);
             charactersList.innerHTML = '';
             if (metadata.character_prompts && metadata.character_prompts.length > 0) {
-                metadata.character_prompts.forEach(cp => {
+                metadata.character_prompts.forEach((cp, idx) => {
                     if (cp && cp.trim()) {
                         addCharacter(cp);
+                        // 기존 height가 있으면 복원
+                        if (existingHeights[idx]) {
+                            const items = charactersList.querySelectorAll('.character-item');
+                            const lastItem = items[items.length - 1];
+                            if (lastItem) {
+                                lastItem.querySelector('textarea').style.height = existingHeights[idx];
+                            }
+                        }
                     }
                 });
             }
@@ -12466,14 +12477,24 @@
                 highlight('negativePromptContent');
             }
 
-            // 캐릭터 프롬프트 적용 (없으면 기존 캐릭터 클리어)
+            // 캐릭터 프롬프트 적용 (기존 height 유지)
             const charactersList = document.getElementById('charactersList');
-            const hadCharacters = charactersList.children.length > 0;
+            // 기존 캐릭터들의 height 저장
+            const existingHeights = Array.from(charactersList.querySelectorAll('.character-item textarea'))
+                .map(ta => ta.style.height || null);
             charactersList.innerHTML = '';
             if (metadata.character_prompts && metadata.character_prompts.length > 0) {
-                metadata.character_prompts.forEach(cp => {
+                metadata.character_prompts.forEach((cp, idx) => {
                     if (cp && cp.trim()) {
                         addCharacter(cp);
+                        // 기존 height가 있으면 복원
+                        if (existingHeights[idx]) {
+                            const items = charactersList.querySelectorAll('.character-item');
+                            const lastItem = items[items.length - 1];
+                            if (lastItem) {
+                                lastItem.querySelector('textarea').style.height = existingHeights[idx];
+                            }
+                        }
                     }
                 });
                 highlight('charactersList');
@@ -17871,6 +17892,7 @@
                 // 저장 옵션 추가
                 save_format: document.getElementById('saveFormat').value || 'png',
                 jpg_quality: parseInt(document.getElementById('jpgQuality')?.value) || 95,
+                output_folder: getOutputFolder(),
                 // 슬롯 정보 (결과를 동일 슬롯에 표시)
                 slot_indices: [enhanceState.slotIndex]
             };
